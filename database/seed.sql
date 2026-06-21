@@ -42,7 +42,7 @@ INSERT INTO categories (id, name, slug, icon, description) VALUES
 -- 2. SEED PRODUCTS
 -- ============================================================================
 INSERT INTO products (id, name, sku, category_id, description, moq, base_price, status) VALUES
-(1, 'Classic Cotton Brief', 'KB-001', 1, 'Classic cut men\'s brief. Suitable for all-day wear. Ideal for retail bundles.', 50, 95.00, 'In Stock'),
+(1, 'Classic Cotton Brief', 'KB-001', 1, 'Classic cut men`s brief. Suitable for all-day wear. Ideal for retail bundles.', 50, 95.00, 'In Stock'),
 (2, 'Stretch Boxer', 'KB-008', 2, 'Premium stretch cotton boxers with reinforced stitching.', 100, 155.00, 'In Stock'),
 (3, 'Ladies Hipster', 'KL-003', 4, 'Soft touch hipster briefs for maximum comfort.', 50, 115.00, 'Low Stock'),
 (4, 'Kids Trunk Set', 'KC-012', 5, 'Comfy cotton trunks for children in fun colors.', 60, 98.00, 'In Stock'),

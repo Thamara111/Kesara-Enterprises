@@ -10,8 +10,8 @@
         <!-- Desktop Navigation -->
         <div class="hidden md:flex items-center gap-8">
             <a href="/catalog" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">Products</a>
-            <a href="/#about" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">About</a>
-            <a href="/#contact" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">Contact</a>
+            <a href="/about" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">About</a>
+            <a href="/contact" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">Contact</a>
             <div class="w-px h-6 bg-gray-100"></div>
             <a href="/cart" class="relative group p-2">
                 <i class="ti ti-shopping-cart text-xl text-gray-600 group-hover:text-brand transition-colors"></i>
@@ -36,8 +36,8 @@
     <!-- Mobile Dropdown Menu -->
     <div id="mobile-menu" class="hidden md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 shadow-lg px-6 py-6 space-y-4 z-50">
         <a href="/catalog" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Products</a>
-        <a href="/#about" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">About</a>
-        <a href="/#contact" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Contact</a>
+        <a href="/about" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">About</a>
+        <a href="/contact" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Contact</a>
         <hr class="border-gray-100">
         <a href="/account" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Account</a>
         <a href="/login" class="block bg-brand text-brand-light text-center text-sm font-semibold py-3 px-6 rounded-xl hover:bg-brand-dark transition-all">Sign in</a>

@@ -278,3 +278,20 @@ CREATE TABLE delivery_issues (
   resolved     BOOLEAN DEFAULT FALSE,
   FOREIGN KEY (assignment_id) REFERENCES delivery_assignments(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ==========================================
+-- 5. OTHER TABLES
+-- ==========================================
+
+-- Inquiries Table (For contact form submissions)
+CREATE TABLE IF NOT EXISTS inquiries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  business_name VARCHAR(100),
+  email VARCHAR(100) NOT NULL,
+  phone VARCHAR(20),
+  inquiry_type VARCHAR(50),
+  message TEXT NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

@@ -14,8 +14,8 @@
             </div>
             <div>
                 <p class="text-sm font-semibold text-gray-400 mb-4">Company</p>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">About us</a>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Contact</a>
+                <a href="/about" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">About us</a>
+                <a href="/contact" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Contact</a>
                 <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Careers</a>
             </div>
             <div>

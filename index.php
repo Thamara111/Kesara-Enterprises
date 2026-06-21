@@ -296,9 +296,9 @@ require_once __DIR__ . "/layouts/header.php";
                             We work exclusively with registered businesses and pride ourselves on consistent stock and
                             honest pricing.
                         </p>
-                        <button
-                            class="bg-brand text-brand-light py-2.5 px-6 rounded-md text-sm font-semibold hover:bg-brand-dark transition-all transform hover:-translate-y-px">Our
-                            story</button>
+                        <a href="/about"
+                            class="inline-block bg-brand text-brand-light py-2.5 px-6 rounded-md text-sm font-semibold hover:bg-brand-dark transition-all transform hover:-translate-y-px">Our
+                            story</a>
                     </div>
                     <i class="ti ti-building-warehouse absolute -bottom-10 -right-10 text-[200px] text-white/20"></i>
                 </div>
