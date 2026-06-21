@@ -1,0 +1,38 @@
+Options -Indexes
+RewriteEngine On
+
+# Clean URLs for Authentication
+RewriteRule ^login$ auth.php?mode=login [L,QSA]
+RewriteRule ^register$ auth.php?mode=register [L,QSA]
+RewriteRule ^catalog$ product_catalog.php [L,QSA]
+RewriteRule ^product$ product_detail.php [L,QSA]
+RewriteRule ^cart$ cart.php [L,QSA]
+RewriteRule ^order-success$ order_confirmation.php [L,QSA]
+RewriteRule ^account$ my_account.php [L,QSA]
+RewriteRule ^admin-login$ admin/admin_index.php?view=login [L,QSA]
+RewriteRule ^admin-dashboard$ admin/admin_index.php?view=dashboard [L,QSA]
+RewriteRule ^admin-orders$ admin/admin_index.php?view=orders [L,QSA]
+RewriteRule ^admin-products$ admin/admin_index.php?view=products [L,QSA]
+RewriteRule ^admin-customers$ admin/admin_index.php?view=customers [L,QSA]
+RewriteRule ^admin-users$ admin/admin_index.php?view=users [L,QSA]
+RewriteRule ^admin-inventory$ admin/admin_index.php?view=inventory [L,QSA]
+RewriteRule ^admin-reports$ admin/admin_index.php?view=reports [L,QSA]
+RewriteRule ^admin-suppliers$ admin/admin_index.php?view=suppliers [L,QSA]
+RewriteRule ^admin-supplier-add$ admin/admin_index.php?view=supplier_form&mode=add [L,QSA]
+RewriteRule ^admin-supplier-edit$ admin/admin_index.php?view=supplier_form&mode=edit [L,QSA]
+RewriteRule ^admin-purchase-orders$ admin/admin_index.php?view=purchase_orders [L,QSA]
+RewriteRule ^admin-goods-received$ admin/admin_index.php?view=goods_received [L,QSA]
+RewriteRule ^admin-personnel$ admin/admin_index.php?view=personnel [L,QSA]
+RewriteRule ^admin-assignments$ admin/admin_index.php?view=assignments [L,QSA]
+RewriteRule ^admin-tracking$ admin/admin_index.php?view=tracking [L,QSA]
+RewriteRule ^driver-portal$ driver_portal/index.php [L,QSA]
+RewriteRule ^driver$ driver_portal/index.php [L,QSA]
+
+
+
+
+
+# Optional: Remove .php extension
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(.*)$ $1.php [L]

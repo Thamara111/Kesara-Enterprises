@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Admin panel: offset main content by sidebar width (w-72 = 18rem) on desktop */
+.admin-content-area {
+  padding-left: 0;
+}
+
+/* Responsive display helpers — guaranteed fallbacks for Tailwind scanner misses */
+@media (min-width: 768px) {
+  .md\:hidden { display: none !important; }
+  .md\:flex   { display: flex  !important; }
+  .md\:block  { display: block !important; }
+}
+
+@media (min-width: 1024px) {
+  .lg\:hidden { display: none !important; }
+  .lg\:flex   { display: flex  !important; }
+  .lg\:block  { display: block !important; }
+  .admin-content-area { padding-left: 18rem; }
+}
