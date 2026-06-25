@@ -43,6 +43,113 @@
             font-weight: 400;
         }
     </style>
+    
+    <!-- Global Toast Notifications System -->
+    <style>
+        #toast-container {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-width: 380px;
+            width: calc(100% - 48px);
+        }
+
+        .toast-notification {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transform: translateX(120%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+            opacity: 0;
+            border-left: 4px solid #cbd5e1;
+        }
+
+        .toast-notification.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .toast-notification.success {
+            border-left-color: #0F6E56;
+        }
+
+        .toast-notification.error {
+            border-left-color: #ef4444;
+        }
+
+        .toast-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .success .toast-icon {
+            background-color: #E1F5EE;
+            color: #0F6E56;
+        }
+
+        .error .toast-icon {
+            background-color: #fef2f2;
+            color: #ef4444;
+        }
+
+        .toast-message {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1f2937;
+            font-family: sans-serif;
+            line-height: 1.4;
+        }
+    </style>
+    <script>
+        function showToast(message, type = 'success') {
+            let container = document.getElementById('toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toast-container';
+                document.body.appendChild(container);
+            }
+
+            const toast = document.createElement('div');
+            toast.className = `toast-notification ${type}`;
+
+            const iconClass = type === 'success' ? 'ti ti-circle-check' : 'ti ti-circle-x';
+            toast.innerHTML = `
+                <div class="toast-icon"><i class="${iconClass}"></i></div>
+                <div class="toast-message">${message}</div>
+            `;
+
+            container.appendChild(toast);
+
+            // Trigger animation
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
+            // Auto dismiss after 4 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                const onTransitionEnd = () => {
+                    toast.remove();
+                    toast.removeEventListener('transitionend', onTransitionEnd);
+                };
+                toast.addEventListener('transitionend', onTransitionEnd);
+            }, 4000);
+        }
+    </script>
 </head>
 
 <body class="font-sans">

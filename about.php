@@ -11,12 +11,12 @@ require_once __DIR__ . "/layouts/header.php";
 ?>
 
 <main class="bg-gray-50 min-h-screen">
-    <!-- HERO SECTION -->
-    <section class="relative bg-brand text-brand-light overflow-hidden py-24 md:py-32">
-        <!-- Abstract shape overlays for rich visual aesthetic -->
-        <div class="absolute inset-0 bg-gradient-to-tr from-brand-dark via-brand to-teal-800 opacity-90 z-0"></div>
-        <div class="absolute -top-24 -right-24 w-96 h-96 bg-brand-light/10 rounded-full blur-3xl z-0"></div>
-        <div class="absolute -bottom-24 -left-24 w-96 h-96 bg-teal-300/10 rounded-full blur-3xl z-0"></div>
+    <section
+        style="background-image: url('/assets/images/hero/hero.jpg'); background-size: cover; background-position: center;"
+        class="py-16 border-b border-gray-100 relative z-0">
+
+        <!-- Overlay to make text readable -->
+        <div class="absolute inset-0 z-0" style="background: linear-gradient(to right, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.3) 50%, rgba(0, 0, 0, 0) 80%);"></div>
 
         <div class="max-w-8xl mx-auto px-6 md:px-12 relative z-10 text-center max-w-3xl">
             <span class="text-[10px] font-bold tracking-widest text-brand-light/70 uppercase mb-3 block">Est. 2012</span>
@@ -51,14 +51,14 @@ require_once __DIR__ . "/layouts/header.php";
                 </div>
 
                 <!-- Stats/Visual Card Area -->
-                <div class="lg:col-span-5 bg-brand-light/40 border border-brand/10 p-8 rounded-3xl space-y-8 relative overflow-hidden">
+                <div class="lg:col-span-5 space-y-8">
                     <div class="absolute -bottom-8 -right-8 text-brand/5">
                         <i class="ti ti-building-warehouse text-[180px]"></i>
                     </div>
                     
                     <h3 class="text-xl font-bold text-gray-900">Why Sri Lanka Chooses Kesara</h3>
                     
-                    <div class="grid grid-cols-2 gap-6 relative z-10">
+                    <div class="grid grid-cols-4 gap-6 relative z-10">
                         <div class="p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
                             <p class="text-3xl font-extrabold text-brand mb-1">50+</p>
                             <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Premium SKUs</p>

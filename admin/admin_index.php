@@ -41,8 +41,8 @@ if (isset($_SESSION['admin_id'])) {
     $role = $_SESSION['admin_role'] ?? 'guest';
 
     $role_access = [
-        'admin' => ['dashboard', 'orders', 'products', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login'],
-        'finance_manager' => ['dashboard', 'orders', 'products', 'inventory', 'reports', 'login'],
+        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login'],
+        'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login'],
         'supplier_manager' => ['dashboard', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'login'],
         'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login']
     ];
@@ -68,6 +68,11 @@ $view_config = [
     'products' => [
         'title' => 'Product Catalog | Kesara Enterprises',
         'description' => 'Manage wholesale products and pricing tiers.',
+        'show_sidebar' => true
+    ],
+    'categories' => [
+        'title' => 'Category Management | Kesara Enterprises',
+        'description' => 'Manage product categories and catalog sections.',
         'show_sidebar' => true
     ],
     'reports' => [

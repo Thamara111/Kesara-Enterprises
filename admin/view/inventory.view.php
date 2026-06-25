@@ -276,10 +276,26 @@ foreach ($rows as $r) {
 
 <style>
     .chip {
-        @apply px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 cursor-pointer transition-all hover:bg-gray-50 whitespace-nowrap flex-shrink-0;
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border: 1px solid #e5e7eb;
+        color: #6b7280;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+        white-space: nowrap;
+        flex-shrink: 0;
+        background-color: transparent;
+    }
+    .chip:hover {
+        background-color: #f3f4f6;
     }
     .chip.on {
-        @apply bg-brand text-white border-brand shadow-lg shadow-brand/20;
+        background-color: #0F6E56;
+        color: #ffffff;
+        border-color: #0F6E56;
+        box-shadow: 0 10px 15px -3px rgba(15, 110, 86, 0.2);
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -297,12 +313,33 @@ function statusColor(p){ return p<=15?'#791F1F':p<=50?'#633806':'#085041'; }
 function badgeClass(p){ return p===0?'bg-gray-100 text-gray-500 border-gray-200':p<=15?'bg-red-100 text-red-700':p<=50?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700'; }
 function badgeText(p){ return p===0?'Out of stock':p<=15?'Critical':p<=50?'Low stock':'In stock'; }
 
+let activeFilter = 'All';
+
 function renderList() {
     const list = document.getElementById('inv-list');
-    list.innerHTML = rows.map((r, idx) => {
+    
+    const filteredRows = rows.map((r, i) => ({ ...r, originalIndex: i })).filter(r => {
         const p = pct(r.stock, r.thresh);
+        const status = r.stock === 0 ? 'Out of stock' : p <= 15 ? 'Critical' : p <= 50 ? 'Low stock' : 'In stock';
+        
+        if (activeFilter === 'All') return true;
+        if (activeFilter === 'Critical') return status === 'Critical';
+        if (activeFilter === 'Low stock') return status === 'Low stock';
+        if (activeFilter === 'Out of stock') return status === 'Out of stock';
+        if (activeFilter === 'In stock') return status === 'In stock';
+        return true;
+    });
+
+    if (filteredRows.length === 0) {
+        list.innerHTML = `<div class="text-xs text-gray-400 text-center py-10 italic">No variants match this filter.</div>`;
+        return;
+    }
+
+    list.innerHTML = filteredRows.map((r) => {
+        const p = pct(r.stock, r.thresh);
+        const isSelected = r.originalIndex === selIdx;
         return `
-        <div class="grid grid-cols-[minmax(200px,2fr)_60px_70px_80px_1fr_100px] gap-4 p-4 rounded-2xl cursor-pointer transition-all border border-transparent items-center ${idx === selIdx ? 'bg-brand/5 border-brand/10 shadow-sm' : 'hover:bg-gray-50'}" onclick="selectRow(this, ${idx})">
+        <div class="grid grid-cols-[minmax(200px,2fr)_60px_70px_80px_1fr_100px] gap-4 p-4 rounded-2xl cursor-pointer transition-all border border-transparent items-center ${isSelected ? 'bg-brand/5 border-brand/10 shadow-sm' : 'hover:bg-gray-50'}" onclick="selectRow(this, ${r.originalIndex})">
             <div class="min-w-0 flex flex-col justify-center">
                 <p class="text-sm font-bold text-gray-900 leading-tight truncate">${r.name.split(' · ').slice(0,2).join(' · ')}</p>
                 <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">${r.sku}</p>
@@ -412,6 +449,29 @@ function selectRow(el, idx, openDrawer = true){
 function chipFilter(el){
   document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
   el.classList.add('on');
+  activeFilter = el.textContent.trim();
+  
+  // Ensure the slide bar is closed when clicking on filters
+  closeAdjPane();
+  
+  // Find first matching row's index to load details
+  const filtered = rows.map((r, i) => ({ ...r, originalIndex: i })).filter(r => {
+      const p = pct(r.stock, r.thresh);
+      const status = r.stock === 0 ? 'Out of stock' : p <= 15 ? 'Critical' : p <= 50 ? 'Low stock' : 'In stock';
+      if (activeFilter === 'All') return true;
+      if (activeFilter === 'Critical') return status === 'Critical';
+      if (activeFilter === 'Low stock') return status === 'Low stock';
+      if (activeFilter === 'Out of stock') return status === 'Out of stock';
+      if (activeFilter === 'In stock') return status === 'In stock';
+      return true;
+  });
+  
+  if (filtered.length > 0) {
+      selIdx = filtered[0].originalIndex;
+      renderDetail(selIdx);
+  }
+  
+  renderList();
 }
 
 function closeAdjPane() {

@@ -77,7 +77,12 @@ $prod_specs = $specs[$product['sku']] ?? ['material' => '100% Combed Cotton', 'g
 
 // Extract unique sizes and colours from variations
 $sizes = array_unique(array_filter(array_column($variations, 'size')));
-$colours = array_unique(array_filter(array_column($variations, 'colour')));
+
+if (!empty($product['colors'])) {
+    $colours = array_map('trim', explode(',', $product['colors']));
+} else {
+    $colours = array_unique(array_filter(array_column($variations, 'colour')));
+}
 
 // Default selected attributes
 $default_colour = !empty($colours) ? reset($colours) : 'White';
@@ -124,22 +129,41 @@ require_once __DIR__ . "/layouts/header.php";
             <!-- LEFT: IMAGES & SPECS -->
             <div class="space-y-10">
                 <!-- Image Gallery -->
+                <?php 
+                $prod_images = json_decode($product['images'] ?? '[]', true) ?: [];
+                $primary_image = !empty($prod_images) ? $prod_images[0] : '';
+                ?>
                 <div class="space-y-4">
-                    <div class="bg-white border border-gray-100 rounded-3xl p-12 flex items-center justify-center shadow-sm relative overflow-hidden group aspect-square lg:aspect-video">
-                        <i class="ti ti-shirt text-[120px] text-gray-100 group-hover:scale-110 transition-transform duration-700"></i>
+                    <div class="bg-white border border-gray-100 rounded-3xl flex items-center justify-center shadow-sm relative overflow-hidden group aspect-square lg:aspect-video">
+                        <?php if (!empty($primary_image)): ?>
+                            <img id="main-product-image" src="<?= htmlspecialchars($primary_image) ?>" alt="<?= htmlspecialchars($product['name']) ?>" class="w-full h-full object-cover">
+                        <?php else: ?>
+                            <i class="ti ti-shirt text-[120px] text-gray-100 group-hover:scale-110 transition-transform duration-700"></i>
+                        <?php endif; ?>
                         <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500"></div>
                     </div>
-                    <div class="flex gap-4">
-                        <div class="w-20 h-20 bg-white border-2 border-brand rounded-2xl p-4 flex items-center justify-center cursor-pointer shadow-sm">
-                            <i class="ti ti-shirt text-2xl text-brand"></i>
-                        </div>
-                        <div class="w-20 h-20 bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-center cursor-pointer hover:border-brand transition-all shadow-sm">
-                            <i class="ti ti-shirt text-2xl text-gray-200"></i>
-                        </div>
-                        <div class="w-20 h-20 bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-center cursor-pointer hover:border-brand transition-all shadow-sm">
-                            <i class="ti ti-shirt text-2xl text-gray-200"></i>
-                        </div>
+                    
+                    <?php if (!empty($prod_images) && count($prod_images) > 1): ?>
+                    <div class="flex gap-4 overflow-x-auto py-2">
+                        <?php foreach ($prod_images as $idx => $img): ?>
+                            <div onclick="changeMainImage('<?= htmlspecialchars($img) ?>', this)" 
+                                 class="thumb-btn w-20 h-20 bg-white rounded-2xl overflow-hidden cursor-pointer shadow-sm transition-all hover:border-brand <?= $idx === 0 ? 'border-2 border-brand' : 'border border-gray-100' ?>">
+                                <img src="<?= htmlspecialchars($img) ?>" alt="Thumbnail" class="w-full h-full object-cover">
+                            </div>
+                        <?php endforeach; ?>
                     </div>
+                    <script>
+                    function changeMainImage(url, el) {
+                        document.getElementById('main-product-image').src = url;
+                        document.querySelectorAll('.thumb-btn').forEach(btn => {
+                            btn.classList.remove('border-brand', 'border-2');
+                            btn.classList.add('border-gray-100', 'border');
+                        });
+                        el.classList.remove('border-gray-100', 'border');
+                        el.classList.add('border-brand', 'border-2');
+                    }
+                    </script>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Product Specifications -->

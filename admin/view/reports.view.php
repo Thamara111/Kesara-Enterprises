@@ -265,10 +265,26 @@
 
 <style>
     .chip {
-        @apply px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 cursor-pointer transition-all hover:bg-gray-50 whitespace-nowrap flex-shrink-0;
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border: 1px solid #e5e7eb;
+        color: #6b7280;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+        white-space: nowrap;
+        flex-shrink: 0;
+        background-color: transparent;
+    }
+    .chip:hover {
+        background-color: #f3f4f6;
     }
     .chip.on {
-        @apply bg-brand text-white border-brand shadow-lg shadow-brand/20;
+        background-color: #0F6E56;
+        color: #ffffff;
+        border-color: #0F6E56;
+        box-shadow: 0 10px 15px -3px rgba(15, 110, 86, 0.2);
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

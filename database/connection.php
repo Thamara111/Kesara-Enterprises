@@ -1,4 +1,7 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 /**
  * Database Connection Helper
  * Attempts to connect to local MySQL instance. Traps error gracefully to avoid site crashes.

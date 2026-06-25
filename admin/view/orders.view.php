@@ -369,19 +369,21 @@ function getInitials(name) {
     return initials.substring(0, 2);
 }
 
-function selectOrder(el, idx) {
+function selectOrder(el, idx, openDrawer = true) {
     document.querySelectorAll('.order-card').forEach(c => c.classList.remove('selected'));
     if (el) el.classList.add('selected');
     
     const o = orders[idx];
     
-    // Open detail pane drawer
-    const pane = document.getElementById('order-detail-pane');
-    const backdrop = document.getElementById('order-detail-backdrop');
-    if (pane) pane.classList.remove('translate-x-full');
-    if (backdrop) {
-        backdrop.classList.remove('hidden');
-        requestAnimationFrame(() => backdrop.classList.add('opacity-100'));
+    // Open detail pane drawer if requested
+    if (openDrawer) {
+        const pane = document.getElementById('order-detail-pane');
+        const backdrop = document.getElementById('order-detail-backdrop');
+        if (pane) pane.classList.remove('translate-x-full');
+        if (backdrop) {
+            backdrop.classList.remove('hidden');
+            requestAnimationFrame(() => backdrop.classList.add('opacity-100'));
+        }
     }
     
     document.getElementById('d-id').textContent = o.formattedId;
@@ -531,11 +533,10 @@ function applyFilters() {
 
     renderOrderList(result);
 
-    // Auto-select first visible card
+    // Auto-select first visible card without opening the drawer
     if (result.length > 0) {
         const firstCard = document.getElementById('order-card-' + result[0].idx);
-        selectOrder(firstCard, result[0].idx);
-        if (window.innerWidth < 1024) closeOrderDetailPane();
+        selectOrder(firstCard, result[0].idx, false);
     }
 }
 

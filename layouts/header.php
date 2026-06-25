@@ -1,3 +1,9 @@
+<?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$is_logged_in = isset($_SESSION['user_id']);
+?>
 <nav class="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm relative">
     <div class="max-w-8xl mx-auto px-6 py-3 flex items-center justify-between">
         <a href="/" class="flex items-center gap-3">
@@ -17,8 +23,11 @@
                 <i class="ti ti-shopping-cart text-xl text-gray-600 group-hover:text-brand transition-colors"></i>
                 <span class="absolute top-0 right-0 w-4 h-4 bg-brand text-brand-light text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white shadow-sm">3</span>
             </a>
-            <a href="/account" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">Account</a>
-            <a href="/login" class="bg-brand text-brand-light text-sm font-semibold py-2 px-6 rounded-md hover:bg-brand-dark transition-all transform hover:-translate-y-px">Sign in</a>
+            <?php if ($is_logged_in): ?>
+                <a href="/account" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">Account</a>
+            <?php else: ?>
+                <a href="/login" class="bg-brand text-brand-light text-sm font-semibold py-2 px-6 rounded-md hover:bg-brand-dark transition-all transform hover:-translate-y-px">Sign in</a>
+            <?php endif; ?>
         </div>
 
         <!-- Mobile: Cart + Hamburger -->
@@ -39,8 +48,11 @@
         <a href="/about" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">About</a>
         <a href="/contact" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Contact</a>
         <hr class="border-gray-100">
-        <a href="/account" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Account</a>
-        <a href="/login" class="block bg-brand text-brand-light text-center text-sm font-semibold py-3 px-6 rounded-xl hover:bg-brand-dark transition-all">Sign in</a>
+        <?php if ($is_logged_in): ?>
+            <a href="/account" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Account</a>
+        <?php else: ?>
+            <a href="/login" class="block bg-brand text-brand-light text-center text-sm font-semibold py-3 px-6 rounded-xl hover:bg-brand-dark transition-all">Sign in</a>
+        <?php endif; ?>
     </div>
 
     <script>

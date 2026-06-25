@@ -4,7 +4,7 @@ require_once __DIR__ . "/database/connection.php";
 $catalog_products = [];
 if ($pdo) {
     try {
-        $stmt = $pdo->query("SELECT p.name, p.sku, p.moq, p.base_price AS price, p.status 
+        $stmt = $pdo->query("SELECT p.name, p.sku, p.moq, p.base_price AS price, p.status, p.images 
                              FROM products p");
         $catalog_products = $stmt->fetchAll();
     } catch (\Exception $e) {
@@ -161,7 +161,14 @@ require_once __DIR__ . "/layouts/header.php";
                     <?php foreach ($catalog_products as $p): ?>
                     <a href="/product?sku=<?= htmlspecialchars($p['sku']) ?>" class="bg-white border border-gray-100 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                         <div class="bg-gray-50 h-48 flex items-center justify-center border-b border-gray-50 relative overflow-hidden">
-                            <i class="ti ti-shirt text-6xl text-gray-200 group-hover:scale-110 transition-transform duration-500"></i>
+                            <?php 
+                            $prod_images = json_decode($p['images'] ?? '[]', true);
+                            if (!empty($prod_images) && !empty($prod_images[0])): 
+                            ?>
+                                <img src="<?= htmlspecialchars($prod_images[0]) ?>" alt="<?= htmlspecialchars($p['name']) ?>" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500">
+                            <?php else: ?>
+                                <i class="ti ti-shirt text-6xl text-gray-200 group-hover:scale-110 transition-transform duration-500"></i>
+                            <?php endif; ?>
                             <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300"></div>
                         </div>
                         <div class="p-5">

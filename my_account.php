@@ -1,7 +1,22 @@
 <?php
-require_once __DIR__ . "/database/connection.php";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-$user_id = 1; // Default to Kamal Perera (User ID 1)
+// Handle Logout
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    session_destroy();
+    header("Location: /login");
+    exit;
+}
+
+$user_id = $_SESSION['user_id'] ?? null;
+if (!$user_id) {
+    header("Location: /login");
+    exit;
+}
+
+require_once __DIR__ . "/database/connection.php";
 $user = null;
 $orders = [];
 $total_orders = 0;
@@ -174,7 +189,7 @@ require_once __DIR__ . "/layouts/header.php";
                         
                         <div class="h-px bg-gray-50 my-4"></div>
                         
-                        <a href="/login" class="flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-red-400 hover:bg-red-50 hover:text-red-600 transition-all">
+                        <a href="?action=logout" class="flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-red-400 hover:bg-red-50 hover:text-red-600 transition-all">
                             <i class="ti ti-logout text-xl"></i>
                             Sign Out
                         </a>

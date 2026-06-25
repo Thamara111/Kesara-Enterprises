@@ -11,7 +11,7 @@ $suspended_count = 0;
 
 if (isset($pdo) && $pdo !== null) {
     try {
-        $stmt = $pdo->query("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.business_name AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
+        $stmt = $pdo->query("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.whatsapp_number, u.business_name AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
                              FROM users u");
         $users_db = $stmt->fetchAll();
 
@@ -79,6 +79,7 @@ if (isset($pdo) && $pdo !== null) {
                 'company' => $usr['company'],
                 'email' => $usr['email'],
                 'phone' => $usr['phone'],
+                'whatsapp' => $usr['whatsapp_number'] ?? '',
                 'type' => $usr['type'],
                 'br' => $usr['br'],
                 'addr' => $usr['addr'],
@@ -237,6 +238,8 @@ if (empty($admin_customers)) {
                     <span class="text-gray-900 break-all" id="d-email">kamal@abcgarments.lk</span>
                     <span class="text-gray-400">Phone</span>
                     <span class="text-gray-900" id="d-phone">+94 77 123 4567</span>
+                    <span class="text-gray-400">WhatsApp</span>
+                    <a id="d-whatsapp" href="#" target="_blank" class="text-green-600 font-semibold flex items-center gap-1 hover:underline"><i class="ti ti-brand-whatsapp"></i><span id="d-whatsapp-text">—</span></a>
                 </div>
             </div>
 
@@ -277,6 +280,17 @@ if (empty($admin_customers)) {
                     <!-- Orders markup -->
                 </div>
             </div>
+
+            <!-- Admin Note / Comment -->
+            <div class="space-y-3">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Admin Note</h3>
+                <div class="relative">
+                    <textarea id="d-comment" rows="4" placeholder="Add a private note about this customer..." class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-xs font-medium text-gray-700 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand transition-all"></textarea>
+                </div>
+                <button onclick="saveComment()" class="w-full flex items-center justify-center gap-2 bg-gray-900 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-widest hover:bg-gray-700 transition-all">
+                    <i class="ti ti-device-floppy"></i> Save Note
+                </button>
+            </div>
         </div>
 
         <!-- Detail Actions -->
@@ -287,11 +301,27 @@ if (empty($admin_customers)) {
 </div>
 
 <style>
-    .chip {
-        @apply px-4 py-2 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 cursor-pointer transition-all hover:bg-gray-50 whitespace-nowrap flex-shrink-0;
+     .chip {
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        border: 1px solid #e5e7eb;
+        color: #6b7280;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+        white-space: nowrap;
+        flex-shrink: 0;
+        background-color: transparent;
+    }
+    .chip:hover {
+        background-color: #f3f4f6;
     }
     .chip.on {
-        @apply bg-brand text-white border-brand shadow-lg shadow-brand/20;
+        background-color: #0F6E56;
+        color: #ffffff;
+        border-color: #0F6E56;
+        box-shadow: 0 10px 15px -3px rgba(15, 110, 86, 0.2);
     }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -365,6 +395,11 @@ function selectCustomer(el, idx, openDrawer = true) {
     document.getElementById('d-name').textContent = c.name;
     document.getElementById('d-email').textContent = c.email;
     document.getElementById('d-phone').textContent = c.phone;
+    const waNum = (c.whatsapp || '').replace(/\D/g, '');
+    const waEl = document.getElementById('d-whatsapp');
+    const waTxt = document.getElementById('d-whatsapp-text');
+    if (waTxt) waTxt.textContent = c.whatsapp || '—';
+    if (waEl) waEl.href = waNum ? `https://wa.me/${waNum}` : '#';
     document.getElementById('d-br').textContent = c.br;
     document.getElementById('d-type').textContent = c.type;
     document.getElementById('d-address').textContent = c.addr;
@@ -403,6 +438,9 @@ function selectCustomer(el, idx, openDrawer = true) {
             </button>
         `;
     }
+
+    // Load persisted admin comment for this customer
+    loadComment(c.id);
 }
 
 function renderCustomerList() {
@@ -444,9 +482,92 @@ function showToast(message, variant = 'success', duration = 3500) {
 }
 
 function updateStatus(id, newStatus) {
-    const labels = { active: 'Customer account activated.', suspended: 'Customer account suspended.', deleted: 'Customer account deleted.' };
-    const variant = (newStatus === 'suspended' || newStatus === 'deleted') ? 'error' : 'success';
-    showToast(labels[newStatus] || `Status updated to ${newStatus}.`, variant);
+    fetch('/api/customers.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: id, status: newStatus })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const idx = customers.findIndex(c => c.id == id);
+            if (idx !== -1) {
+                const c = customers[idx];
+                c.actions = newStatus === 'approved' ? 'normal' : newStatus;
+                
+                if (newStatus === 'approved') {
+                    c.badge = 'bg-emerald-100 text-emerald-700';
+                    c.badgeText = 'Approved';
+                    c.note = '';
+                } else if (newStatus === 'pending') {
+                    c.badge = 'bg-amber-100 text-amber-700';
+                    c.badgeText = 'Pending';
+                    c.note = '<div class="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3"><i class="ti ti-clock text-amber-600 mt-0.5"></i><p class="text-xs text-amber-700 leading-relaxed font-medium">Awaiting approval. BR number not yet verified.</p></div>';
+                } else if (newStatus === 'suspended') {
+                    c.badge = 'bg-purple-100 text-purple-700';
+                    c.badgeText = 'Suspended';
+                    c.note = '<div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3"><i class="ti ti-ban text-red-600 mt-0.5"></i><p class="text-xs text-red-700 leading-relaxed font-medium">Account suspended.</p></div>';
+                } else if (newStatus === 'rejected') {
+                    c.badge = 'bg-red-100 text-red-700';
+                    c.badgeText = 'Rejected';
+                    c.note = '<div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3"><i class="ti ti-x text-red-600 mt-0.5"></i><p class="text-xs text-red-700 leading-relaxed font-medium">Account rejected.</p></div>';
+                }
+                
+                renderCustomerList();
+                const rowEl = document.getElementById(`customer-row-${idx}`);
+                selectCustomer(rowEl, idx, false);
+            }
+            
+            const labels = { approved: 'Customer account approved.', suspended: 'Customer account suspended.', rejected: 'Customer account rejected.' };
+            const variant = (newStatus === 'suspended' || newStatus === 'rejected') ? 'error' : 'success';
+            showToast(labels[newStatus] || data.message || `Status updated to ${newStatus}.`, variant);
+        } else {
+            showToast(data.message || 'Failed to update customer status.', 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('An error occurred while updating status.', 'error');
+    });
+}
+
+let _activeCustomerId = null;
+
+function loadComment(customerId) {
+    _activeCustomerId = customerId;
+    const ta = document.getElementById('d-comment');
+    if (!ta) return;
+    ta.value = '';
+    ta.placeholder = 'Loading...';
+    fetch(`/api/customers.php?id=${customerId}`)
+        .then(res => res.json())
+        .then(data => {
+            ta.value = data.comment || '';
+            ta.placeholder = 'Add a private note about this customer...';
+        })
+        .catch(() => { ta.placeholder = 'Add a private note about this customer...'; });
+}
+
+function saveComment() {
+    const ta = document.getElementById('d-comment');
+    if (!ta || !_activeCustomerId) return;
+    const comment = ta.value.trim();
+    fetch('/api/customers.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_comment', id: _activeCustomerId, comment: comment })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Admin note saved.', 'success');
+        } else {
+            showToast(data.message || 'Failed to save note.', 'error');
+        }
+    })
+    .catch(() => showToast('An error occurred while saving note.', 'error'));
 }
 
 function closeDetailPane() {

@@ -17,6 +17,9 @@ module.exports = {
           light: "#E1F5EE",
           dark: "#0c5a46",
         },
+        gray: {
+          950: "#030712",
+        },
       },
       maxWidth: {
         '8xl': '88rem',

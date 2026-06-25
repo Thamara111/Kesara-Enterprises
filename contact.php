@@ -2,7 +2,7 @@
 require_once __DIR__ . "/database/connection.php";
 
 $errors = [];
-$success = false;
+$success = isset($_GET['success']) && $_GET['success'] == 1;
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -157,7 +157,7 @@ require_once __DIR__ . "/layouts/header.php";
                         </div>
                     <?php endif; ?>
 
-                    <form action="/contact" method="POST" class="space-y-6">
+                    <form id="inquiry-form" action="/contact" method="POST" class="space-y-6">
                         <!-- Two Column Row -->
                         <div class="grid sm:grid-cols-2 gap-6">
                             <div>
@@ -237,5 +237,39 @@ require_once __DIR__ . "/layouts/header.php";
         </div>
     </div>
 </main>
+
+<script>
+document.getElementById('inquiry-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const btn = this.querySelector('button[type="submit"]');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    fetch('/api/inquiries.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Inquiry submitted successfully! Redirecting...', 'success');
+            setTimeout(() => {
+                window.location.href = '/contact?success=1';
+            }, 1000);
+        } else {
+            showToast(data.message || 'Error submitting inquiry.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Send Message';
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('Network error occurred.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Send Message';
+    });
+});
+</script>
 
 <?php require_once __DIR__ . "/layouts/footer.php"; ?>

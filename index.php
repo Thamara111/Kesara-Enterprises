@@ -7,14 +7,14 @@ $featured_products = [];
 if ($pdo) {
     try {
         // Fetch categories with style counts
-        $stmt = $pdo->query("SELECT c.id, c.name, c.slug, c.icon, COUNT(p.id) AS style_count 
+        $stmt = $pdo->query("SELECT c.id, c.name, c.slug, c.icon, c.image, COUNT(p.id) AS style_count 
                              FROM categories c 
                              LEFT JOIN products p ON p.category_id = c.id 
                              GROUP BY c.id");
         $categories = $stmt->fetchAll();
 
         // Fetch featured products (first 4 products)
-        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, p.moq, p.base_price, p.status 
+        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, p.moq, p.base_price, p.status, p.images 
                              FROM products p 
                              LIMIT 4");
         $featured_products = $stmt->fetchAll();
@@ -26,11 +26,11 @@ if ($pdo) {
 // Fallback to mock data if DB is offline or empty
 if (empty($categories)) {
     $categories = [
-        ['name' => 'Briefs', 'slug' => 'briefs', 'icon' => 'ti-shirt', 'style_count' => 12],
-        ['name' => 'Boxers', 'slug' => 'boxers', 'icon' => 'ti-shirt', 'style_count' => 8],
-        ['name' => 'Trunks', 'slug' => 'trunks', 'icon' => 'ti-shirt', 'style_count' => 10],
-        ['name' => 'Ladies', 'slug' => 'ladies', 'icon' => 'ti-heart', 'style_count' => 14],
-        ['name' => 'Children', 'slug' => 'children', 'icon' => 'ti-star', 'style_count' => 9],
+        ['name' => 'Briefs', 'slug' => 'briefs', 'icon' => 'ti-shirt', 'image' => '', 'style_count' => 12],
+        ['name' => 'Boxers', 'slug' => 'boxers', 'icon' => 'ti-shirt', 'image' => '', 'style_count' => 8],
+        ['name' => 'Trunks', 'slug' => 'trunks', 'icon' => 'ti-shirt', 'image' => '', 'style_count' => 10],
+        ['name' => 'Ladies', 'slug' => 'ladies', 'icon' => 'ti-heart', 'image' => '', 'style_count' => 14],
+        ['name' => 'Children', 'slug' => 'children', 'icon' => 'ti-star', 'image' => '', 'style_count' => 9],
     ];
 }
 
@@ -106,8 +106,14 @@ require_once __DIR__ . "/layouts/header.php";
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                 <?php foreach ($categories as $cat): ?>
                 <a href="/catalog?category=<?= htmlspecialchars($cat['slug']) ?>"
-                    class="bg-white rounded-md p-6 text-center border border-gray-100 cursor-pointer transition-all hover:border-brand hover:shadow-lg hover:-translate-y-0.5">
-                    <i class="ti <?= htmlspecialchars($cat['icon']) ?> text-3xl text-brand mb-3"></i>
+                    class="bg-white rounded-md p-6 text-center border border-gray-100 cursor-pointer transition-all hover:border-brand hover:shadow-lg hover:-translate-y-0.5 flex flex-col items-center justify-center">
+                    <?php if (!empty($cat['image'])): ?>
+                        <div class="w-16 h-16 mb-3 rounded-full overflow-hidden border border-gray-100 flex items-center justify-center bg-gray-50">
+                            <img src="<?= htmlspecialchars($cat['image']) ?>" alt="<?= htmlspecialchars($cat['name']) ?>" class="w-full h-full object-cover">
+                        </div>
+                    <?php else: ?>
+                        <i class="ti <?= htmlspecialchars($cat['icon'] ?? 'ti-tag') ?> text-3xl text-brand mb-3"></i>
+                    <?php endif; ?>
                     <p class="text-[15px] font-semibold text-gray-900 mb-1"><?= htmlspecialchars($cat['name']) ?></p>
                     <p class="text-[12px] text-gray-400"><?= $cat['style_count'] ?> styles</p>
                 </a>
@@ -134,8 +140,15 @@ require_once __DIR__ . "/layouts/header.php";
                 <?php foreach ($featured_products as $p): ?>
                 <a href="/product?sku=<?= htmlspecialchars($p['sku']) ?>"
                     class="bg-white border border-gray-100 rounded-lg overflow-hidden transition-all hover:shadow-xl hover:-translate-y-1">
-                    <div class="bg-gray-50 h-40 flex items-center justify-center border-b border-gray-100">
-                        <i class="ti ti-shirt text-5xl text-gray-300"></i>
+                    <div class="bg-gray-50 h-40 flex items-center justify-center border-b border-gray-100 overflow-hidden relative">
+                        <?php 
+                        $prod_images = json_decode($p['images'] ?? '[]', true);
+                        if (!empty($prod_images) && !empty($prod_images[0])): 
+                        ?>
+                            <img src="<?= htmlspecialchars($prod_images[0]) ?>" alt="<?= htmlspecialchars($p['name']) ?>" class="w-full h-full object-cover">
+                        <?php else: ?>
+                            <i class="ti ti-shirt text-5xl text-gray-300"></i>
+                        <?php endif; ?>
                     </div>
                     <div class="p-4">
                         <p class="text-[15px] font-semibold mb-1"><?= htmlspecialchars($p['name']) ?></p>

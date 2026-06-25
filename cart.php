@@ -102,9 +102,9 @@ require_once __DIR__ . "/layouts/header.php";
                     </div>
 
                     <div class="space-y-4">
-                        <a href="/order-success" id="checkout-btn" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center">
+                        <button id="checkout-btn" onclick="submitOrder()" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center">
                             Proceed to Checkout
-                        </a>
+                        </button>
                         <button class="w-full bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl hover:bg-gray-50 hover:border-brand hover:text-brand transition-all transform hover:-translate-y-px active:scale-95 flex items-center justify-center gap-2">
                             <i class="ti ti-file-text text-xl"></i>
                             Download as Quote
@@ -147,8 +147,8 @@ const TIERS_C = [
 ];
 
 const cartItems = [
-  {id:0, name:'Classic Cotton Brief', meta:'Black · Size M · SKU KB-001', qty:120, moq:50, tiers:TIERS_A},
-  {id:1, name:'Ladies Hipster', meta:'White · Size S · SKU KL-003', qty:40,  moq:50, tiers:TIERS_B},
+  {id:1, name:'Classic Cotton Brief', meta:'Black · Size M · SKU KB-001', qty:120, moq:50, tiers:TIERS_A},
+  {id:3, name:'Ladies Hipster', meta:'White · Size S · SKU KL-003', qty:55,  moq:50, tiers:TIERS_B}, // Changed to 55 to satisfy MOQ 50
   {id:2, name:'Stretch Boxer', meta:'Navy · Size L · SKU KB-008', qty:200, moq:100, tiers:TIERS_C}
 ];
 
@@ -262,6 +262,57 @@ function clearCart() {
       cartItems.length = 0;
       render();
   }
+}
+
+function submitOrder() {
+  const checkoutBtn = document.getElementById('checkout-btn');
+  checkoutBtn.disabled = true;
+  checkoutBtn.textContent = 'Processing Order...';
+
+  // Calculate total amount
+  let subtotal = 0;
+  const itemsPayload = cartItems.map(item => {
+    const price = getPrice(item);
+    subtotal += item.qty * price;
+    return {
+      product_id: item.id,
+      quantity: item.qty,
+      unit_price: price
+    };
+  });
+
+  const vat = subtotal * 0.18;
+  const totalAmount = subtotal + vat;
+
+  fetch('/api/orders.php', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      total_amount: totalAmount,
+      items: itemsPayload
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.status === 'success') {
+      showToast('Order processed successfully! Redirecting...', 'success');
+      setTimeout(() => {
+        window.location.href = `/order-success?order_id=${data.order_id}`;
+      }, 1000);
+    } else {
+      showToast(data.message || 'Error processing order.', 'error');
+      checkoutBtn.disabled = false;
+      checkoutBtn.textContent = 'Proceed to Checkout';
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    showToast('Network error occurred.', 'error');
+    checkoutBtn.disabled = false;
+    checkoutBtn.textContent = 'Proceed to Checkout';
+  });
 }
 
 // Initial Render
