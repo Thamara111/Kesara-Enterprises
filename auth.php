@@ -114,8 +114,8 @@ require_once __DIR__ . "/layouts/head.php";
                 </p>
             </div>
             <div class="pt-4">
-                <a href="/login" class="inline-block bg-brand text-brand-light font-bold px-8 py-3.5 rounded-xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 text-sm">
-                    Return to Login
+                <a href="/" class="inline-block bg-brand text-brand-light font-bold px-8 py-3.5 rounded-xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 text-sm">
+                    Return to Home
                 </a>
             </div>
         </div>
