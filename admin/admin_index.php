@@ -41,7 +41,7 @@ if (isset($_SESSION['admin_id'])) {
     $role = $_SESSION['admin_role'] ?? 'guest';
 
     $role_access = [
-        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries'],
+        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp'],
         'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries'],
         'supplier_manager' => ['dashboard', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'login', 'inquiries'],
         'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries']
@@ -143,6 +143,11 @@ $view_config = [
     'inquiries' => [
         'title' => 'Customer Inquiries | Kesara Enterprises',
         'description' => 'Manage and assign customer inquiries.',
+        'show_sidebar' => true
+    ],
+    'whatsapp' => [
+        'title' => 'WhatsApp Simulator | Kesara Enterprises',
+        'description' => 'View intercepted WhatsApp messages.',
         'show_sidebar' => true
     ],
     'login' => [

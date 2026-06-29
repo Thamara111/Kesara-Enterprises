@@ -70,6 +70,10 @@ $has_delivery = in_array($role, ['admin', 'delivery_manager']);
                 <i class="ti ti-trash text-xl"></i>
                 Recycle Bin
             </a>
+            <a href="/admin-whatsapp" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'whatsapp' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <i class="ti ti-brand-whatsapp text-xl"></i>
+                WhatsApp Simulator
+            </a>
             <?php endif; ?>
             
             <?php if ($has_finance): ?>

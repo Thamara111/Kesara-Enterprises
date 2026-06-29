@@ -100,6 +100,32 @@ if (isset($pdo) && $pdo !== null) {
     try {
         $stmt = $pdo->prepare("UPDATE users SET status = ? WHERE id = ?");
         $stmt->execute([$status, $id]);
+        
+        // Mock WhatsApp integration
+        if ($status === 'approved' || $status === 'suspended') {
+            $userStmt = $pdo->prepare("SELECT phone, first_name, admin_comment FROM users WHERE id = ?");
+            $userStmt->execute([$id]);
+            $user = $userStmt->fetch();
+            
+            if ($user && !empty($user['phone'])) {
+                $greeting = "Hello " . ($user['first_name'] ?: 'Customer') . ",\n\n";
+                if ($status === 'approved') {
+                    $body = "Your account at Kesara Enterprises has been approved! You can now log in and place orders.\n";
+                } else {
+                    $body = "Your account at Kesara Enterprises has been temporarily suspended.\n";
+                }
+                
+                if (!empty($user['admin_comment'])) {
+                    $body .= "\nAdmin Note:\n" . $user['admin_comment'];
+                }
+                
+                $fullMessage = $greeting . $body;
+                
+                $waStmt = $pdo->prepare("INSERT INTO mock_whatsapp_messages (customer_id, phone, message) VALUES (?, ?, ?)");
+                $waStmt->execute([$id, $user['phone'], $fullMessage]);
+            }
+        }
+        
         echo json_encode(["status" => "success", "message" => "Customer status updated to " . ucfirst($status) . "."]);
     } catch (\Exception $e) {
         http_response_code(500);
