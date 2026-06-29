@@ -37,6 +37,10 @@ $has_delivery = in_array($role, ['admin', 'delivery_manager']);
                 <i class="ti ti-layout-grid text-xl"></i>
                 Dashboard
             </a>
+            <a href="/admin-inquiries" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'inquiries' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <i class="ti ti-inbox text-xl"></i>
+                Inquiries
+            </a>
             
             <?php if ($has_finance): ?>
             <a href="/admin-orders" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'orders' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
@@ -61,6 +65,10 @@ $has_delivery = in_array($role, ['admin', 'delivery_manager']);
             <a href="/admin-users" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'users' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                 <i class="ti ti-user-cog text-xl"></i>
                 Users
+            </a>
+            <a href="/admin-trash" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'trash' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <i class="ti ti-trash text-xl"></i>
+                Recycle Bin
             </a>
             <?php endif; ?>
             

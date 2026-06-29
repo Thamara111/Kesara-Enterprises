@@ -41,10 +41,10 @@ if (isset($_SESSION['admin_id'])) {
     $role = $_SESSION['admin_role'] ?? 'guest';
 
     $role_access = [
-        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login'],
-        'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login'],
-        'supplier_manager' => ['dashboard', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'login'],
-        'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login']
+        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries'],
+        'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries'],
+        'supplier_manager' => ['dashboard', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'login', 'inquiries'],
+        'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries']
     ];
 
     $allowed_views = $role_access[$role] ?? [];
@@ -133,6 +133,16 @@ $view_config = [
     'access_denied' => [
         'title' => 'Access Denied | Kesara Enterprises',
         'description' => 'Unauthorised access attempt to restricted page.',
+        'show_sidebar' => true
+    ],
+    'trash' => [
+        'title' => 'Recycle Bin | Kesara Enterprises',
+        'description' => 'Manage deleted records and suspended customers.',
+        'show_sidebar' => true
+    ],
+    'inquiries' => [
+        'title' => 'Customer Inquiries | Kesara Enterprises',
+        'description' => 'Manage and assign customer inquiries.',
         'show_sidebar' => true
     ],
     'login' => [

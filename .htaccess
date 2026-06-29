@@ -26,6 +26,8 @@ RewriteRule ^admin-goods-received$ admin/admin_index.php?view=goods_received [L,
 RewriteRule ^admin-personnel$ admin/admin_index.php?view=personnel [L,QSA]
 RewriteRule ^admin-assignments$ admin/admin_index.php?view=assignments [L,QSA]
 RewriteRule ^admin-tracking$ admin/admin_index.php?view=tracking [L,QSA]
+RewriteRule ^admin-trash$ admin/admin_index.php?view=trash [L,QSA]
+RewriteRule ^admin-inquiries$ admin/admin_index.php?view=inquiries [L,QSA]
 RewriteRule ^driver-portal$ driver_portal/index.php [L,QSA]
 RewriteRule ^driver$ driver_portal/index.php [L,QSA]
 
