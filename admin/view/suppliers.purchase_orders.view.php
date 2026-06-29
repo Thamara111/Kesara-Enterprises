@@ -496,7 +496,7 @@ foreach ($admin_pos as $p) {
                 Record Goods Received ↗
             </button>
             <div class="grid grid-cols-2 gap-3">
-                <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all">
+                <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all" onclick="downloadPDF('detail-pane', 'Purchase_Order')">
                     <i class="ti ti-download text-base"></i>
                     PDF
                 </button>

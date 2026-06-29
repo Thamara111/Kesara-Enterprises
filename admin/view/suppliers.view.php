@@ -113,7 +113,7 @@ foreach ($admin_suppliers as $s) {
 <!-- Suppliers View -->
 <div class="flex-1 flex overflow-hidden">
     <!-- List Pane -->
-    <div class="flex-1 flex flex-col min-w-0 bg-white">
+    <div id="suppliers-container" class="flex-1 flex flex-col min-w-0 bg-white">
         <!-- Header -->
         <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
             <div>
@@ -121,9 +121,9 @@ foreach ($admin_suppliers as $s) {
                 <p class="text-sm text-gray-500 mt-1">Manage your supply chain and partner relationships</p>
             </div>
             <div class="flex gap-3">
-                <button class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
+                <button class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm" onclick="downloadPDF('suppliers-container', 'Suppliers_List')">
                     <i class="ti ti-download text-lg"></i>
-                    Export
+                    Export PDF
                 </button>
                 <a href="/admin-supplier-add" class="inline-flex items-center gap-2 px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-semibold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
                     <i class="ti ti-plus text-lg"></i>

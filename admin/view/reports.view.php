@@ -22,11 +22,8 @@
                 <option>Custom range</option>
             </select>
             <div class="flex items-center gap-1">
-                <button class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm">
-                    <i class="ti ti-download"></i> CSV
-                </button>
-                <button class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm" onclick="sendPrompt('How should invoice PDF generation work for Kesara Enterprises orders?')">
-                    <i class="ti ti-file-text"></i> PDF
+                <button class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm" onclick="exportActiveReport()">
+                    <i class="ti ti-download"></i> PDF Report
                 </button>
             </div>
         </div>
@@ -380,5 +377,19 @@ function switchTab(el, tab) {
             pane.classList.add('hidden');
         }
     });
+}
+
+function exportActiveReport() {
+    let activeTab = 'sales';
+    document.querySelectorAll('.chip').forEach(t => {
+        if(t.classList.contains('on')) {
+            if(t.innerText.includes('Sales')) activeTab = 'sales';
+            else if(t.innerText.includes('Products')) activeTab = 'products';
+            else if(t.innerText.includes('Customers')) activeTab = 'customers';
+        }
+    });
+    const id = 'tab-' + activeTab;
+    const name = activeTab.charAt(0).toUpperCase() + activeTab.slice(1) + "_Report";
+    downloadPDF(id, name);
 }
 </script>

@@ -132,12 +132,12 @@ foreach ($admin_orders as $o) {
 <main class="flex-1 flex overflow-hidden">
     
     <!-- LEFT: ORDER LIST -->
-    <div class="flex-1 flex flex-col bg-white border-r border-gray-100 overflow-hidden">
+    <div id="orders-container" class="flex-1 flex flex-col bg-white border-r border-gray-100 overflow-hidden">
         <!-- Header -->
         <div class="p-8 border-b border-gray-50 flex items-center justify-between gap-4">
             <h1 class="text-xl font-extrabold text-gray-900 tracking-tight uppercase">Orders</h1>
-            <button class="bg-gray-50 text-gray-400 hover:text-brand hover:bg-brand-light p-2 rounded-xl transition-all">
-                <i class="ti ti-download text-xl"></i>
+            <button class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all" onclick="downloadPDF('orders-container', 'Orders_List')">
+                <i class="ti ti-download text-xl"></i>Export PDF
             </button>
         </div>
 
@@ -242,6 +242,9 @@ foreach ($admin_orders as $o) {
             </div>
             <div class="flex items-center gap-3">
                 <span id="d-badge" class="px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider">Pending</span>
+                <button class="flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-900 bg-white border border-gray-200 rounded-xl transition-all shadow-sm" onclick="downloadPDF('order-detail-pane', 'Invoice')" title="Download Invoice PDF">
+                    <i class="ti ti-file-text text-xl"></i>
+                </button>
                 <button onclick="closeOrderDetailPane()" class="p-1.5 text-gray-400 hover:text-brand hover:bg-brand-light rounded-xl transition-all focus:outline-none" aria-label="Close details">
                     <i class="ti ti-x text-xl"></i>
                 </button>

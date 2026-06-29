@@ -114,10 +114,9 @@ if (empty($admin_customers)) {
                 <h1 class="text-2xl font-bold text-gray-900">Customers</h1>
                 <p class="text-sm text-gray-500 mt-1">Manage wholesale buyer accounts and verification.</p>
             </div>
-            <button class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all">
-                <i class="ti ti-download"></i>
-                Export CSV
-            </button>
+                <button class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm" onclick="downloadPDF('customer-list-container', 'Customers_List')">
+                    <i class="ti ti-download"></i> Export PDF
+                </button>
         </div>
 
         <!-- Stats -->
@@ -597,7 +596,11 @@ function updateStatus(id, newStatus) {
                 }
 
                 // Re-select the same row to refresh the detail pane
-                selectCustomer(rowEl, false);
+                try {
+                    selectCustomer(rowEl, false);
+                } catch (e) {
+                    console.error("Error in selectCustomer:", e);
+                }
             }
             
             const labels = { approved: 'Customer account approved.', suspended: 'Customer account suspended.', rejected: 'Customer account rejected.' };
@@ -609,7 +612,7 @@ function updateStatus(id, newStatus) {
     })
     .catch(err => {
         console.error(err);
-        showToast('An error occurred while updating status.', 'error');
+        showToast('Error: ' + err.message, 'error');
     });
 }
 

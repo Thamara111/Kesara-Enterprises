@@ -103,7 +103,7 @@ if (empty($chart_months)) { $chart_months = []; $chart_revenue = []; }
 $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format($current_month_revenue/1000000, 1) . 'M' : number_format($current_month_revenue/1000, 0) . 'K');
 ?>
 <!-- MAIN CONTENT -->
-<main class="flex-1 overflow-y-auto">
+<main id="dashboard-container" class="flex-1 overflow-y-auto bg-white">
     
     <!-- Header -->
     <header class="bg-white border-b border-gray-100 px-4 md:px-10 py-4 md:py-6 sticky top-0 z-30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 md:gap-6">
@@ -120,8 +120,8 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
                     <option>Last Quarter</option>
                 </select>
             </div>
-            <button class="bg-gray-900 text-white font-bold px-6 py-3 rounded-2xl text-xs uppercase tracking-widest hover:bg-gray-800 transition-all flex items-center gap-2">
-                <i class="ti ti-download"></i> Export Report
+            <button class="bg-gray-900 text-white font-bold px-6 py-3 rounded-2xl text-xs uppercase tracking-widest hover:bg-gray-800 transition-all flex items-center gap-2" onclick="downloadPDF('dashboard-container', 'Dashboard_Overview')">
+                <i class="ti ti-download"></i> Export PDF
             </button>
         </div>
     </header>

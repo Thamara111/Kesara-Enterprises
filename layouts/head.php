@@ -1,3 +1,8 @@
+<?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 
@@ -7,6 +12,13 @@
     <title>Kesara Enterprises</title>
     <link href="/dist/output.css" rel="stylesheet">
     <link href="/dist/admin-layout.css" rel="stylesheet">
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- PDF Generation (Local) -->
+    <script src="/assets/js/html2pdf.bundle.min.js"></script>
+    <script src="/assets/js/pdf-helper.js"></script>
+    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 
     <style>

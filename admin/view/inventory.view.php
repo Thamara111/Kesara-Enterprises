@@ -82,16 +82,15 @@ foreach ($rows as $r) {
 
 <div class="flex-1 flex overflow-hidden">
     <!-- List Pane -->
-    <div class="flex-1 flex flex-col min-w-0 bg-white">
+    <div id="inventory-container" class="flex-1 flex flex-col min-w-0 bg-white">
         <!-- Header -->
         <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">Inventory</h1>
                 <p class="text-sm text-gray-500 mt-1">Manage stock levels and warehouse replenishment.</p>
             </div>
-            <button class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all">
-                <i class="ti ti-download"></i>
-                Export CSV
+            <button class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all" onclick="downloadPDF('inventory-container', 'Inventory_Report')">
+                <i class="ti ti-download"></i> Export PDF
             </button>
         </div>
 

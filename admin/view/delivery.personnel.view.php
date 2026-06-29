@@ -146,7 +146,7 @@ foreach ($admin_drivers as $d) {
 
 <div class="flex-1 flex overflow-hidden">
     <!-- List Pane (Left) -->
-    <div class="flex-1 flex flex-col min-w-0 bg-white">
+    <div id="delivery-personnel-container" class="flex-1 flex flex-col min-w-0 bg-white">
         <!-- Header -->
         <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
             <div>
@@ -154,9 +154,9 @@ foreach ($admin_drivers as $d) {
                 <p class="text-sm text-gray-500 mt-1">Manage delivery personnel, assignments, and performance</p>
             </div>
             <div class="flex gap-3">
-                <button class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
+                <button class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm" onclick="downloadPDF('delivery-personnel-container', 'Delivery_Personnel')">
                     <i class="ti ti-download text-lg"></i>
-                    Export
+                    Export PDF
                 </button>
                 <button onclick="sendPrompt('What should the add or edit delivery person page include for Kesara Enterprises admin?')" class="inline-flex items-center gap-2 px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-semibold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
                     <i class="ti ti-plus text-lg"></i>
