@@ -25,7 +25,8 @@ if (isset($pdo) && $pdo !== null) {
     try {
         $stmt = $pdo->query("SELECT c.*, COUNT(p.id) AS product_count 
                              FROM categories c 
-                             LEFT JOIN products p ON p.category_id = c.id 
+                             LEFT JOIN products p ON p.category_id = c.id AND p.deleted_at IS NULL
+                             WHERE c.deleted_at IS NULL
                              GROUP BY c.id");
         $categories_data = $stmt->fetchAll();
     } catch (\Exception $e) {
@@ -78,7 +79,42 @@ if (empty($categories_data)) {
                         </tr>
                     </thead>
                     <tbody id="cat-table-body" class="divide-y divide-gray-50">
-                        <!-- Table rows rendered dynamically -->
+                        <?php foreach ($categories_data as $idx => $c): ?>
+                        <tr class="cat-row cursor-pointer transition-colors hover:bg-gray-50/50 bg-white"
+                            data-idx="<?= $idx ?>"
+                            data-id="<?= htmlspecialchars($c['id']) ?>"
+                            data-name="<?= htmlspecialchars($c['name']) ?>"
+                            data-slug="<?= htmlspecialchars($c['slug']) ?>"
+                            data-image="<?= htmlspecialchars($c['image']) ?>"
+                            data-icon="<?= htmlspecialchars($c['icon'] ?? 'ti-tag') ?>"
+                            data-description="<?= htmlspecialchars($c['description']) ?>"
+                            onclick="selectCat(this)">
+                            <td class="p-6">
+                                <div class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 transition-all overflow-hidden">
+                                    <?php if (!empty($c['image'])): ?>
+                                        <img src="<?= htmlspecialchars($c['image']) ?>" alt="<?= htmlspecialchars($c['name']) ?>" class="w-full h-full object-cover">
+                                    <?php else: ?>
+                                        <i class="ti <?= htmlspecialchars($c['icon'] ?? 'ti-tag') ?> text-xl"></i>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                            <td class="p-6">
+                                <h4 class="text-sm font-bold text-gray-900 truncate"><?= htmlspecialchars($c['name']) ?></h4>
+                                <p class="text-[10px] font-medium text-gray-400 truncate mt-0.5"><?= htmlspecialchars($c['description'] ?: 'No description') ?></p>
+                            </td>
+                            <td class="p-6 text-xs font-bold text-gray-500"><?= htmlspecialchars($c['slug']) ?></td>
+                            <td class="p-6 text-xs font-bold text-gray-950"><?= htmlspecialchars($c['product_count'] ?? 0) ?> Products</td>
+                            <td class="p-6 text-right">
+                                <div class="flex justify-end gap-2 text-gray-300">
+                                    <button class="p-2 hover:text-brand transition-colors" aria-label="Edit"><i class="ti ti-edit text-base"></i></button>
+                                    <button onclick="event.stopPropagation(); selectCat(this.closest('tr')); submitDelete();" class="p-2 hover:text-red-500 transition-colors" aria-label="Delete"><i class="ti ti-trash text-base"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php if (empty($categories_data)): ?>
+                            <tr><td colspan="5" class="p-6 text-center text-gray-400 text-xs">No categories found.</td></tr>
+                        <?php endif; ?>
                     </tbody>
                 </table>
             </div>
@@ -179,48 +215,24 @@ if (empty($categories_data)) {
 </style>
 
 <script>
-const categories = <?php echo json_encode($categories_data); ?>;
-let selectedIdx = -1;
-
-function renderCatList() {
-    const tbody = document.getElementById('cat-table-body');
-    tbody.innerHTML = categories.map((c, i) => `
-        <tr onclick="selectCat(this, ${i})" class="cat-row cursor-pointer transition-colors hover:bg-gray-50/50 ${i === selectedIdx ? 'selected' : ''}">
-            <td class="p-6">
-                <div class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 transition-all overflow-hidden">
-                    ${c.image ? `<img src="${c.image}" alt="${c.name}" class="w-full h-full object-cover">` : `<i class="ti ${c.icon || 'ti-tag'} text-xl"></i>`}
-                </div>
-            </td>
-            <td class="p-6">
-                <h4 class="text-sm font-bold text-gray-900 truncate">${c.name}</h4>
-                <p class="text-[10px] font-medium text-gray-400 truncate mt-0.5">${c.description || 'No description'}</p>
-            </td>
-            <td class="p-6 text-xs font-bold text-gray-500">${c.slug}</td>
-            <td class="p-6 text-xs font-bold text-gray-950">${c.product_count || 0} Products</td>
-            <td class="p-6 text-right">
-                <div class="flex justify-end gap-2 text-gray-300">
-                    <button class="p-2 hover:text-brand transition-colors" aria-label="Edit"><i class="ti ti-edit text-base"></i></button>
-                    <button onclick="event.stopPropagation(); selectCat(this.parentElement.parentElement.parentElement, ${i}); submitDelete();" class="p-2 hover:text-red-500 transition-colors" aria-label="Delete"><i class="ti ti-trash text-base"></i></button>
-                </div>
-            </td>
-        </tr>
-    `).join('');
-}
-
-function selectCat(el, idx, openDrawer = true) {
-    selectedIdx = idx;
-    renderCatList();
-    const c = categories[idx];
+function selectCat(el, openDrawer = true) {
+    if (!el) return;
+    document.querySelectorAll('.cat-row').forEach(r => {
+        r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+        r.classList.add('bg-white', 'border-gray-100');
+    });
+    el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+    el.classList.remove('bg-white', 'border-gray-100');
     
     document.getElementById('form-mode-label').textContent = 'Edit Category';
-    document.getElementById('f-id').value = c.id;
-    document.getElementById('f-name').value = c.name;
-    document.getElementById('f-slug').value = c.slug;
-    document.getElementById('f-image').value = c.image || '';
+    document.getElementById('f-id').value = el.dataset.id;
+    document.getElementById('f-name').value = el.dataset.name;
+    document.getElementById('f-slug').value = el.dataset.slug;
+    document.getElementById('f-image').value = el.dataset.image || '';
     document.getElementById('f-image-file').value = ''; // Reset file input
-    updatePreviewFromUrl(c.image || '');
-    document.getElementById('f-icon').value = c.icon || 'ti-tag';
-    document.getElementById('f-desc').value = c.description || '';
+    updatePreviewFromUrl(el.dataset.image || '');
+    document.getElementById('f-icon').value = el.dataset.icon || 'ti-tag';
+    document.getElementById('f-desc').value = el.dataset.description || '';
     
     // Show delete button for existing categories
     document.getElementById('btn-delete').classList.remove('hidden');
@@ -237,8 +249,10 @@ function selectCat(el, idx, openDrawer = true) {
 }
 
 function showNew() {
-    selectedIdx = -1;
-    renderCatList();
+    document.querySelectorAll('.cat-row').forEach(r => {
+        r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+        r.classList.add('bg-white', 'border-gray-100');
+    });
     document.getElementById('form-mode-label').textContent = 'Add New Category';
     document.getElementById('f-id').value = '';
     document.getElementById('f-name').value = '';
@@ -304,8 +318,10 @@ function closeCatFormPane() {
         backdrop.classList.remove('opacity-100');
         backdrop.classList.add('hidden');
     }
-    selectedIdx = -1;
-    renderCatList();
+    document.querySelectorAll('.cat-row').forEach(r => {
+        r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+        r.classList.add('bg-white', 'border-gray-100');
+    });
 }
 
 // Intercept form submissions and route through our REST API
@@ -365,6 +381,5 @@ function submitDelete() {
     }
 }
 
-// Initial render
-renderCatList();
+
 </script>

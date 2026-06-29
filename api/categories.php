@@ -74,7 +74,7 @@ if ($method === 'POST') {
 
         if (isset($pdo) && $pdo !== null) {
             try {
-                $stmt = $pdo->prepare("DELETE FROM categories WHERE id = ?");
+                $stmt = $pdo->prepare("UPDATE categories SET deleted_at = NOW() WHERE id = ?");
                 $stmt->execute([$id]);
                 echo json_encode(["status" => "success", "message" => "Category deleted successfully."]);
             } catch (\Exception $e) {

@@ -101,11 +101,8 @@ if ($method === 'POST') {
         if (isset($pdo) && $pdo !== null) {
             try {
                 $pdo->beginTransaction();
-                // 1. Delete pricing tiers
-                $stmt = $pdo->prepare("DELETE FROM pricing_tiers WHERE product_id = ?");
-                $stmt->execute([$id]);
-                // 2. Delete product
-                $stmt2 = $pdo->prepare("DELETE FROM products WHERE id = ?");
+                // Soft delete product
+                $stmt2 = $pdo->prepare("UPDATE products SET deleted_at = NOW() WHERE id = ?");
                 $stmt2->execute([$id]);
                 
                 $pdo->commit();
