@@ -130,35 +130,91 @@ require_once __DIR__ . "/layouts/header.php";
 </main>
 
 <script>
-const TIERS_A = [
-  {min:50,  max:99,  price:120},
-  {min:100, max:499, price:108},
-  {min:500, max:Infinity, price:95}
-];
-const TIERS_B = [
-  {min:50,  max:99,  price:145},
-  {min:100, max:499, price:130},
-  {min:500, max:Infinity, price:115}
-];
-const TIERS_C = [
-  {min:50,  max:99,  price:195},
-  {min:100, max:499, price:175},
-  {min:500, max:Infinity, price:155}
-];
+let cartItems = [];
+let dbProducts = {};
 
-const cartItems = [
-  {id:1, name:'Classic Cotton Brief', meta:'Black · Size M · SKU KB-001', qty:120, moq:50, tiers:TIERS_A},
-  {id:3, name:'Ladies Hipster', meta:'White · Size S · SKU KL-003', qty:55,  moq:50, tiers:TIERS_B}, // Changed to 55 to satisfy MOQ 50
-  {id:2, name:'Stretch Boxer', meta:'Navy · Size L · SKU KB-008', qty:200, moq:100, tiers:TIERS_C}
-];
+// Load cart from LocalStorage
+function loadCartFromStorage() {
+    const saved = localStorage.getItem('kesara_cart');
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch (e) {
+            return [];
+        }
+    }
+    return [];
+}
 
+function saveCartToStorage() {
+    // Only save id and qty
+    const toSave = cartItems.map(item => ({id: item.id, qty: item.qty}));
+    localStorage.setItem('kesara_cart', JSON.stringify(toSave));
+}
+
+// Fetch DB details for the items
+async function initializeCart() {
+    const storageCart = loadCartFromStorage();
+    if (storageCart.length === 0) {
+        cartItems = [];
+        render();
+        return;
+    }
+
+    const ids = storageCart.map(i => i.id);
+    try {
+        const res = await fetch('/api/cart_items.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({product_ids: ids})
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            const products = data.data;
+            products.forEach(p => dbProducts[p.id] = p);
+            
+            // Rebuild cartItems with db details
+            cartItems = storageCart.map(item => {
+                const dbP = dbProducts[item.id];
+                if (!dbP) return null;
+                // Enforce MOQ on load
+                let finalQty = item.qty < dbP.moq ? dbP.moq : item.qty;
+                return {
+                    id: dbP.id,
+                    name: dbP.name,
+                    meta: dbP.meta,
+                    moq: dbP.moq,
+                    tiers: dbP.tiers,
+                    qty: finalQty
+                };
+            }).filter(i => i !== null);
+            saveCartToStorage(); // Save validated quantities
+            render();
+        }
+    } catch (e) {
+        console.error("Failed to load cart items:", e);
+    }
+}
+
+// Call on load
+document.addEventListener('DOMContentLoaded', initializeCart);
+
+// Helper to calculate price based on tiers
 function getPrice(item) {
-  return (item.tiers.find(t=>item.qty>=t.min&&item.qty<=t.max)||item.tiers[0]).price;
+  if (!item.tiers || item.tiers.length === 0) return 0;
+  for (let t of item.tiers) {
+    const max = t.max === null ? Infinity : t.max;
+    if (item.qty >= t.min && item.qty <= max) {
+      return t.price;
+    }
+  }
+  // Fallback to highest tier if over max, or lowest if under min
+  return item.tiers[item.tiers.length - 1].price;
 }
 
 function getTierLabel(item) {
-  const t = item.tiers.find(t=>item.qty>=t.min&&item.qty<=t.max)||item.tiers[0];
-  return t.max===Infinity ? `500+ tier` : `${t.min}–${t.max} tier`;
+  const t = item.tiers.find(t=>item.qty>=t.min&&(t.max===null||item.qty<=t.max))||item.tiers[0];
+  return t.max===null ? `500+ tier` : `${t.min}–${t.max} tier`;
 }
 
 function render() {
@@ -247,72 +303,40 @@ function render() {
   }
 }
 
-function changeQty(i, delta) {
-  cartItems[i].qty = Math.max(0, cartItems[i].qty + delta);
+function changeQty(index, delta) {
+  cartItems[index].qty += delta;
+  if(cartItems[index].qty < 0) cartItems[index].qty = 0;
+  saveCartToStorage();
   render();
 }
 
 function removeItem(i) {
   cartItems.splice(i, 1);
+  saveCartToStorage();
   render();
 }
 
 function clearCart() {
   if(confirm('Are you sure you want to clear your entire cart?')) {
       cartItems.length = 0;
+      saveCartToStorage();
       render();
   }
 }
 
 function submitOrder() {
   const checkoutBtn = document.getElementById('checkout-btn');
+  if (cartItems.length === 0) {
+      showToast('Your cart is empty', 'error');
+      return;
+  }
+  
   checkoutBtn.disabled = true;
-  checkoutBtn.textContent = 'Processing Order...';
+  checkoutBtn.textContent = 'Redirecting to Checkout...';
 
-  // Calculate total amount
-  let subtotal = 0;
-  const itemsPayload = cartItems.map(item => {
-    const price = getPrice(item);
-    subtotal += item.qty * price;
-    return {
-      product_id: item.id,
-      quantity: item.qty,
-      unit_price: price
-    };
-  });
-
-  const vat = subtotal * 0.18;
-  const totalAmount = subtotal + vat;
-
-  fetch('/api/orders.php', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      total_amount: totalAmount,
-      items: itemsPayload
-    })
-  })
-  .then(res => res.json())
-  .then(data => {
-    if (data.status === 'success') {
-      showToast('Order processed successfully! Redirecting...', 'success');
-      setTimeout(() => {
-        window.location.href = `/order-success?order_id=${data.order_id}`;
-      }, 1000);
-    } else {
-      showToast(data.message || 'Error processing order.', 'error');
-      checkoutBtn.disabled = false;
-      checkoutBtn.textContent = 'Proceed to Checkout';
-    }
-  })
-  .catch(err => {
-    console.error(err);
-    showToast('Network error occurred.', 'error');
-    checkoutBtn.disabled = false;
-    checkoutBtn.textContent = 'Proceed to Checkout';
-  });
+  setTimeout(() => {
+      window.location.href = '/checkout';
+  }, 500);
 }
 
 // Initial Render

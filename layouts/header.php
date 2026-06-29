@@ -1,7 +1,5 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+
 $is_logged_in = isset($_SESSION['user_id']);
 ?>
 <nav class="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm relative">
@@ -21,10 +19,12 @@ $is_logged_in = isset($_SESSION['user_id']);
             <div class="w-px h-6 bg-gray-100"></div>
             <a href="/cart" class="relative group p-2">
                 <i class="ti ti-shopping-cart text-xl text-gray-600 group-hover:text-brand transition-colors"></i>
-                <span class="absolute top-0 right-0 w-4 h-4 bg-brand text-brand-light text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white shadow-sm">3</span>
+                <span id="cart-badge-desktop" class="absolute top-0 right-0 w-4 h-4 bg-brand text-brand-light text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white shadow-sm hidden">0</span>
             </a>
             <?php if ($is_logged_in): ?>
-                <a href="/account" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">Account</a>
+                <a href="/account" class="group p-2 cursor-pointer" aria-label="Account">
+                    <i class="ti ti-user text-xl text-gray-600 group-hover:text-brand transition-colors"></i>
+                </a>
             <?php else: ?>
                 <a href="/login" class="bg-brand text-brand-light text-sm font-semibold py-2 px-6 rounded-md hover:bg-brand-dark transition-all transform hover:-translate-y-px">Sign in</a>
             <?php endif; ?>
@@ -34,7 +34,7 @@ $is_logged_in = isset($_SESSION['user_id']);
         <div class="flex items-center md:hidden gap-3">
             <a href="/cart" class="relative group p-2">
                 <i class="ti ti-shopping-cart text-xl text-gray-650"></i>
-                <span class="absolute top-0 right-0 w-4 h-4 bg-brand text-brand-light text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white shadow-sm">3</span>
+                <span id="cart-badge-mobile" class="absolute top-0 right-0 w-4 h-4 bg-brand text-brand-light text-[9px] font-bold rounded-full flex items-center justify-center border-2 border-white shadow-sm hidden">0</span>
             </a>
             <button id="mobile-menu-toggle" class="p-2 text-gray-600 hover:text-brand transition-colors focus:outline-none" aria-label="Toggle Navigation">
                 <i class="ti ti-menu-2 text-2xl" id="menu-icon"></i>
@@ -49,7 +49,9 @@ $is_logged_in = isset($_SESSION['user_id']);
         <a href="/contact" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Contact</a>
         <hr class="border-gray-100">
         <?php if ($is_logged_in): ?>
-            <a href="/account" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Account</a>
+            <a href="/account" class="flex items-center gap-2 block text-sm font-bold text-gray-600 hover:text-brand transition-colors">
+                <i class="ti ti-user text-xl"></i> Account
+            </a>
         <?php else: ?>
             <a href="/login" class="block bg-brand text-brand-light text-center text-sm font-semibold py-3 px-6 rounded-xl hover:bg-brand-dark transition-all">Sign in</a>
         <?php endif; ?>
@@ -67,4 +69,4 @@ $is_logged_in = isset($_SESSION['user_id']);
             }
         });
     </script>
-</nav>
+</nav>

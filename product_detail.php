@@ -322,7 +322,7 @@ require_once __DIR__ . "/layouts/header.php";
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <a href="/cart" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2">
+                    <button onclick="addToCart()" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2">
                         <i class="ti ti-shopping-cart-plus text-xl"></i>
                         Add to Order
                     </a>
@@ -425,6 +425,32 @@ function updateUI() {
 function changeQty(delta) {
   qty = Math.max(0, qty + delta);
   updateUI();
+}
+
+function addToCart() {
+    if (qty < moq) {
+        alert("Minimum Order Quantity is " + moq);
+        return;
+    }
+    const productId = <?= (int)$product['id'] ?>;
+    let saved = localStorage.getItem('kesara_cart');
+    let cart = [];
+    if (saved) {
+        try { cart = JSON.parse(saved); } catch(e){}
+    }
+    
+    // Check if already in cart
+    let existing = cart.find(i => i.id === productId);
+    if (existing) {
+        existing.qty += qty;
+    } else {
+        cart.push({ id: productId, qty: qty });
+    }
+    
+    localStorage.setItem('kesara_cart', JSON.stringify(cart));
+    
+    // Redirect to cart
+    window.location.href = '/cart.php';
 }
 
 // Initial render

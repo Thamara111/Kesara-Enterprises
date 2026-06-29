@@ -52,5 +52,43 @@
 </footer>
 
 <script src="dist/app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function updateCartBadges() {
+        const saved = localStorage.getItem('kesara_cart');
+        let count = 0;
+        if (saved) {
+            try {
+                const cart = JSON.parse(saved);
+                count = cart.length; // Count of distinct items, or use cart.reduce((sum, item) => sum + item.qty, 0) for total qty
+            } catch(e) {}
+        }
+        
+        const desktopBadge = document.getElementById('cart-badge-desktop');
+        const mobileBadge = document.getElementById('cart-badge-mobile');
+        
+        if (desktopBadge) {
+            desktopBadge.textContent = count;
+            if (count > 0) desktopBadge.classList.remove('hidden');
+            else desktopBadge.classList.add('hidden');
+        }
+        
+        if (mobileBadge) {
+            mobileBadge.textContent = count;
+            if (count > 0) mobileBadge.classList.remove('hidden');
+            else mobileBadge.classList.add('hidden');
+        }
+    }
+    
+    updateCartBadges();
+    
+    // Listen for storage changes from other tabs
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'kesara_cart') {
+            updateCartBadges();
+        }
+    });
+});
+</script>
 </body>
 </html>
