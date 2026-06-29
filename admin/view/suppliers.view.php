@@ -94,32 +94,9 @@ if (isset($pdo) && $pdo !== null) {
 }
 
 if (empty($admin_suppliers)) {
-    $admin_suppliers = [
-        [
-            'id' => 1,
-            'initials' => 'SC',
-            'av' => 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-emerald-100',
-            'name' => 'Sri Lanka Cotton Mills',
-            'email' => 'slcm@cottonmills.lk',
-            'contact' => 'Mr. Roshan Silva',
-            'phone' => '+94 11 456 7890',
-            'addr' => 'Colombo 10, WP',
-            'terms' => 'Net 30',
-            'products' => '<span class="px-3 py-1 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-medium text-gray-600 uppercase tracking-wider">Combed cotton fabric</span>',
-            'lead' => '7 days',
-            'cat' => 'Fabric',
-            'ontime' => '96%',
-            'ontimeW' => 96,
-            'quality' => '98%',
-            'qualityW' => 98,
-            'badge' => 'bg-blue-50 text-blue-700',
-            'badgeText' => 'Preferred',
-            'status' => 'preferred',
-            'orders' => 2,
-            'spend' => 'LKR 39K'
-        ]
-    ];
+    $admin_suppliers = [];
 }
+
 
 // Calculate dynamic stats
 $total_suppliers = count($admin_suppliers);

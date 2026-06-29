@@ -92,48 +92,13 @@ if (isset($pdo) && $pdo !== null) {
 
 // Fallback values if empty
 if ($current_month_revenue == 0) $current_month_revenue = 1400000.00;
-if ($current_month_orders == 0) $current_month_orders = 47;
-if ($pending_payment_count == 0) $pending_payment_count = 8;
-if ($pending_registration_count == 0) $pending_registration_count = 5;
 
-if (empty($critical_stock_items)) {
-    $critical_stock_items = [
-        ['name' => 'Classic Brief', 'size' => 'XL', 'colour' => 'Black', 'quantity' => 18, 'restock_min' => 200],
-        ['name' => 'Ladies Hipster', 'size' => 'S', 'colour' => 'White', 'quantity' => 34, 'restock_min' => 200],
-        ['name' => 'Kids Trunk', 'size' => 'M', 'colour' => 'Navy', 'quantity' => 62, 'restock_min' => 200]
-    ];
-}
 
-if (empty($live_orders)) {
-    $live_orders = [
-        ['id' => 1, 'status' => 'pending', 'business_name' => 'ABC Garments'],
-        ['id' => 2, 'status' => 'processing', 'business_name' => 'Seylan Stores']
-    ];
-}
-
-if (empty($inventory_pressure)) {
-    $inventory_pressure = [
-        ['name' => 'Classic Brief', 'size' => 'XL', 'colour' => 'Black', 'quantity' => 18, 'restock_min' => 200],
-        ['name' => 'Ladies Hipster', 'size' => 'S', 'colour' => 'White', 'quantity' => 34, 'restock_min' => 200],
-        ['name' => 'Kids Trunk', 'size' => 'M', 'colour' => 'Navy', 'quantity' => 62, 'restock_min' => 200]
-    ];
-}
-
-if (empty($pending_registrations)) {
-    $pending_registrations = [
-        ['id' => 4, 'business_name' => 'Nimal Traders', 'first_name' => 'Nimal', 'last_name' => 'Silva', 'email' => 'nimal@traders.lk', 'business_type' => 'Retailer', 'br_number' => 'PV 88421', 'created_at' => date('Y-m-d H:i:s', strtotime('-2 days'))],
-        ['id' => 5, 'business_name' => 'Lakshmi Stores', 'first_name' => 'Lakshmi', 'last_name' => 'Fernando', 'email' => 'admin@lakshmi.lk', 'business_type' => 'Distributor', 'br_number' => 'PV 77312', 'created_at' => date('Y-m-d H:i:s', strtotime('-1 days'))]
-    ];
-}
-
-if (empty($chart_months)) {
-    $chart_months = ['Dec','Jan','Feb','Mar','Apr','May'];
-    $chart_revenue = [800000, 950000, 1100000, 900000, 1200000, 1400000];
-}
-
-if (array_sum($status_counts) == 0) {
-    $status_counts = ['Pending' => 8, 'Processing' => 12, 'Shipped' => 15, 'Delivered' => 12];
-}
+if (empty($critical_stock_items)) { $critical_stock_items = []; }
+if (empty($live_orders)) { $live_orders = []; }
+if (empty($inventory_pressure)) { $inventory_pressure = []; }
+if (empty($pending_registrations)) { $pending_registrations = []; }
+if (empty($chart_months)) { $chart_months = []; $chart_revenue = []; }
 
 $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format($current_month_revenue/1000000, 1) . 'M' : number_format($current_month_revenue/1000, 0) . 'K');
 ?>

@@ -245,19 +245,11 @@ if (isset($pdo) && $pdo !== null) {
 }
 
 if (empty($admin_products)) {
-    $admin_products = [
-      [ 'id' => 0, 'name' => 'Classic Cotton Brief', 'sku' => 'KB-001', 'cat' => "Men's Briefs", 'moq' => 50, 'price' => 95, 'status' => 'In Stock', 'badge' => 'bg-green-50 text-green-600 border-green-100', 'desc' => "Classic cut men's brief. Suitable for all-day wear. Ideal for retail bundles.", 'tiers' => [['q' => 50, 'p' => 120], ['q' => 100, 'p' => 108], ['q' => 500, 'p' => 95]] ],
-      [ 'id' => 1, 'name' => 'Stretch Boxer', 'sku' => 'KB-008', 'cat' => "Men's Boxers", 'moq' => 100, 'price' => 155, 'status' => 'In Stock', 'badge' => 'bg-green-50 text-green-600 border-green-100', 'desc' => "Premium stretch cotton boxers with reinforced stitching.", 'tiers' => [['q' => 100, 'p' => 185], ['q' => 500, 'p' => 155]] ],
-      [ 'id' => 2, 'name' => 'Ladies Hipster', 'sku' => 'KL-003', 'cat' => "Ladies Innerwear", 'moq' => 50, 'price' => 115, 'status' => 'Low Stock', 'badge' => 'bg-amber-50 text-amber-600 border-amber-100', 'desc' => "Soft touch hipster briefs for maximum comfort.", 'tiers' => [['q' => 50, 'p' => 135], ['q' => 200, 'p' => 115]] ]
-    ];
+    $admin_products = [];
 }
 
 if (empty($all_categories)) {
-    $all_categories = [
-        ['id' => 1, 'name' => "Men's Briefs"],
-        ['id' => 2, 'name' => "Men's Boxers"],
-        ['id' => 3, 'name' => "Ladies Innerwear"]
-    ];
+    $all_categories = [];
 }
 ?>
 

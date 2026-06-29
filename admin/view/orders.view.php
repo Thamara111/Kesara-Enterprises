@@ -111,32 +111,9 @@ if (isset($pdo) && $pdo !== null) {
 }
 
 if (empty($admin_orders)) {
-    $admin_orders = [
-        [
-            'id' => 1,
-            'formattedId' => 'KE-2025-00847',
-            'status' => 'pending',
-            'badge' => 'bg-amber-50 text-amber-600 border border-amber-100',
-            'badgeText' => 'PENDING PAYMENT',
-            'company' => 'ABC Garments',
-            'clientName' => 'Kamal Perera',
-            'clientEmail' => 'kamal@abc.lk',
-            'date' => '12 May 2025, 9:14 AM',
-            'total' => '71,933.00',
-            'items' => [
-                ['n' => 'Classic Cotton Brief', 'q' => 120, 'p' => '12,960'],
-                ['n' => 'Ladies Hipster', 'q' => 100, 'p' => '13,000'],
-                ['n' => 'Stretch Boxer', 'q' => 200, 'p' => '35,000']
-            ],
-            'timeline' => [
-                ['t' => 'Order Placed', 'd' => '12 May, 9:14 AM', 's' => 'now'],
-                ['t' => 'Processing', 'd' => '', 's' => 'pend'],
-                ['t' => 'Shipped', 'd' => '', 's' => 'pend'],
-                ['t' => 'Delivered', 'd' => '', 's' => 'pend']
-            ]
-        ]
-    ];
+    $admin_orders = [];
 }
+
 
 // Calculate dynamic stats
 $total_orders = count($admin_orders);

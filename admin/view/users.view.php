@@ -51,14 +51,9 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
-// Fallback to seeded / mock staff if database is offline or empty
+// Show empty list if no staff found in DB
 if (empty($staff_users)) {
-    $staff_users = [
-        ['id' => 1, 'username' => 'admin', 'email' => 'admin@kesara.lk', 'role' => 'admin', 'created_at' => '2026-06-09 08:00:00'],
-        ['id' => 2, 'username' => 'finance', 'email' => 'finance@kesara.lk', 'role' => 'finance_manager', 'created_at' => '2026-06-09 08:00:00'],
-        ['id' => 3, 'username' => 'supplier', 'email' => 'supplier@kesara.lk', 'role' => 'supplier_manager', 'created_at' => '2026-06-09 08:00:00'],
-        ['id' => 4, 'username' => 'delivery', 'email' => 'delivery@kesara.lk', 'role' => 'delivery_manager', 'created_at' => '2026-06-09 08:00:00']
-    ];
+    $staff_users = [];
 }
 
 // Role label & badge class helpers

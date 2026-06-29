@@ -59,51 +59,12 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
-// Fallback to mock data if database connection fails or user is not found
+// If user data could not be loaded, redirect to login
 if (!$user) {
-    $user = [
-        'first_name' => 'Kamal',
-        'last_name' => 'Perera',
-        'email' => 'kamal@abcgarments.lk',
-        'phone' => '+94 77 123 4567',
-        'business_name' => 'ABC Garments (Pvt) Ltd',
-        'br_number' => 'PV 12345',
-        'status' => 'approved',
-        'address' => "No. 45, Factory Road\nKatunayake, Western Province\nSri Lanka"
-    ];
-    $total_orders = 14;
-    $total_spent = 1200000; // 1.2M LKR
-    $units_ordered = 8400;
-    $last_order_date = '12 May';
-    $last_order_year = '2025';
-    
-    $orders = [
-        [
-            'id' => 1,
-            'created_at' => '2025-05-12 09:14:00',
-            'items_count' => 3,
-            'total_units' => 420,
-            'total_amount' => 71933.00,
-            'status' => 'pending'
-        ],
-        [
-            'id' => 2,
-            'created_at' => '2025-04-28 14:30:00',
-            'items_count' => 2,
-            'total_units' => 300,
-            'total_amount' => 48600.00,
-            'status' => 'shipped'
-        ],
-        [
-            'id' => 3,
-            'created_at' => '2025-03-15 10:00:00',
-            'items_count' => 5,
-            'total_units' => 800,
-            'total_amount' => 124000.00,
-            'status' => 'delivered'
-        ]
-    ];
+    header("Location: /login");
+    exit;
 }
+
 
 function formatSpent($amount) {
     if ($amount >= 1000000) {
