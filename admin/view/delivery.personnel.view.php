@@ -226,7 +226,50 @@ foreach ($admin_drivers as $d) {
                 </div>
 
                 <div id="driver-list" class="space-y-2">
-                    <!-- Driver rows injected here -->
+                    <?php foreach ($admin_drivers as $idx => $d): ?>
+                    <?php
+                        $vehicleIcon = 'ti-motorbike';
+                        if (stripos($d['vehicle'], 'van') !== false) $vehicleIcon = 'ti-van';
+                        elseif (stripos($d['vehicle'], 'lorry') !== false) $vehicleIcon = 'ti-truck';
+                    ?>
+                    <div class="driver-row group grid grid-cols-[40px_1fr_120px_120px_100px] gap-4 items-center p-4 rounded-2xl transition-all cursor-pointer bg-white border border-gray-100 hover:border-brand/30 hover:bg-gray-50"
+                         data-idx="<?= $idx ?>"
+                         data-av="<?= htmlspecialchars($d['av']) ?>"
+                         data-av-color="<?= htmlspecialchars($d['avColor']) ?>"
+                         data-name="<?= htmlspecialchars($d['name']) ?>"
+                         data-phone="<?= htmlspecialchars($d['phone']) ?>"
+                         data-badge="<?= htmlspecialchars($d['badge']) ?>"
+                         data-badge-text="<?= htmlspecialchars($d['badgeText']) ?>"
+                         data-nic="<?= htmlspecialchars($d['nic']) ?>"
+                         data-vehicle="<?= htmlspecialchars($d['vehicle']) ?>"
+                         data-licence="<?= htmlspecialchars($d['licence']) ?>"
+                         data-zones="<?= htmlspecialchars(json_encode($d['zones'])) ?>"
+                         data-joined="<?= htmlspecialchars($d['joined']) ?>"
+                         data-today-run="<?= htmlspecialchars(json_encode($d['todayRun'])) ?>"
+                         data-ot="<?= htmlspecialchars($d['ot']) ?>"
+                         data-ot-w="<?= htmlspecialchars($d['otW']) ?>"
+                         data-del="<?= htmlspecialchars($d['del']) ?>"
+                         data-fail="<?= htmlspecialchars($d['fail']) ?>"
+                         data-avg="<?= htmlspecialchars($d['avg']) ?>"
+                         data-recent="<?= htmlspecialchars(json_encode($d['recent'])) ?>"
+                         onclick="selectRow(this)">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs <?= $d['avColor'] ?>"><?= htmlspecialchars($d['av']) ?></div>
+                        <div>
+                            <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors"><?= htmlspecialchars($d['name']) ?></p>
+                            <p class="text-xs text-gray-500"><?= htmlspecialchars($d['phone']) ?></p>
+                        </div>
+                        <span class="text-xs font-medium text-gray-600"><?= htmlspecialchars($d['zones'][0] ?? '') ?></span>
+                        <span class="text-xs font-medium text-gray-900 flex items-center gap-1.5">
+                            <i class="ti <?= $vehicleIcon ?> text-sm text-gray-400"></i> <?= htmlspecialchars(explode(' · ', $d['vehicle'])[0]) ?>
+                        </span>
+                        <div class="text-right">
+                            <span class="px-3 py-1 <?= $d['badge'] ?> border rounded-full text-[10px] font-bold uppercase tracking-wider"><?= htmlspecialchars($d['badgeText']) ?></span>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($admin_drivers)): ?>
+                        <div class="text-xs text-gray-400 text-center py-10 italic">No personnel found.</div>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Pagination -->
@@ -352,20 +395,30 @@ foreach ($admin_drivers as $d) {
 </div>
 
 <script>
-const drivers = <?php echo json_encode($admin_drivers); ?>;
-
 function barColor(w){ return w>=90?'#10b981':w>=75?'#f59e0b':'#ef4444'; }
 function barText(w){ return w>=90?'#047857':w>=75?'#b45309':'#b91c1c'; }
 
-function select(el, idx, openDrawer = true) {
+let activeFilter = 'All';
+
+function applyFilters() {
+    document.querySelectorAll('.driver-row').forEach(r => {
+        const status = r.dataset.badgeText;
+        let visible = true;
+        if (activeFilter !== 'All' && status !== activeFilter) {
+            visible = false;
+        }
+        r.style.display = visible ? '' : 'none';
+    });
+}
+
+function selectRow(el, openDrawer = true) {
+  if (!el) return;
   document.querySelectorAll('.driver-row').forEach(r => {
     r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
     r.classList.add('bg-white', 'border-gray-100');
   });
-  if (el) {
-    el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
-    el.classList.remove('bg-white', 'border-gray-100');
-  }
+  el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+  el.classList.remove('bg-white', 'border-gray-100');
   
   // Open drawer
   if (openDrawer) {
@@ -378,42 +431,45 @@ function select(el, idx, openDrawer = true) {
     }
   }
   
-  const d = drivers[idx];
   const av = document.getElementById('d-av');
-  av.textContent = d.av;
-  av.className = 'w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-bold border shadow-lg mb-4 ' + d.avColor;
+  av.textContent = el.dataset.av;
+  av.className = 'w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-bold border shadow-lg mb-4 ' + el.dataset.avColor;
   
-  document.getElementById('d-name').textContent = d.name;
-  document.getElementById('d-phone').textContent = d.phone;
+  document.getElementById('d-name').textContent = el.dataset.name;
+  document.getElementById('d-phone').textContent = el.dataset.phone;
   
   const badge = document.getElementById('d-badge');
-  badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ' + d.badge;
-  badge.textContent = d.badgeText;
+  badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ' + el.dataset.badge;
+  badge.textContent = el.dataset.badgeText;
   
-  document.getElementById('d-nic').textContent = d.nic;
-  document.getElementById('d-vehicle').textContent = d.vehicle;
-  document.getElementById('d-licence').textContent = d.licence;
+  document.getElementById('d-nic').textContent = el.dataset.nic;
+  document.getElementById('d-vehicle').textContent = el.dataset.vehicle;
+  document.getElementById('d-licence').textContent = el.dataset.licence;
   
   // Zones as badges
-  document.getElementById('d-zones').innerHTML = d.zones.map(z => `
+  let zones = [];
+  try { zones = JSON.parse(el.dataset.zones || '[]'); } catch (e) {}
+  document.getElementById('d-zones').innerHTML = zones.map(z => `
     <span class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-[10px] font-bold">${z}</span>
   `).join('');
   
-  document.getElementById('d-joined').textContent = d.joined;
+  document.getElementById('d-joined').textContent = el.dataset.joined;
   
   // Today's active run
+  let todayRun = null;
+  try { todayRun = JSON.parse(el.dataset.todayRun || 'null'); } catch (e) {}
   const runDiv = document.getElementById('d-today-run');
-  if (d.todayRun) {
+  if (todayRun) {
     runDiv.innerHTML = `
       <div class="flex justify-between items-start">
         <div>
-          <p class="text-xs font-bold text-gray-900">${d.todayRun.id}</p>
-          <p class="text-[11px] text-gray-500 mt-0.5">${d.todayRun.desc}</p>
+          <p class="text-xs font-bold text-gray-900">${todayRun.id}</p>
+          <p class="text-[11px] text-gray-500 mt-0.5">${todayRun.desc}</p>
         </div>
       </div>
       <div class="flex justify-between items-center text-[11px] pt-2 border-t border-gray-100 mt-2">
-        <span class="text-gray-500 font-medium">${d.todayRun.prog}</span>
-        <span class="text-brand font-bold cursor-pointer hover:underline" onclick="trackPersonnelRun('${d.todayRun.id}')">Track live ↗</span>
+        <span class="text-gray-500 font-medium">${todayRun.prog}</span>
+        <span class="text-brand font-bold cursor-pointer hover:underline" onclick="trackPersonnelRun('${todayRun.id}')">Track live ↗</span>
       </div>
     `;
   } else {
@@ -421,17 +477,20 @@ function select(el, idx, openDrawer = true) {
   }
   
   // Performance
-  document.getElementById('d-bar-ot').style.width = d.otW + '%';
-  document.getElementById('d-bar-ot').style.backgroundColor = barColor(d.otW);
-  document.getElementById('d-ot').textContent = d.ot;
-  document.getElementById('d-ot').style.color = barText(d.otW);
+  const otW = parseInt(el.dataset.otW);
+  document.getElementById('d-bar-ot').style.width = otW + '%';
+  document.getElementById('d-bar-ot').style.backgroundColor = barColor(otW);
+  document.getElementById('d-ot').textContent = el.dataset.ot;
+  document.getElementById('d-ot').style.color = barText(otW);
   
-  document.getElementById('d-del').textContent = d.del;
-  document.getElementById('d-fail').textContent = d.fail;
-  document.getElementById('d-avg').textContent = d.avg;
+  document.getElementById('d-del').textContent = el.dataset.del;
+  document.getElementById('d-fail').textContent = el.dataset.fail;
+  document.getElementById('d-avg').textContent = el.dataset.avg;
   
   // Recent runs
-  document.getElementById('d-recent').innerHTML = d.recent.map(r => `
+  let recent = [];
+  try { recent = JSON.parse(el.dataset.recent || '[]'); } catch (e) {}
+  document.getElementById('d-recent').innerHTML = recent.map(r => `
     <div class="flex justify-between items-center text-xs py-2 border-b border-gray-100 last:border-b-0">
         <span class="text-gray-400 font-medium">${r.date}</span>
         <span class="text-gray-700 font-medium">${r.desc}</span>
@@ -443,31 +502,7 @@ function select(el, idx, openDrawer = true) {
   `).join('');
 }
 
-function renderDriverList() {
-  const list = document.getElementById('driver-list');
-  list.innerHTML = drivers.map((d, idx) => {
-    let vehicleIcon = 'ti-motorbike';
-    if (d.vehicle.toLowerCase().includes('van')) vehicleIcon = 'ti-van';
-    else if (d.vehicle.toLowerCase().includes('lorry')) vehicleIcon = 'ti-truck';
-    
-    return `
-      <div id="driver-row-${idx}" class="driver-row group grid grid-cols-[40px_1fr_120px_120px_100px] gap-4 items-center p-4 rounded-2xl transition-all cursor-pointer bg-white border border-gray-100 hover:border-brand/30 hover:bg-gray-50" onclick="select(this, ${idx})">
-          <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${d.avColor}">${d.av}</div>
-          <div>
-              <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">${d.name}</p>
-              <p class="text-xs text-gray-500">${d.phone}</p>
-          </div>
-          <span class="text-xs font-medium text-gray-600">${d.zones[0]}</span>
-          <span class="text-xs font-medium text-gray-900 flex items-center gap-1.5">
-              <i class="ti ${vehicleIcon} text-sm text-gray-400"></i> ${d.vehicle.split(' · ')[0]}
-          </span>
-          <div class="text-right">
-              <span class="px-3 py-1 ${d.badge} border rounded-full text-[10px] font-bold uppercase tracking-wider">${d.badgeText}</span>
-          </div>
-      </div>
-    `;
-  }).join('');
-}
+
 
 function chipFilter(el) {
   document.querySelectorAll('.chip').forEach(c => {
@@ -476,6 +511,15 @@ function chipFilter(el) {
   });
   el.classList.add('bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'on');
   el.classList.remove('bg-white', 'text-gray-500', 'border-gray-200');
+  
+  activeFilter = el.textContent.trim();
+  closeDriverDetailPane();
+  applyFilters();
+  
+  const firstVisible = Array.from(document.querySelectorAll('.driver-row')).find(r => r.style.display !== 'none');
+  if (firstVisible) {
+      selectRow(firstVisible, false);
+  }
 }
 
 function trackPersonnelRun(runIdText) {
@@ -500,7 +544,8 @@ function closeDriverDetailPane() {
 }
 
 // Initial Render
-renderDriverList();
-select(document.getElementById('driver-row-0'), 0, false);
+applyFilters();
+const firstRow = document.querySelector('.driver-row');
+if (firstRow) selectRow(firstRow, false);
 closeDriverDetailPane();
 </script>

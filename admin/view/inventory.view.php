@@ -153,7 +153,49 @@ foreach ($rows as $r) {
         <!-- List -->
         <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar" id="inv-list-container">
             <div class="min-w-[800px] p-6 space-y-1" id="inv-list">
-                <!-- Dynamic items -->
+                <?php if (empty($rows)): ?>
+                    <div class="text-xs text-gray-400 text-center py-10 italic">No variants match this filter.</div>
+                <?php else: ?>
+                <?php foreach ($rows as $idx => $r): ?>
+                <?php
+                    $p = 0;
+                    if ($r['thresh'] > 0) {
+                        $p = min(100, (int)round(($r['stock'] / $r['thresh']) * 100));
+                    }
+                    $status = $r['stock'] === 0 ? 'Out of stock' : ($p <= 15 ? 'Critical' : ($p <= 50 ? 'Low stock' : 'In stock'));
+                    $stockColor = $p <= 15 ? '#791F1F' : ($p <= 50 ? '#633806' : '#111827');
+                    $barColor = $p <= 15 ? '#E24B4A' : ($p <= 50 ? '#EF9F27' : '#1D9E75');
+                    $badgeClass = $r['stock'] === 0 ? 'bg-gray-100 text-gray-500 border-gray-200' : ($p <= 15 ? 'bg-red-100 text-red-700' : ($p <= 50 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
+                    $badgeText = $r['stock'] === 0 ? 'Out of stock' : ($p <= 15 ? 'Critical' : ($p <= 50 ? 'Low stock' : 'In stock'));
+                ?>
+                <div id="inv-row-<?= $idx ?>" class="inv-row grid grid-cols-[minmax(200px,2fr)_60px_70px_80px_1fr_100px] gap-4 p-4 rounded-2xl cursor-pointer transition-all border border-transparent items-center hover:bg-gray-50"
+                     data-idx="<?= $idx ?>"
+                     data-id="<?= htmlspecialchars($r['id']) ?>"
+                     data-name="<?= htmlspecialchars($r['name']) ?>"
+                     data-sku="<?= htmlspecialchars($r['sku']) ?>"
+                     data-stock="<?= htmlspecialchars($r['stock']) ?>"
+                     data-thresh="<?= htmlspecialchars($r['thresh']) ?>"
+                     data-status="<?= htmlspecialchars($status) ?>"
+                     data-logs="<?= htmlspecialchars(json_encode($r['logs'])) ?>"
+                     onclick="selectRow(this)">
+                    <div class="min-w-0 flex flex-col justify-center">
+                        <p class="text-sm font-bold text-gray-900 leading-tight truncate"><?= htmlspecialchars(implode(' · ', array_slice(explode(' · ', $r['name']), 0, 2))) ?></p>
+                        <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight"><?= htmlspecialchars($r['sku']) ?></p>
+                    </div>
+                    <div class="flex items-center justify-center text-xs font-bold text-gray-500 bg-gray-100/50 rounded-lg h-8"><?= htmlspecialchars($r['size']) ?></div>
+                    <div class="stock-val flex items-center justify-center text-sm font-black" style="color: <?= $stockColor ?>"><?= htmlspecialchars($r['stock']) ?></div>
+                    <div class="flex items-center justify-center text-xs font-bold text-gray-400"><?= htmlspecialchars($r['thresh']) ?></div>
+                    <div class="flex items-center px-2">
+                        <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="bar-val h-full rounded-full transition-all duration-500" style="width: <?= $p ?>%; background-color: <?= $barColor ?>"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-end">
+                        <span class="badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest <?= $badgeClass ?> border border-transparent shadow-sm"><?= $badgeText ?></span>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -302,8 +344,7 @@ foreach ($rows as $r) {
 </style>
 
 <script>
-const rows = <?php echo json_encode($rows); ?>;
-let selIdx = 0;
+let selEl = null;
 
 function pct(s,t){ return Math.min(100, Math.round(s/t*100)); }
 function barColor(p){ return p<=15?'#E24B4A':p<=50?'#EF9F27':'#1D9E75'; }
@@ -315,69 +356,47 @@ function badgeText(p){ return p===0?'Out of stock':p<=15?'Critical':p<=50?'Low s
 
 let activeFilter = 'All';
 
-function renderList() {
-    const list = document.getElementById('inv-list');
-    
-    const filteredRows = rows.map((r, i) => ({ ...r, originalIndex: i })).filter(r => {
-        const p = pct(r.stock, r.thresh);
-        const status = r.stock === 0 ? 'Out of stock' : p <= 15 ? 'Critical' : p <= 50 ? 'Low stock' : 'In stock';
+function applyFilters() {
+    let visibleCount = 0;
+    document.querySelectorAll('.inv-row').forEach(r => {
+        const stock = parseInt(r.dataset.stock);
+        const thresh = parseInt(r.dataset.thresh);
+        const p = pct(stock, thresh);
+        const status = stock === 0 ? 'Out of stock' : p <= 15 ? 'Critical' : p <= 50 ? 'Low stock' : 'In stock';
         
-        if (activeFilter === 'All') return true;
-        if (activeFilter === 'Critical') return status === 'Critical';
-        if (activeFilter === 'Low stock') return status === 'Low stock';
-        if (activeFilter === 'Out of stock') return status === 'Out of stock';
-        if (activeFilter === 'In stock') return status === 'In stock';
-        return true;
+        let visible = true;
+        if (activeFilter !== 'All' && status !== activeFilter) {
+            visible = false;
+        }
+        
+        r.style.display = visible ? '' : 'none';
+        if (visible) visibleCount++;
     });
-
-    if (filteredRows.length === 0) {
-        list.innerHTML = `<div class="text-xs text-gray-400 text-center py-10 italic">No variants match this filter.</div>`;
-        return;
-    }
-
-    list.innerHTML = filteredRows.map((r) => {
-        const p = pct(r.stock, r.thresh);
-        const isSelected = r.originalIndex === selIdx;
-        return `
-        <div class="grid grid-cols-[minmax(200px,2fr)_60px_70px_80px_1fr_100px] gap-4 p-4 rounded-2xl cursor-pointer transition-all border border-transparent items-center ${isSelected ? 'bg-brand/5 border-brand/10 shadow-sm' : 'hover:bg-gray-50'}" onclick="selectRow(this, ${r.originalIndex})">
-            <div class="min-w-0 flex flex-col justify-center">
-                <p class="text-sm font-bold text-gray-900 leading-tight truncate">${r.name.split(' · ').slice(0,2).join(' · ')}</p>
-                <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">${r.sku}</p>
-            </div>
-            <div class="flex items-center justify-center text-xs font-bold text-gray-500 bg-gray-100/50 rounded-lg h-8">${r.size}</div>
-            <div class="flex items-center justify-center text-sm font-black" style="color: ${stockColor(p)}">${r.stock}</div>
-            <div class="flex items-center justify-center text-xs font-bold text-gray-400">${r.thresh}</div>
-            <div class="flex items-center px-2">
-                <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all duration-500" style="width: ${p}%; background-color: ${barColor(p)}"></div>
-                </div>
-            </div>
-            <div class="flex items-center justify-end">
-                <span class="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${badgeClass(p)} border border-transparent shadow-sm">${badgeText(p)}</span>
-            </div>
-        </div>`;
-    }).join('');
 }
 
-function renderDetail(idx){
-  if (!rows || rows.length === 0) return;
-  const r = rows[idx];
-  const p = pct(r.stock, r.thresh);
-  document.getElementById('d-name').textContent = r.name;
-  document.getElementById('d-sku').textContent = 'SKU: '+r.sku;
-  document.getElementById('d-stock').textContent = r.stock;
+function renderDetail(el){
+  if (!el) return;
+  const stock = parseInt(el.dataset.stock);
+  const thresh = parseInt(el.dataset.thresh);
+  const p = pct(stock, thresh);
+  document.getElementById('d-name').textContent = el.dataset.name;
+  document.getElementById('d-sku').textContent = 'SKU: '+el.dataset.sku;
+  document.getElementById('d-stock').textContent = stock;
   document.getElementById('d-stock').style.color = stockColor(p);
-  document.getElementById('d-thresh').textContent = r.thresh;
+  document.getElementById('d-thresh').textContent = thresh;
   document.getElementById('d-bar').style.width = p+'%';
   document.getElementById('d-bar').style.backgroundColor = barColor(p);
   document.getElementById('d-status-text').textContent = statusText(p);
   document.getElementById('d-status-text').style.color = statusColor(p);
-  document.getElementById('adj-qty').value = Math.max(0, r.thresh - r.stock);
-  document.getElementById('thresh-input').value = r.thresh;
+  document.getElementById('adj-qty').value = Math.max(0, thresh - stock);
+  document.getElementById('thresh-input').value = thresh;
   
   const logContainer = document.getElementById('adj-log');
-  if (r.logs && r.logs.length > 0) {
-      logContainer.innerHTML = r.logs.map(l => `
+  let logs = [];
+  try { logs = JSON.parse(el.dataset.logs || '[]'); } catch (e) {}
+  
+  if (logs && logs.length > 0) {
+      logContainer.innerHTML = logs.map(l => `
           <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-gray-100 text-xs">
               <span class="font-bold text-gray-400">${l.date}</span>
               <span class="font-bold ${l.class}">${l.change}</span>
@@ -400,9 +419,9 @@ function updateAdjLabel(){
 function updatePreview(){
   const t = document.getElementById('adj-type').value;
   const q = parseInt(document.getElementById('adj-qty').value)||0;
-  if (!rows || rows.length === 0) return;
-  const r = rows[selIdx];
-  let next = t==='add'?r.stock+q:t==='remove'?Math.max(0,r.stock-q):q;
+  if (!selEl) return;
+  const stock = parseInt(selEl.dataset.stock);
+  let next = t==='add'?stock+q:t==='remove'?Math.max(0,stock-q):q;
   document.getElementById('adj-preview').textContent = next+' units';
 }
 
@@ -412,29 +431,53 @@ function applyAdj(){
   const t = document.getElementById('adj-type').value;
   const q = parseInt(document.getElementById('adj-qty').value)||0;
   const note = document.getElementById('adj-note').value || 'Manual adjustment';
-  if (!rows || rows.length === 0) return;
-  const r = rows[selIdx];
-  const prev = r.stock;
-  r.stock = t==='add'?r.stock+q:t==='remove'?Math.max(0,r.stock-q):q;
-  const diff = r.stock - prev;
+  if (!selEl) return;
+  const prev = parseInt(selEl.dataset.stock);
+  const newStock = t==='add'?prev+q:t==='remove'?Math.max(0,prev-q):q;
+  const diff = newStock - prev;
   const sign = diff>=0?'+':'';
   
-  if (!r.logs) r.logs = [];
-  r.logs.unshift({
+  // Update dataset
+  selEl.dataset.stock = newStock;
+  
+  let logs = [];
+  try { logs = JSON.parse(selEl.dataset.logs || '[]'); } catch (e) {}
+  logs.unshift({
       date: 'Now',
       change: `${sign}${diff} (${note})`,
       class: diff>=0?'text-emerald-600':'text-red-600',
       by: 'Admin'
   });
+  selEl.dataset.logs = JSON.stringify(logs);
+
+  // Update DOM inline
+  const thresh = parseInt(selEl.dataset.thresh);
+  const p = pct(newStock, thresh);
+  const bc = badgeClass(p);
+  const bt = badgeText(p);
+
+  selEl.querySelector('.stock-val').textContent = newStock;
+  selEl.querySelector('.stock-val').style.color = stockColor(p);
+  selEl.querySelector('.bar-val').style.width = p + '%';
+  selEl.querySelector('.bar-val').style.backgroundColor = barColor(p);
+  selEl.querySelector('.badge-val').className = `badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${bc} border border-transparent shadow-sm`;
+  selEl.querySelector('.badge-val').textContent = bt;
   
-  renderList();
-  renderDetail(selIdx);
+  applyFilters();
+  renderDetail(selEl);
 }
 
-function selectRow(el, idx, openDrawer = true){
-  selIdx = idx;
-  renderList();
-  renderDetail(idx);
+function selectRow(el, openDrawer = true){
+  if (!el) return;
+  document.querySelectorAll('.inv-row').forEach(r => {
+      r.classList.remove('bg-brand/5', 'border-brand/10', 'shadow-sm');
+      r.classList.add('hover:bg-gray-50');
+  });
+  el.classList.add('bg-brand/5', 'border-brand/10', 'shadow-sm');
+  el.classList.remove('hover:bg-gray-50');
+  
+  selEl = el;
+  renderDetail(el);
   if (openDrawer) {
     const pane = document.getElementById('adj-pane');
     const backdrop = document.getElementById('inventory-detail-backdrop');
@@ -451,27 +494,14 @@ function chipFilter(el){
   el.classList.add('on');
   activeFilter = el.textContent.trim();
   
-  // Ensure the slide bar is closed when clicking on filters
   closeAdjPane();
+  applyFilters();
   
-  // Find first matching row's index to load details
-  const filtered = rows.map((r, i) => ({ ...r, originalIndex: i })).filter(r => {
-      const p = pct(r.stock, r.thresh);
-      const status = r.stock === 0 ? 'Out of stock' : p <= 15 ? 'Critical' : p <= 50 ? 'Low stock' : 'In stock';
-      if (activeFilter === 'All') return true;
-      if (activeFilter === 'Critical') return status === 'Critical';
-      if (activeFilter === 'Low stock') return status === 'Low stock';
-      if (activeFilter === 'Out of stock') return status === 'Out of stock';
-      if (activeFilter === 'In stock') return status === 'In stock';
-      return true;
-  });
-  
-  if (filtered.length > 0) {
-      selIdx = filtered[0].originalIndex;
-      renderDetail(selIdx);
+  // Find first matching visible row
+  const firstVisible = Array.from(document.querySelectorAll('.inv-row')).find(r => r.style.display !== 'none');
+  if (firstVisible) {
+      selectRow(firstVisible, false);
   }
-  
-  renderList();
 }
 
 function closeAdjPane() {
@@ -485,9 +515,10 @@ function closeAdjPane() {
 }
 
 // Initial render
-renderList();
-if (rows && rows.length > 0) {
-  renderDetail(0);
+applyFilters();
+const firstRow = document.querySelector('.inv-row');
+if (firstRow) {
+  selectRow(firstRow, false);
 }
 closeAdjPane();
 </script>

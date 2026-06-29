@@ -355,7 +355,57 @@ foreach ($admin_pos as $p) {
                 </div>
 
                 <div id="po-list" class="space-y-2">
-                    <!-- PO Rows injected here -->
+                    <?php foreach ($admin_pos as $idx => $p): ?>
+                    <?php
+                        $progressWidth = '0%';
+                        if ($p['badgeText'] === 'Fully received' || $p['badgeText'] === 'Received') {
+                          $progressWidth = '100%';
+                        } else if ($p['badgeText'] === 'Partial' || $p['badgeText'] === 'Partial receipt') {
+                          $progressWidth = '60%';
+                        }
+                        
+                        $expectedText = $p['expected'];
+                        if ($p['alert'] === 'overdue') {
+                          $expectedText .= ' <i class="ti ti-alert-triangle text-sm"></i>';
+                        }
+                    ?>
+                    <div class="po-row group grid grid-cols-[1fr_100px_100px_120px_110px] gap-4 items-center p-4 rounded-2xl transition-all cursor-pointer bg-white border border-gray-100 hover:border-brand/30 hover:bg-gray-50"
+                         data-idx="<?= $idx ?>"
+                         data-num="<?= htmlspecialchars($p['num']) ?>"
+                         data-date="<?= htmlspecialchars($p['date']) ?>"
+                         data-badge="<?= htmlspecialchars($p['badge']) ?>"
+                         data-badge-text="<?= htmlspecialchars($p['badgeText']) ?>"
+                         data-supp="<?= htmlspecialchars($p['supp']) ?>"
+                         data-contact="<?= htmlspecialchars($p['contact']) ?>"
+                         data-payment="<?= htmlspecialchars($p['payment']) ?>"
+                         data-expected="<?= htmlspecialchars($p['expected']) ?>"
+                         data-expected-color="<?= htmlspecialchars($p['expectedColorClass']) ?>"
+                         data-total="<?= htmlspecialchars($p['total']) ?>"
+                         data-alert="<?= htmlspecialchars($p['alert']) ?>"
+                         data-alert-text="<?= htmlspecialchars($p['alertText']) ?>"
+                         data-items="<?= htmlspecialchars(json_encode($p['items'])) ?>"
+                         data-timeline="<?= htmlspecialchars(json_encode($p['timeline'])) ?>"
+                         onclick="selectPO(this)">
+                        <div>
+                            <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors"><?= htmlspecialchars($p['num']) ?></p>
+                            <p class="text-xs text-gray-500"><?= htmlspecialchars($p['supp']) ?></p>
+                        </div>
+                        <span class="text-xs font-semibold <?= $p['alert'] === 'overdue' ? 'text-red-600' : 'text-gray-500' ?> flex items-center gap-1"><?= $expectedText ?></span>
+                        <span class="text-xs font-bold text-gray-900"><?= htmlspecialchars($p['total']) ?></span>
+                        <div class="flex items-center gap-2">
+                            <div class="h-1.5 w-16 bg-gray-100 rounded-full overflow-hidden flex-shrink-0">
+                                <div class="h-full bg-brand rounded-full transition-all duration-500" style="width: <?= $progressWidth ?>"></div>
+                            </div>
+                            <span class="text-[10px] font-bold text-gray-400"><?= $progressWidth ?></span>
+                        </div>
+                        <div class="text-right">
+                            <span class="px-3 py-1 <?= htmlspecialchars($p['badge']) ?> rounded-full text-[10px] font-bold uppercase tracking-wider"><?= htmlspecialchars($p['badgeText']) ?></span>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($admin_pos)): ?>
+                        <div class="text-xs text-gray-400 text-center py-10 italic">No purchase orders found.</div>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Pagination -->
@@ -464,7 +514,6 @@ foreach ($admin_pos as $p) {
 </div>
 
 <script>
-const pos = <?php echo json_encode($admin_pos); ?>;
 
 function getItemBadgeClass(pct) {
   if (pct === '100%') return 'bg-emerald-50 border-emerald-100 text-emerald-700';
@@ -487,15 +536,14 @@ function getTimelineTextClass(s) {
   return 'text-gray-900 font-bold';
 }
 
-function selectPO(el, idx, openDrawer = true) {
+function selectPO(el, openDrawer = true) {
+  if (!el) return;
   document.querySelectorAll('.po-row').forEach(r => {
     r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
     r.classList.add('bg-white', 'border-gray-100');
   });
-  if (el) {
-    el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
-    el.classList.remove('bg-white', 'border-gray-100');
-  }
+  el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+  el.classList.remove('bg-white', 'border-gray-100');
   
   // Open drawer
   if (openDrawer) {
@@ -508,25 +556,24 @@ function selectPO(el, idx, openDrawer = true) {
     }
   }
   
-  const p = pos[idx];
-  document.getElementById('d-po-num').textContent = p.num;
-  document.getElementById('d-po-date').textContent = p.date;
+  document.getElementById('d-po-num').textContent = el.dataset.num;
+  document.getElementById('d-po-date').textContent = el.dataset.date;
   
   const badge = document.getElementById('d-badge');
-  badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ' + p.badge;
-  badge.textContent = p.badgeText;
+  badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ' + el.dataset.badge;
+  badge.textContent = el.dataset.badgeText;
   
-  document.getElementById('d-supp').textContent = p.supp;
-  document.getElementById('d-contact').textContent = p.contact;
+  document.getElementById('d-supp').textContent = el.dataset.supp;
+  document.getElementById('d-contact').textContent = el.dataset.contact;
   
   const payment = document.getElementById('d-payment');
-  payment.textContent = p.payment;
+  payment.textContent = el.dataset.payment;
   
   const expected = document.getElementById('d-expected');
-  expected.textContent = p.expected;
-  expected.className = 'text-xs font-bold ' + p.expectedColorClass;
+  expected.textContent = el.dataset.expected;
+  expected.className = 'text-xs font-bold ' + el.dataset.expectedColor;
   
-  document.getElementById('d-total').textContent = p.total;
+  document.getElementById('d-total').textContent = el.dataset.total;
   
   const alertStyles = {
     overdue: { bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-700', icon: 'ti-alert-triangle' },
@@ -536,13 +583,15 @@ function selectPO(el, idx, openDrawer = true) {
   };
   
   const al = document.getElementById('d-alert');
-  const style = alertStyles[p.alert];
+  const style = alertStyles[el.dataset.alert];
   al.className = `p-4 rounded-2xl flex items-start gap-3 border text-xs ${style.bg} ${style.border} ${style.text}`;
   al.querySelector('i').className = `ti ${style.icon} text-lg flex-shrink-0`;
-  document.getElementById('d-alert-text').textContent = p.alertText;
+  document.getElementById('d-alert-text').textContent = el.dataset.alertText;
   
   // Render items
-  document.getElementById('d-items').innerHTML = p.items.map(item => `
+  let items = [];
+  try { items = JSON.parse(el.dataset.items || '[]'); } catch (e) {}
+  document.getElementById('d-items').innerHTML = items.map(item => `
     <div class="flex justify-between items-start gap-4 py-2 border-b border-gray-100 last:border-b-0">
         <div class="flex-1 min-w-0">
             <p class="text-xs font-bold text-gray-900">${item.name}</p>
@@ -556,7 +605,9 @@ function selectPO(el, idx, openDrawer = true) {
   `).join('');
   
   // Render timeline
-  document.getElementById('d-timeline').innerHTML = p.timeline.map(t => `
+  let timeline = [];
+  try { timeline = JSON.parse(el.dataset.timeline || '[]'); } catch (e) {}
+  document.getElementById('d-timeline').innerHTML = timeline.map(t => `
     <div class="relative flex gap-4">
         <div class="w-3 h-3 rounded-full ${getTimelineDotClass(t.s)} shrink-0 mt-1 ring-4 z-10"></div>
         <div>
@@ -568,48 +619,24 @@ function selectPO(el, idx, openDrawer = true) {
   
   // Toggle Cancel button visibility
   const cancelBtn = document.getElementById('d-cancel-btn');
-  if (p.badgeText === 'Received' || p.badgeText === 'Fully received') {
+  if (el.dataset.badgeText === 'Received' || el.dataset.badgeText === 'Fully received') {
     cancelBtn.classList.add('hidden');
   } else {
     cancelBtn.classList.remove('hidden');
   }
 }
 
-function renderPOList() {
-  const list = document.getElementById('po-list');
-  list.innerHTML = pos.map((p, idx) => {
-    let progressWidth = '0%';
-    if (p.badgeText === 'Fully received' || p.badgeText === 'Received') {
-      progressWidth = '100%';
-    } else if (p.badgeText === 'Partial' || p.badgeText === 'Partial receipt') {
-      progressWidth = '60%';
-    }
-    
-    let expectedText = p.expected;
-    if (p.alert === 'overdue') {
-      expectedText += ' <i class="ti ti-alert-triangle text-sm"></i>';
-    }
+let activeFilter = 'All';
 
-    return `
-      <div id="po-row-${idx}" class="po-row group grid grid-cols-[1fr_100px_100px_120px_110px] gap-4 items-center p-4 rounded-2xl transition-all cursor-pointer bg-white border border-gray-100 hover:border-brand/30 hover:bg-gray-50" onclick="selectPO(this, ${idx})">
-          <div>
-              <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">${p.num}</p>
-              <p class="text-xs text-gray-500">${p.supp}</p>
-          </div>
-          <span class="text-xs font-semibold ${p.alert === 'overdue' ? 'text-red-600' : 'text-gray-500'} flex items-center gap-1">${expectedText}</span>
-          <span class="text-xs font-bold text-gray-900">${p.total}</span>
-          <div class="flex items-center gap-2">
-              <div class="h-1.5 w-16 bg-gray-100 rounded-full overflow-hidden flex-shrink-0">
-                  <div class="h-full bg-brand rounded-full transition-all duration-500" style="width: ${progressWidth}"></div>
-              </div>
-              <span class="text-[10px] font-bold text-gray-400">${progressWidth}</span>
-          </div>
-          <div class="text-right">
-              <span class="px-3 py-1 ${p.badge} rounded-full text-[10px] font-bold uppercase tracking-wider">${p.badgeText}</span>
-          </div>
-      </div>
-    `;
-  }).join('');
+function applyFilters() {
+    document.querySelectorAll('.po-row').forEach(r => {
+        const status = r.dataset.badgeText;
+        let visible = true;
+        if (activeFilter !== 'All' && status !== activeFilter) {
+            visible = false;
+        }
+        r.style.display = visible ? '' : 'none';
+    });
 }
 
 function chipFilter(el) {
@@ -619,6 +646,15 @@ function chipFilter(el) {
   });
   el.classList.add('bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'on');
   el.classList.remove('bg-white', 'text-gray-500', 'border-gray-200');
+  
+  activeFilter = el.textContent.trim();
+  closePODetailPane();
+  applyFilters();
+  
+  const firstVisible = Array.from(document.querySelectorAll('.po-row')).find(r => r.style.display !== 'none');
+  if (firstVisible) {
+      selectPO(firstVisible, false);
+  }
 }
 
 function closePODetailPane() {
@@ -636,15 +672,12 @@ function closePODetailPane() {
 }
 
 // Initial Render
-renderPOList();
-if (pos && pos.length > 0) {
-  const rowToSelect = pos.length > 1 ? 1 : 0;
+applyFilters();
+const firstRow = document.querySelector('.po-row');
+if (firstRow) {
   setTimeout(() => {
-    const el = document.getElementById('po-row-' + rowToSelect);
-    if (el) {
-      selectPO(el, rowToSelect, false);
-      closePODetailPane();
-    }
+    selectPO(firstRow, false);
+    closePODetailPane();
   }, 100);
 }
 </script>

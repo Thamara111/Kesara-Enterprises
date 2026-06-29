@@ -309,7 +309,47 @@ foreach ($admin_assignments as $a) {
                 </div>
 
                 <div id="asgn-list" class="space-y-2">
-                    <!-- Injected dynamically by JS -->
+                    <?php foreach ($admin_assignments as $idx => $a): ?>
+                    <?php
+                        $completedStops = count(array_filter($a['stops'], function($s) { return strpos($s['status'], 'Delivered') === 0; }));
+                        $totalStops = count($a['stops']);
+                        $progressText = $completedStops . ' / ' . $totalStops;
+                        $zone = (stripos($a['vehicle'], 'motorbike') !== false) ? 'Colombo' : ((stripos($a['vehicle'], 'van') !== false) ? 'Gampaha' : 'Kandy');
+                        
+                        $driverNameParts = explode(' ', $a['driver']);
+                        $driverShortName = $driverNameParts[0] . (isset($driverNameParts[1]) ? ' ' . substr($driverNameParts[1], 0, 1) . '.' : '');
+                    ?>
+                    <div class="asgn-row group grid grid-cols-[1fr_100px_80px_100px_100px] gap-4 items-center p-4 rounded-2xl transition-all cursor-pointer bg-white border border-gray-100 hover:border-brand/30 hover:bg-gray-50"
+                         data-idx="<?= $idx ?>"
+                         data-id="<?= htmlspecialchars($a['id']) ?>"
+                         data-date="<?= htmlspecialchars($a['date']) ?>"
+                         data-badge="<?= htmlspecialchars($a['badge']) ?>"
+                         data-badge-text="<?= htmlspecialchars($a['badgeText']) ?>"
+                         data-av="<?= htmlspecialchars($a['av']) ?>"
+                         data-av-color="<?= htmlspecialchars($a['avColor']) ?>"
+                         data-driver="<?= htmlspecialchars($a['driver']) ?>"
+                         data-vehicle="<?= htmlspecialchars($a['vehicle']) ?>"
+                         data-can-cancel="<?= htmlspecialchars($a['canCancel'] ? '1' : '0') ?>"
+                         data-stops="<?= htmlspecialchars(json_encode($a['stops'])) ?>"
+                         onclick="selectRow(this)">
+                        <div>
+                            <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors"><?= htmlspecialchars($a['id']) ?></p>
+                            <p class="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+                                <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] <?= $a['avColor'] ?>"><?= htmlspecialchars($a['av']) ?></span>
+                                <?= htmlspecialchars($driverShortName) ?>
+                            </p>
+                        </div>
+                        <span class="text-xs font-medium text-gray-600"><?= htmlspecialchars($zone) ?></span>
+                        <span class="text-xs font-bold text-gray-900 text-center"><?= $totalStops ?></span>
+                        <span class="text-xs font-bold text-blue-700 text-center"><?= $progressText ?></span>
+                        <div class="text-right">
+                            <span class="px-3 py-1 <?= $a['badge'] ?> border rounded-full text-[10px] font-bold uppercase tracking-wider"><?= htmlspecialchars($a['badgeText']) ?></span>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if (empty($admin_assignments)): ?>
+                        <div class="text-xs text-gray-400 text-center py-10 italic">No assignments match this filter.</div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -472,24 +512,29 @@ foreach ($admin_assignments as $a) {
 </div>
 
 <script>
-const defaultAssignments = <?php echo json_encode($admin_assignments); ?>;
+const driverInfo = <?php echo json_encode($driver_info_map); ?>;
+let activeFilter = 'All';
 
-let assignments = JSON.parse(localStorage.getItem('ke_assignments')) || [...defaultAssignments];
-if (!localStorage.getItem('ke_assignments')) {
-  localStorage.setItem('ke_assignments', JSON.stringify(assignments));
+function applyFilters() {
+    document.querySelectorAll('.asgn-row').forEach(r => {
+        const status = r.dataset.badgeText;
+        let visible = true;
+        if (activeFilter !== 'All' && status !== activeFilter) {
+            if (activeFilter === 'In progress' && status !== 'Active') visible = false;
+            else if (activeFilter !== 'In progress') visible = false;
+        }
+        r.style.display = visible ? '' : 'none';
+    });
 }
 
-const driverInfo = <?php echo json_encode($driver_info_map); ?>;
-
-function selectRow(el, idx, openDrawer = true) {
+function selectRow(el, openDrawer = true) {
+  if (!el) return;
   document.querySelectorAll('.asgn-row').forEach(r => {
     r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
     r.classList.add('bg-white', 'border-gray-100');
   });
-  if (el) {
-    el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
-    el.classList.remove('bg-white', 'border-gray-100');
-  }
+  el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+  el.classList.remove('bg-white', 'border-gray-100');
   
   // Open drawer
   if (openDrawer) {
@@ -502,7 +547,7 @@ function selectRow(el, idx, openDrawer = true) {
     }
   }
   
-  showDetailView(idx);
+  showDetailView(el);
 }
 
 function getStopsHTML(stops) {
@@ -532,33 +577,35 @@ function getStopsHTML(stops) {
   }).join('');
 }
 
-function showDetailView(idx) {
+function showDetailView(el) {
+  if (!el) return;
   document.getElementById('new-form').style.display = 'none';
   document.getElementById('detail-view').style.display = 'block';
   
-  const a = assignments[idx];
-  document.getElementById('d-id').textContent = a.id;
-  document.getElementById('d-date').textContent = a.date;
+  document.getElementById('d-id').textContent = el.dataset.id;
+  document.getElementById('d-date').textContent = el.dataset.date;
   
   const badge = document.getElementById('d-badge');
-  badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold uppercase border ' + a.badge;
-  badge.textContent = a.badgeText;
+  badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold uppercase border ' + el.dataset.badge;
+  badge.textContent = el.dataset.badgeText;
   
   const av = document.getElementById('d-av');
-  av.textContent = a.av;
-  av.className = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ' + a.avColor;
+  av.textContent = el.dataset.av;
+  av.className = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ' + el.dataset.avColor;
   
-  document.getElementById('d-driver').textContent = a.driver;
-  document.getElementById('d-vehicle').textContent = a.vehicle;
+  document.getElementById('d-driver').textContent = el.dataset.driver;
+  document.getElementById('d-vehicle').textContent = el.dataset.vehicle;
   
   // Render timeline drops
-  document.getElementById('d-stops').innerHTML = getStopsHTML(a.stops);
+  let stops = [];
+  try { stops = JSON.parse(el.dataset.stops || '[]'); } catch (e) {}
+  document.getElementById('d-stops').innerHTML = getStopsHTML(stops);
   
   const cancelBtn = document.getElementById('d-cancel-btn');
-  cancelBtn.style.display = a.canCancel ? 'block' : 'none';
+  cancelBtn.style.display = el.dataset.canCancel === '1' ? 'block' : 'none';
   
   const reassignBtn = document.getElementById('d-reassign-btn');
-  reassignBtn.style.display = a.badgeText === 'Completed' ? 'none' : 'block';
+  reassignBtn.style.display = el.dataset.badgeText === 'Completed' ? 'none' : 'block';
 }
 
 function showNewForm() {
@@ -601,33 +648,6 @@ function toggleOrderChip(el) {
   }
 }
 
-function renderAssignments() {
-  const list = document.getElementById('asgn-list');
-  list.innerHTML = assignments.map((a, idx) => {
-    let completedStops = a.stops.filter(s => s.status.startsWith('Delivered')).length;
-    let totalStops = a.stops.length;
-    let progressText = completedStops + ' / ' + totalStops;
-    
-    return `
-      <div id="asgn-row-${idx}" class="asgn-row group grid grid-cols-[1fr_100px_80px_100px_100px] gap-4 items-center p-4 rounded-2xl transition-all cursor-pointer bg-white border border-gray-100 hover:border-brand/30 hover:bg-gray-50" onclick="selectRow(this, ${idx})">
-          <div>
-              <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">${a.id}</p>
-              <p class="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
-                  <span class="w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] ${a.avColor}">${a.av}</span>
-                  ${a.driver.split(' ')[0]} ${a.driver.split(' ')[1] ? a.driver.split(' ')[1][0] + '.' : ''}
-              </p>
-          </div>
-          <span class="text-xs font-medium text-gray-600">${a.vehicle.split(' · ')[0].toLowerCase().includes('motorbike') ? 'Colombo' : (a.vehicle.toLowerCase().includes('van') ? 'Gampaha' : 'Kandy')}</span>
-          <span class="text-xs font-bold text-gray-900 text-center">${totalStops}</span>
-          <span class="text-xs font-bold text-blue-700 text-center">${progressText}</span>
-          <div class="text-right">
-              <span class="px-3 py-1 ${a.badge} border rounded-full text-[10px] font-bold uppercase tracking-wider">${a.badgeText}</span>
-          </div>
-      </div>
-    `;
-  }).join('');
-}
-
 function chipFilter(el) {
   document.querySelectorAll('.chip').forEach(c => {
     c.classList.remove('bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'on');
@@ -635,6 +655,15 @@ function chipFilter(el) {
   });
   el.classList.add('bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'on');
   el.classList.remove('bg-white', 'text-gray-500', 'border-gray-200');
+  
+  activeFilter = el.textContent.trim();
+  closeAsgnDetailPane();
+  applyFilters();
+  
+  const firstVisible = Array.from(document.querySelectorAll('.asgn-row')).find(r => r.style.display !== 'none');
+  if (firstVisible) {
+      selectRow(firstVisible, false);
+  }
 }
 
 function trackLiveRun() {
@@ -688,24 +717,8 @@ function dispatchNewAssignment() {
     };
   });
   
-  const newId = 'DA-2025-' + (313 + assignments.length);
-  const newAsgn = {
-    id: newId,
-    date: 'Assigned Today, ' + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-    badge: 'bg-amber-50 text-amber-700 border border-amber-100',
-    badgeText: 'Pending',
-    av: driverVal,
-    avColor: driverVal === 'SR' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-indigo-100' : (driverVal === 'LW' ? 'bg-amber-100 text-amber-700 border border-amber-200 shadow-amber-100' : 'bg-lime-100 text-lime-700 border border-lime-200 shadow-lime-100'),
-    driver: driverName,
-    vehicle: info.vehicle,
-    canCancel: true,
-    zone: info.zone,
-    stops: stops
-  };
-  
-  assignments.unshift(newAsgn);
-  localStorage.setItem('ke_assignments', JSON.stringify(assignments));
-  
+  const newId = 'DA-2025-' + (313 + Math.floor(Math.random()*100));
+  // In a real app, this would post to the server.
   window.location.href = '/admin-tracking?id=' + newId;
 }
 
@@ -724,14 +737,12 @@ function closeAsgnDetailPane() {
 }
 
 // Initial Render
-renderAssignments();
-if (assignments && assignments.length > 0) {
+applyFilters();
+const firstRow = document.querySelector('.asgn-row');
+if (firstRow) {
   setTimeout(() => {
-    const el = document.getElementById('asgn-row-0');
-    if (el) {
-      selectRow(el, 0, false);
-      closeAsgnDetailPane();
-    }
+    selectRow(firstRow, false);
+    closeAsgnDetailPane();
   }, 100);
 }
 </script>

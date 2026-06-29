@@ -1,3 +1,68 @@
+<?php
+$admin_products = [];
+$all_categories = [];
+if (isset($pdo) && $pdo !== null) {
+    try {
+        $cat_stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
+        $all_categories = $cat_stmt->fetchAll();
+
+        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors 
+                             FROM products p 
+                             LEFT JOIN categories c ON p.category_id = c.id 
+                             WHERE p.deleted_at IS NULL");
+        $prods = $stmt->fetchAll();
+
+        foreach ($prods as $pr) {
+            $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ?");
+            $t_stmt->execute([$pr['id']]);
+            $tiers = $t_stmt->fetchAll();
+
+            // Convert types appropriately for JSON/JS consumption
+            $formatted_tiers = [];
+            foreach ($tiers as $t) {
+                $formatted_tiers[] = [
+                    'q' => (int)$t['q'],
+                    'p' => (float)$t['p']
+                ];
+            }
+
+            $status_lower = strtolower($pr['status']);
+            if ($status_lower === 'in stock') {
+                $badge = 'bg-green-50 text-green-600 border-green-100';
+            } elseif ($status_lower === 'low stock') {
+                $badge = 'bg-amber-50 text-amber-600 border-amber-100';
+            } else {
+                $badge = 'bg-red-50 text-red-600 border-red-100';
+            }
+
+            $admin_products[] = [
+                'id' => (int)$pr['id'],
+                'name' => $pr['name'],
+                'sku' => $pr['sku'],
+                'cat' => $pr['cat'] ?? 'Uncategorized',
+                'moq' => (int)$pr['moq'],
+                'price' => (float)$pr['price'],
+                'status' => $pr['status'],
+                'badge' => $badge,
+                'desc' => $pr['desc'] ?? '',
+                'images' => json_decode($pr['images'] ?? '[]', true) ?: [],
+                'colors' => $pr['colors'] ?? '',
+                'tiers' => $formatted_tiers
+            ];
+        }
+    } catch (\Exception $e) {
+        // Handled via fallback
+    }
+}
+
+if (empty($admin_products)) {
+    $admin_products = [];
+}
+
+if (empty($all_categories)) {
+    $all_categories = [];
+}
+?>
 <!-- MAIN CONTENT AREA (SPLIT LAYOUT) -->
 <main class="flex-1 flex overflow-hidden">
     
@@ -16,10 +81,11 @@
             <div class="flex gap-4">
                 <div class="relative flex-1 group">
                     <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand transition-colors"></i>
-                    <input type="text" placeholder="Search SKU or Name..." class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-transparent rounded-2xl text-xs font-medium outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <input type="text" id="prod-search" placeholder="Search SKU or Name..." class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-transparent rounded-2xl text-xs font-medium outline-none focus:bg-white focus:border-brand/20 transition-all">
                 </div>
-                <select class="bg-gray-50 border border-transparent rounded-2xl px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest outline-none cursor-pointer focus:bg-white focus:border-brand/20 transition-all">
+                <select id="prod-cat-filter" class="bg-gray-50 border border-transparent rounded-2xl px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest outline-none cursor-pointer focus:bg-white focus:border-brand/20 transition-all">
                     <option value="">Category</option>
+                    <option value="all">All Categories</option>
                     <?php foreach ($all_categories as $cat): ?>
                         <option value="<?= htmlspecialchars($cat['name']) ?>"><?= htmlspecialchars($cat['name']) ?></option>
                     <?php endforeach; ?>
@@ -40,7 +106,44 @@
                 </div>
                 
                 <div id="prod-list" class="space-y-1 pb-10">
-                    <!-- Cards injected by JS -->
+                    <?php if (empty($admin_products)): ?>
+                    <div class="flex flex-col items-center justify-center py-24 text-center gap-4">
+                        <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300"><i class="ti ti-shirt text-3xl"></i></div>
+                        <p class="text-sm font-bold text-gray-400">No products found</p>
+                    </div>
+                    <?php else: ?>
+                    <?php foreach ($admin_products as $idx => $p): ?>
+                    <div id="prod-row-<?= $idx ?>" class="prod-card p-4 bg-white border border-transparent rounded-3xl cursor-pointer transition-all hover:bg-gray-50 grid grid-cols-[48px_1fr_80px_80px_100px_80px] gap-4 items-center group"
+                         data-idx="<?= $idx ?>"
+                         data-id="<?= htmlspecialchars($p['id']) ?>"
+                         data-name="<?= htmlspecialchars(strtolower($p['name'])) ?>"
+                         data-sku="<?= htmlspecialchars(strtolower($p['sku'])) ?>"
+                         data-cat="<?= htmlspecialchars(strtolower($p['cat'])) ?>"
+                         data-original-name="<?= htmlspecialchars($p['name']) ?>"
+                         data-original-sku="<?= htmlspecialchars($p['sku']) ?>"
+                         data-original-cat="<?= htmlspecialchars($p['cat']) ?>"
+                         data-desc="<?= htmlspecialchars($p['desc']) ?>"
+                         data-images="<?= htmlspecialchars(json_encode($p['images'])) ?>"
+                         data-colors="<?= htmlspecialchars($p['colors']) ?>"
+                         data-tiers="<?= htmlspecialchars(json_encode($p['tiers'])) ?>"
+                         onclick="selectProd(this)">
+                        <div class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all overflow-hidden">
+                            <?= (!empty($p['images']) && isset($p['images'][0])) ? '<img src="'.htmlspecialchars($p['images'][0]).'" alt="'.htmlspecialchars($p['name']).'" class="w-full h-full object-cover">' : '<i class="ti ti-shirt text-2xl"></i>' ?>
+                        </div>
+                        <div class="min-w-0">
+                            <h4 class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors truncate"><?= htmlspecialchars($p['name']) ?></h4>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 truncate"><?= htmlspecialchars($p['sku']) ?> · <?= htmlspecialchars($p['cat']) ?></p>
+                        </div>
+                        <span class="text-xs font-bold text-gray-500"><?= htmlspecialchars($p['moq']) ?></span>
+                        <span class="text-xs font-black text-gray-900 truncate">LKR <?= htmlspecialchars($p['price']) ?></span>
+                        <span class="px-3 py-1 <?= $p['badge'] ?> text-[9px] font-bold rounded-full border uppercase tracking-tighter text-center truncate"><?= htmlspecialchars($p['status']) ?></span>
+                        <div class="flex justify-end gap-2 text-gray-300">
+                            <button class="p-2 hover:text-brand transition-colors"><i class="ti ti-edit"></i></button>
+                            <button class="p-2 hover:text-red-500 transition-colors" onclick="event.stopPropagation(); selectProd(this.closest('.prod-card')); deleteProduct();"><i class="ti ti-trash"></i></button>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -188,112 +291,31 @@
 }
 </style>
 
-<?php
-$admin_products = [];
-$all_categories = [];
-if (isset($pdo) && $pdo !== null) {
-    try {
-        $cat_stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
-        $all_categories = $cat_stmt->fetchAll();
 
-        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors 
-                             FROM products p 
-                             LEFT JOIN categories c ON p.category_id = c.id");
-        $prods = $stmt->fetchAll();
-
-        foreach ($prods as $pr) {
-            $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ?");
-            $t_stmt->execute([$pr['id']]);
-            $tiers = $t_stmt->fetchAll();
-
-            // Convert types appropriately for JSON/JS consumption
-            $formatted_tiers = [];
-            foreach ($tiers as $t) {
-                $formatted_tiers[] = [
-                    'q' => (int)$t['q'],
-                    'p' => (float)$t['p']
-                ];
-            }
-
-            $status_lower = strtolower($pr['status']);
-            if ($status_lower === 'in stock') {
-                $badge = 'bg-green-50 text-green-600 border-green-100';
-            } elseif ($status_lower === 'low stock') {
-                $badge = 'bg-amber-50 text-amber-600 border-amber-100';
-            } else {
-                $badge = 'bg-red-50 text-red-600 border-red-100';
-            }
-
-            $admin_products[] = [
-                'id' => (int)$pr['id'],
-                'name' => $pr['name'],
-                'sku' => $pr['sku'],
-                'cat' => $pr['cat'] ?? 'Uncategorized',
-                'moq' => (int)$pr['moq'],
-                'price' => (float)$pr['price'],
-                'status' => $pr['status'],
-                'badge' => $badge,
-                'desc' => $pr['desc'] ?? '',
-                'images' => json_decode($pr['images'] ?? '[]', true) ?: [],
-                'colors' => $pr['colors'] ?? '',
-                'tiers' => $formatted_tiers
-            ];
-        }
-    } catch (\Exception $e) {
-        // Handled via fallback
-    }
-}
-
-if (empty($admin_products)) {
-    $admin_products = [];
-}
-
-if (empty($all_categories)) {
-    $all_categories = [];
-}
-?>
 
 <script>
-const products = <?php echo json_encode($admin_products); ?>;
+let selectedIdx = -1;
 
-let selectedIdx = 0;
-
-function renderProdList() {
-    const list = document.getElementById('prod-list');
-    list.innerHTML = products.map((p, i) => `
-        <div onclick="selectProd(this, ${i})" class="prod-card p-4 bg-white border border-transparent rounded-3xl cursor-pointer transition-all hover:bg-gray-50 grid grid-cols-[48px_1fr_80px_80px_100px_80px] gap-4 items-center group ${i === selectedIdx ? 'selected shadow-lg' : ''}">
-            <div class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all overflow-hidden">
-                ${p.images && p.images[0] ? `<img src="${p.images[0]}" alt="${p.name}" class="w-full h-full object-cover">` : `<i class="ti ti-shirt text-2xl"></i>`}
-            </div>
-            <div>
-                <h4 class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors truncate">${p.name}</h4>
-                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">${p.sku} · ${p.cat}</p>
-            </div>
-            <span class="text-xs font-bold text-gray-500">${p.moq}</span>
-            <span class="text-xs font-black text-gray-900">LKR ${p.price}</span>
-            <span class="px-3 py-1 ${p.badge} text-[9px] font-bold rounded-full border uppercase tracking-tighter text-center">${p.status}</span>
-            <div class="flex justify-end gap-2 text-gray-300">
-                <button class="p-2 hover:text-brand transition-colors"><i class="ti ti-edit"></i></button>
-                <button class="p-2 hover:text-red-500 transition-colors"><i class="ti ti-trash"></i></button>
-            </div>
-        </div>
-    `).join('');
-}
-
-function selectProd(el, idx, openDrawer = true) {
-    selectedIdx = idx;
-    renderProdList();
-    const p = products[idx];
+function selectProd(el, openDrawer = true) {
+    if (el) {
+        selectedIdx = parseInt(el.dataset.idx);
+        document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected', 'shadow-lg'));
+        el.classList.add('selected', 'shadow-lg');
+    } else {
+        return;
+    }
     
+    const id = parseInt(el.dataset.id || "0");
     document.getElementById('form-mode-label').textContent = 'Edit Product';
-    document.getElementById('f-id').value = p.id;
-    document.getElementById('f-name').value = p.name;
-    document.getElementById('f-sku').value = p.sku;
-    document.getElementById('f-cat').value = p.cat;
-    document.getElementById('f-desc').value = p.desc;
+    document.getElementById('f-id').value = id;
+    document.getElementById('f-name').value = el.dataset.originalName || '';
+    document.getElementById('f-sku').value = el.dataset.originalSku || '';
+    document.getElementById('f-cat').value = el.dataset.originalCat || '';
+    document.getElementById('f-desc').value = el.dataset.desc || '';
 
     // Set existing images across 6 slots
-    const prodImages = p.images || [];
+    let prodImages = [];
+    try { prodImages = JSON.parse(el.dataset.images || '[]'); } catch (e) {}
     for (let i = 0; i < 6; i++) {
         const imgUrl = prodImages[i] || '';
         document.getElementById('f-image-url-' + i).value = imgUrl;
@@ -302,7 +324,7 @@ function selectProd(el, idx, openDrawer = true) {
     }
 
     // Set colors
-    const colorsStr = p.colors || '';
+    const colorsStr = el.dataset.colors || '';
     document.getElementById('f-colors').value = colorsStr;
     const colorsArray = colorsStr.split(',').map(c => c.trim().toLowerCase());
     document.querySelectorAll('.color-chip').forEach(btn => {
@@ -314,14 +336,16 @@ function selectProd(el, idx, openDrawer = true) {
     });
 
     // Show delete button for existing products, hide if id is 0/temp
-    if (p.id > 0) {
+    if (id > 0) {
         document.getElementById('btn-prod-delete').classList.remove('hidden');
     } else {
         document.getElementById('btn-prod-delete').classList.add('hidden');
     }
 
     // Tiers
-    renderTiers(p.tiers);
+    let tiers = [];
+    try { tiers = JSON.parse(el.dataset.tiers || '[]'); } catch (e) {}
+    renderTiers(tiers);
     
     // Open drawer
     if (openDrawer) {
@@ -363,7 +387,7 @@ function addTier() {
 
 function showNew() {
     selectedIdx = -1;
-    renderProdList();
+    document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected', 'shadow-lg'));
     document.getElementById('form-mode-label').textContent = 'Add New Product';
     document.getElementById('f-id').value = '';
     document.getElementById('f-name').value = '';
@@ -419,7 +443,7 @@ function closeProductFormPane() {
         backdrop.classList.add('hidden');
     }
     selectedIdx = -1;
-    renderProdList();
+    document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected', 'shadow-lg'));
 }
 
 function previewProductImage(input, index) {
@@ -538,7 +562,30 @@ function deleteProduct() {
     const id = document.getElementById('f-id').value;
     if (!id) return;
 
-    if (confirm("Are you sure you want to delete this product?")) {
+    // Show custom modal instead of alert
+    const modal = document.getElementById('delete-confirm-modal');
+    const content = document.getElementById('delete-confirm-content');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        content.classList.remove('scale-95', 'opacity-0');
+        content.classList.add('scale-100', 'opacity-100');
+    }, 10);
+}
+
+function closeDeleteModal() {
+    const modal = document.getElementById('delete-confirm-modal');
+    const content = document.getElementById('delete-confirm-content');
+    content.classList.remove('scale-100', 'opacity-100');
+    content.classList.add('scale-95', 'opacity-0');
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 200);
+}
+
+function confirmDeleteProduct() {
+    const id = document.getElementById('f-id').value;
+    if (!id) return;
+
         fetch('/api/products.php?action=delete', {
             method: 'POST',
             headers: {
@@ -561,11 +608,47 @@ function deleteProduct() {
             console.error(err);
             showToast('Network error deleting product.', 'error');
         });
-    }
 }
 
-// Initial render
-renderProdList();
-selectProd(null, 0, false);
+// Filters
+function applyFilters() {
+    const q = (document.getElementById('prod-search')?.value || '').toLowerCase().trim();
+    const cat = (document.getElementById('prod-cat-filter')?.value || '').toLowerCase();
+    
+    document.querySelectorAll('.prod-card').forEach(row => {
+        const rName = row.dataset.name || '';
+        const rSku = row.dataset.sku || '';
+        const rCat = row.dataset.cat || '';
+        
+        const matchQ = !q || rName.includes(q) || rSku.includes(q);
+        const matchCat = !cat || cat === 'all' || rCat === cat;
+        
+        row.hidden = !(matchQ && matchCat);
+    });
+}
+
+document.getElementById('prod-search')?.addEventListener('input', applyFilters);
+document.getElementById('prod-cat-filter')?.addEventListener('change', applyFilters);
+
+// Initial render logic
+const firstRow = document.querySelector('.prod-card');
+if (firstRow) {
+    selectProd(firstRow, false);
+}
 closeProductFormPane();
 </script>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-confirm-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-200" style="display: none;">
+    <div id="delete-confirm-content" class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-sm w-full text-center flex flex-col items-center transform scale-95 opacity-0 transition-all duration-200">
+        <div class="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-6">
+            <i class="ti ti-trash text-3xl"></i>
+        </div>
+        <h3 class="text-xl font-extrabold text-gray-900 mb-2">Delete Product?</h3>
+        <p class="text-sm font-medium text-gray-500 mb-8">Are you sure you want to delete this product? This action cannot be undone.</p>
+        <div class="flex gap-3 w-full">
+            <button onclick="closeDeleteModal()" class="flex-1 bg-gray-50 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-100 transition-colors">Cancel</button>
+            <button onclick="confirmDeleteProduct()" class="flex-1 bg-red-500 text-white font-bold py-3.5 rounded-2xl hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all transform hover:-translate-y-px">Delete</button>
+        </div>
+    </div>
+</div>

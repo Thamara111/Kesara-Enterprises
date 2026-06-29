@@ -11,7 +11,7 @@ $suspended_count = 0;
 
 if (isset($pdo) && $pdo !== null) {
     try {
-        $stmt = $pdo->query("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.whatsapp_number, u.business_name AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
+        $stmt = $pdo->query("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.phone AS whatsapp_number, u.business_name AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
                              FROM users u");
         $users_db = $stmt->fetchAll();
 
@@ -97,32 +97,12 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
+
 if (empty($admin_customers)) {
-    $admin_customers = [
-        [
-            'id' => 1,
-            'av' => 'AB',
-            'name' => 'Kamal Perera',
-            'company' => 'ABC Garments (Pvt) Ltd',
-            'email' => 'kamal@abc.lk',
-            'phone' => '+94 77 123 4567',
-            'type' => 'Retailer',
-            'br' => 'PV 12345',
-            'addr' => 'No. 12, Main Street, Colombo 03',
-            'badge' => 'bg-emerald-100 text-emerald-700',
-            'badgeText' => 'Approved',
-            'spent' => 'LKR 72K',
-            'orders' => 1,
-            'actions' => 'normal',
-            'note' => '',
-            'recentOrders' => ''
-        ]
-    ];
-    $total_count = 142;
-    $pending_count = 5;
-    $approved_count = 135;
-    $suspended_count = 2;
+    $admin_customers = [];
+    // Stats already zero from initialization above if DB returned nothing
 }
+
 ?>
 
 <div class="flex-1 flex overflow-hidden">
@@ -164,12 +144,15 @@ if (empty($admin_customers)) {
         <div class="px-8 py-4 bg-gray-50/30 flex items-center gap-4 border-b border-gray-100">
             <div class="relative flex-1">
                 <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                <input type="text" placeholder="Search company, email or contact..." class="w-full pl-11 pr-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all">
+                <input type="text" id="customer-search" placeholder="Search company, email or contact..."
+                       oninput="applyFilters()"
+                       class="w-full pl-11 pr-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all">
             </div>
-            <select class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm font-medium transition-all">
-                <option>Newest first</option>
-                <option>Highest spend</option>
-                <option>Name A–Z</option>
+            <select id="customer-sort" onchange="applyFilters()"
+                    class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm font-medium transition-all">
+                <option value="newest">Newest first</option>
+                <option value="spend">Highest spend</option>
+                <option value="alpha">Name A–Z</option>
             </select>
         </div>
 
@@ -194,7 +177,52 @@ if (empty($admin_customers)) {
         <!-- List -->
         <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar" id="customer-list-container">
             <div class="min-w-[800px] p-6 space-y-1" id="customer-list">
-                <!-- Dynamic content -->
+                <?php if (empty($admin_customers)): ?>
+                <div id="empty-state" class="flex flex-col items-center justify-center py-24 text-center gap-4">
+                    <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300"><i class="ti ti-users text-3xl"></i></div>
+                    <p class="text-sm font-bold text-gray-400">No customers found</p>
+                    <p class="text-xs text-gray-300">Customers who register through the site will appear here.</p>
+                </div>
+                <?php else: ?>
+                <?php foreach ($admin_customers as $idx => $c): ?>
+                <div id="customer-row-<?= $idx ?>" class="customer-row grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1fr)_100px_100px] gap-4 items-center p-4 bg-white border border-gray-100 rounded-2xl cursor-pointer hover:border-brand/30 hover:bg-gray-50/50 transition-all"
+                     data-idx="<?= $idx ?>"
+                     data-id="<?= htmlspecialchars($c['id']) ?>"
+                     data-name="<?= htmlspecialchars(strtolower($c['name'])) ?>"
+                     data-company="<?= htmlspecialchars(strtolower($c['company'])) ?>"
+                     data-email="<?= htmlspecialchars(strtolower($c['email'])) ?>"
+                     data-phone="<?= htmlspecialchars(strtolower($c['phone'])) ?>"
+                     data-status="<?= htmlspecialchars(strtolower($c['badgeText'])) ?>"
+                     data-av="<?= htmlspecialchars($c['av']) ?>"
+                     data-original-name="<?= htmlspecialchars($c['name']) ?>"
+                     data-original-company="<?= htmlspecialchars($c['company']) ?>"
+                     data-original-email="<?= htmlspecialchars($c['email']) ?>"
+                     data-original-phone="<?= htmlspecialchars($c['phone']) ?>"
+                     data-whatsapp="<?= htmlspecialchars($c['whatsapp']) ?>"
+                     data-type="<?= htmlspecialchars($c['type']) ?>"
+                     data-br="<?= htmlspecialchars($c['br']) ?>"
+                     data-addr="<?= htmlspecialchars($c['addr']) ?>"
+                     data-badge="<?= htmlspecialchars($c['badge']) ?>"
+                     data-badgetext="<?= htmlspecialchars($c['badgeText']) ?>"
+                     data-spent="<?= htmlspecialchars($c['spent']) ?>"
+                     data-orders="<?= htmlspecialchars($c['orders']) ?>"
+                     data-actions="<?= htmlspecialchars($c['actions']) ?>"
+                     data-note="<?= htmlspecialchars($c['note']) ?>"
+                     data-recentorders="<?= htmlspecialchars($c['recentOrders']) ?>"
+                     onclick="selectCustomer(this)">
+                    <div class="w-10 h-10 rounded-xl bg-brand-light text-brand flex items-center justify-center font-bold text-xs shadow-sm border border-brand/5"><?= htmlspecialchars($c['av']) ?></div>
+                    <div>
+                        <p class="text-sm font-bold text-gray-900"><?= htmlspecialchars($c['company']) ?></p>
+                        <p class="text-xs text-gray-400 font-medium mt-0.5"><?= htmlspecialchars($c['name']) ?></p>
+                    </div>
+                    <span class="text-xs text-gray-500 font-semibold"><?= htmlspecialchars($c['type']) ?></span>
+                    <span class="text-center font-bold text-gray-900 text-xs"><?= htmlspecialchars($c['spent']) ?></span>
+                    <div class="text-right">
+                        <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider <?= $c['badge'] ?> border"><?= htmlspecialchars($c['badgeText']) ?></span>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -364,20 +392,18 @@ if (empty($admin_customers)) {
 
 
 <script>
-const customers = <?php echo json_encode($admin_customers); ?>;
-
-function selectCustomer(el, idx, openDrawer = true) {
+function selectCustomer(el, openDrawer = true) {
+    if (!el) return;
+    
     document.querySelectorAll('.customer-row').forEach(r => {
         r.classList.remove('bg-brand/5', 'border-brand/20', 'shadow-sm');
         r.classList.add('bg-white', 'border-gray-100');
     });
-    if (el) {
-        el.classList.add('bg-brand/5', 'border-brand/20', 'shadow-sm');
-        el.classList.remove('bg-white', 'border-gray-100');
-    }
+    
+    el.classList.add('bg-brand/5', 'border-brand/20', 'shadow-sm');
+    el.classList.remove('bg-white', 'border-gray-100');
 
-    const c = customers[idx];
-    document.getElementById('d-avatar').textContent = c.av;
+    document.getElementById('d-avatar').textContent = el.dataset.av;
     
     // Open drawer
     if (openDrawer) {
@@ -389,82 +415,136 @@ function selectCustomer(el, idx, openDrawer = true) {
             requestAnimationFrame(() => backdrop.classList.add('opacity-100'));
         }
     }
-    document.getElementById('d-badge').className = 'px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ' + c.badge;
-    document.getElementById('d-badge').textContent = c.badgeText;
-    document.getElementById('d-company').textContent = c.company;
-    document.getElementById('d-name').textContent = c.name;
-    document.getElementById('d-email').textContent = c.email;
-    document.getElementById('d-phone').textContent = c.phone;
-    const waNum = (c.whatsapp || '').replace(/\D/g, '');
+    document.getElementById('d-badge').className = 'px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ' + el.dataset.badge;
+    document.getElementById('d-badge').textContent = el.dataset.badgetext;
+    document.getElementById('d-company').textContent = el.dataset.originalCompany;
+    document.getElementById('d-name').textContent = el.dataset.originalName;
+    document.getElementById('d-email').textContent = el.dataset.originalEmail;
+    document.getElementById('d-phone').textContent = el.dataset.originalPhone;
+    const waNum = (el.dataset.whatsapp || '').replace(/\D/g, '');
     const waEl = document.getElementById('d-whatsapp');
     const waTxt = document.getElementById('d-whatsapp-text');
-    if (waTxt) waTxt.textContent = c.whatsapp || '—';
+    if (waTxt) waTxt.textContent = el.dataset.whatsapp || '—';
     if (waEl) waEl.href = waNum ? `https://wa.me/${waNum}` : '#';
-    document.getElementById('d-br').textContent = c.br;
-    document.getElementById('d-type').textContent = c.type;
-    document.getElementById('d-address').textContent = c.addr;
+    document.getElementById('d-br').textContent = el.dataset.br;
+    document.getElementById('d-type').textContent = el.dataset.type;
+    document.getElementById('d-address').textContent = el.dataset.addr;
 
-    document.getElementById('d-note-container').innerHTML = c.note;
+    document.getElementById('d-note-container').innerHTML = el.dataset.note;
 
-    document.getElementById('d-orders').textContent = c.orders;
-    document.getElementById('d-spent').textContent = c.spent;
+    document.getElementById('d-orders').textContent = el.dataset.orders;
+    document.getElementById('d-spent').textContent = el.dataset.spent;
 
-    document.getElementById('d-recent-orders').innerHTML = c.recentOrders;
+    document.getElementById('d-recent-orders').innerHTML = el.dataset.recentorders;
 
     const actionDiv = document.getElementById('d-actions');
-    if (c.actions === 'pending') {
+    const actions = el.dataset.actions;
+    const cid = el.dataset.id;
+    if (actions === 'pending') {
         actionDiv.innerHTML = `
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="updateStatus(${c.id}, 'approved')" class="bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10">Approve</button>
-                <button onclick="updateStatus(${c.id}, 'rejected')" class="bg-white border border-gray-200 text-red-600 font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all">Reject</button>
+                <button onclick="updateStatus(${cid}, 'approved')" class="bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10">Approve</button>
+                <button onclick="updateStatus(${cid}, 'rejected')" class="bg-white border border-gray-200 text-red-600 font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all">Reject</button>
             </div>
         `;
-    } else if (c.actions === 'normal') {
+    } else if (actions === 'normal') {
         actionDiv.innerHTML = `
-            <button onclick="updateStatus(${c.id}, 'suspended')" class="w-full bg-white border border-red-100 text-red-650 font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center gap-2">
+            <button onclick="updateStatus(${cid}, 'suspended')" class="w-full bg-white border border-red-100 text-red-650 font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center gap-2">
                 <i class="ti ti-ban"></i> Suspend Account
             </button>
         `;
-    } else if (c.actions === 'suspended') {
+    } else if (actions === 'suspended') {
         actionDiv.innerHTML = `
-            <button onclick="updateStatus(${c.id}, 'approved')" class="w-full bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2">
+            <button onclick="updateStatus(${cid}, 'approved')" class="w-full bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2">
                 <i class="ti ti-circle-check"></i> Activate Account
             </button>
         `;
     } else {
         actionDiv.innerHTML = `
-            <button onclick="updateStatus(${c.id}, 'approved')" class="w-full bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2">
+            <button onclick="updateStatus(${cid}, 'approved')" class="w-full bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2">
                 <i class="ti ti-rotate"></i> Re-evaluate Request
             </button>
         `;
     }
 
     // Load persisted admin comment for this customer
-    loadComment(c.id);
+    loadComment(cid);
 }
 
-function renderCustomerList() {
+// ── Filtering state ──────────────────────────────────────────────
+let _activeChip  = 'all';  // 'all' | 'pending' | 'approved' | 'suspended' | 'rejected'
+
+function applyFilters() {
+    const q    = (document.getElementById('customer-search')?.value || '').toLowerCase().trim();
+    const sort = document.getElementById('customer-sort')?.value || 'newest';
     const list = document.getElementById('customer-list');
-    list.innerHTML = customers.map((c, idx) => `
-        <div id="customer-row-${idx}" class="customer-row grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1fr)_100px_100px] gap-4 items-center p-4 bg-white border border-gray-100 rounded-2xl cursor-pointer hover:border-brand/30 hover:bg-gray-50/50 transition-all" onclick="selectCustomer(this, ${idx})">
-            <div class="w-10 h-10 rounded-xl bg-brand-light text-brand flex items-center justify-center font-bold text-xs shadow-sm border border-brand/5">${c.av}</div>
-            <div>
-                <p class="text-sm font-bold text-gray-900">${c.company}</p>
-                <p class="text-xs text-gray-400 font-medium mt-0.5">${c.name}</p>
-            </div>
-            <span class="text-xs text-gray-500 font-semibold">${c.type}</span>
-            <span class="text-center font-bold text-gray-900 text-xs">${c.spent}</span>
-            <div class="text-right">
-                <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${c.badge} border">${c.badgeText}</span>
-            </div>
-        </div>
-    `).join('');
+    const rows = Array.from(document.querySelectorAll('.customer-row'));
+
+    rows.forEach(r => {
+        let visible = true;
+        if (_activeChip !== 'all' && r.dataset.status !== _activeChip) visible = false;
+        
+        if (q && !r.dataset.company.includes(q)
+               && !r.dataset.name.includes(q)
+               && !r.dataset.email.includes(q)
+               && !r.dataset.phone.includes(q)) {
+            visible = false;
+        }
+        
+        r.style.display = visible ? '' : 'none';
+    });
+
+    if (sort === 'alpha') {
+        rows.sort((a, b) => a.dataset.originalCompany.localeCompare(b.dataset.originalCompany));
+    } else if (sort === 'spend') {
+        const parseSpend = s => {
+            if (!s || s === '\u2014') return 0;
+            const n = parseFloat(s.replace(/[^\d.]/g, ''));
+            return s.includes('M') ? n * 1e6 : s.includes('K') ? n * 1e3 : n;
+        };
+        rows.sort((a, b) => parseSpend(b.dataset.spent) - parseSpend(a.dataset.spent));
+    } else if (sort === 'newest') {
+        rows.sort((a, b) => parseInt(a.dataset.idx) - parseInt(b.dataset.idx));
+    }
+
+    rows.forEach(r => list.appendChild(r));
+
+    // Show empty state if no visible rows
+    let visibleCount = rows.filter(r => r.style.display !== 'none').length;
+    let emptyState = document.getElementById('empty-state');
+    if (!emptyState) {
+        emptyState = document.createElement('div');
+        emptyState.id = 'empty-state';
+        emptyState.className = 'flex flex-col items-center justify-center py-24 text-center gap-4';
+        emptyState.innerHTML = `
+            <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300"><i class="ti ti-users text-3xl"></i></div>
+            <p class="text-sm font-bold text-gray-400">No customers found</p>
+            <p class="text-xs text-gray-300">Adjust your search or filter to find customers.</p>
+        `;
+        list.appendChild(emptyState);
+    }
+    emptyState.style.display = visibleCount === 0 ? 'flex' : 'none';
+
+    closeDetailPane();
 }
+
+// ── Initial render ────────────────────────────────────────────────
+applyFilters();
+const firstRow = document.querySelector('.customer-row');
+if (firstRow) {
+    selectCustomer(firstRow, false);
+}
+closeDetailPane();
+
 
 function filterChip(el) {
     document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
     el.classList.add('on');
+    _activeChip = el.textContent.trim().toLowerCase();
+    applyFilters();
 }
+
+// refreshRowStatus removed as it's now handled inline in updateStatus
 
 function showToast(message, variant = 'success', duration = 3500) {
     const icons = { success: '<i class="ti ti-circle-check"></i>', error: '<i class="ti ti-circle-x"></i>', info: '<i class="ti ti-info-circle"></i>' };
@@ -492,32 +572,32 @@ function updateStatus(id, newStatus) {
     .then(res => res.json())
     .then(data => {
         if (data.status === 'success') {
-            const idx = customers.findIndex(c => c.id == id);
-            if (idx !== -1) {
-                const c = customers[idx];
-                c.actions = newStatus === 'approved' ? 'normal' : newStatus;
-                
-                if (newStatus === 'approved') {
-                    c.badge = 'bg-emerald-100 text-emerald-700';
-                    c.badgeText = 'Approved';
-                    c.note = '';
-                } else if (newStatus === 'pending') {
-                    c.badge = 'bg-amber-100 text-amber-700';
-                    c.badgeText = 'Pending';
-                    c.note = '<div class="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3"><i class="ti ti-clock text-amber-600 mt-0.5"></i><p class="text-xs text-amber-700 leading-relaxed font-medium">Awaiting approval. BR number not yet verified.</p></div>';
-                } else if (newStatus === 'suspended') {
-                    c.badge = 'bg-purple-100 text-purple-700';
-                    c.badgeText = 'Suspended';
-                    c.note = '<div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3"><i class="ti ti-ban text-red-600 mt-0.5"></i><p class="text-xs text-red-700 leading-relaxed font-medium">Account suspended.</p></div>';
-                } else if (newStatus === 'rejected') {
-                    c.badge = 'bg-red-100 text-red-700';
-                    c.badgeText = 'Rejected';
-                    c.note = '<div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3"><i class="ti ti-x text-red-600 mt-0.5"></i><p class="text-xs text-red-700 leading-relaxed font-medium">Account rejected.</p></div>';
+            const rowEl = document.querySelector(`.customer-row[data-id="${id}"]`);
+            if (rowEl) {
+                rowEl.dataset.actions = newStatus === 'approved' ? 'normal' : newStatus;
+
+                const statusMap = {
+                    approved:  { badge: 'bg-emerald-100 text-emerald-700', badgeText: 'Approved',  note: '' },
+                    pending:   { badge: 'bg-amber-100 text-amber-700',    badgeText: 'Pending',    note: '<div class="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3"><i class="ti ti-clock text-amber-600 mt-0.5"></i><p class="text-xs text-amber-700 leading-relaxed font-medium">Awaiting approval. BR number not yet verified.</p></div>' },
+                    suspended: { badge: 'bg-purple-100 text-purple-700',  badgeText: 'Suspended',  note: '<div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3"><i class="ti ti-ban text-red-600 mt-0.5"></i><p class="text-xs text-red-700 leading-relaxed font-medium">Account suspended.</p></div>' },
+                    rejected:  { badge: 'bg-red-100 text-red-700',        badgeText: 'Rejected',   note: '<div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3"><i class="ti ti-x text-red-600 mt-0.5"></i><p class="text-xs text-red-700 leading-relaxed font-medium">Account rejected.</p></div>' }
+                };
+                const m = statusMap[newStatus];
+                if (m) { 
+                    rowEl.dataset.badge = m.badge; 
+                    rowEl.dataset.badgetext = m.badgeText; 
+                    rowEl.dataset.note = m.note; 
+                    rowEl.dataset.status = m.badgeText.toLowerCase();
+                    
+                    const badgeSpan = rowEl.querySelector('span.rounded-full');
+                    if (badgeSpan) {
+                        badgeSpan.className = `px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${m.badge} border`;
+                        badgeSpan.textContent = m.badgeText;
+                    }
                 }
-                
-                renderCustomerList();
-                const rowEl = document.getElementById(`customer-row-${idx}`);
-                selectCustomer(rowEl, idx, false);
+
+                // Re-select the same row to refresh the detail pane
+                selectCustomer(rowEl, false);
             }
             
             const labels = { approved: 'Customer account approved.', suspended: 'Customer account suspended.', rejected: 'Customer account rejected.' };
@@ -584,8 +664,6 @@ function closeDetailPane() {
     });
 }
 
-// Initial render
-renderCustomerList();
-selectCustomer(document.getElementById('customer-row-0'), 0, false);
-closeDetailPane();
+
+
 </script>

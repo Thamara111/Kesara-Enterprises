@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 $staff_users = [];
 if (isset($pdo) && $pdo !== null) {
     try {
-        $stmt = $pdo->query("SELECT id, username, email, role, created_at FROM admins ORDER BY created_at DESC");
+        $stmt = $pdo->query("SELECT id, username, email, role, created_at FROM admins WHERE deleted_at IS NULL ORDER BY created_at DESC");
         $staff_users = $stmt->fetchAll();
     } catch (\Exception $e) {
         // Fallback

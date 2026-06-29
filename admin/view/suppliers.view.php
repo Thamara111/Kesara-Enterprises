@@ -157,21 +157,21 @@ foreach ($admin_suppliers as $s) {
             <div class="flex gap-3">
                 <div class="relative flex-1 group">
                     <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand transition-colors"></i>
-                    <input type="text" placeholder="Search supplier name, email or contact..." 
+                    <input id="supp-search" type="text" placeholder="Search supplier name, email or contact..." 
                         class="w-full pl-11 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-brand/20 transition-all outline-none">
                 </div>
-                <select class="px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 outline-none cursor-pointer">
-                    <option>All Categories</option>
-                    <option>Fabric</option>
-                    <option>Elastic / Trims</option>
-                    <option>Packaging</option>
+                <select id="supp-cat" class="px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 outline-none cursor-pointer">
+                    <option value="all">All Categories</option>
+                    <option value="fabric">Fabric</option>
+                    <option value="elastic / trims">Elastic / Trims</option>
+                    <option value="packaging">Packaging</option>
                 </select>
-                <select class="px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 outline-none cursor-pointer">
-                    <option>All Statuses</option>
-                    <option>Active</option>
-                    <option>Preferred</option>
-                    <option>On Hold</option>
-                    <option>Inactive</option>
+                <select id="supp-status" class="px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 outline-none cursor-pointer">
+                    <option value="all">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="preferred">Preferred</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="inactive">Inactive</option>
                 </select>
             </div>
         </div>
@@ -189,7 +189,48 @@ foreach ($admin_suppliers as $s) {
                 </div>
 
                 <div id="supplier-list" class="space-y-2">
-                    <!-- Supplier rows injected here -->
+                    <?php if (empty($admin_suppliers)): ?>
+                        <p class="text-center text-gray-500 py-8 text-sm">No suppliers found.</p>
+                    <?php else: ?>
+                    <?php foreach ($admin_suppliers as $idx => $s): ?>
+                    <div id="supplier-row-<?= $idx ?>" class="supplier-row group grid grid-cols-[40px_1.5fr_1fr_1fr_120px_100px] gap-4 items-center p-4 rounded-2xl transition-all cursor-pointer bg-white border border-gray-100 hover:border-brand/30 hover:bg-gray-50/50" 
+                         data-idx="<?= $idx ?>"
+                         data-id="<?= htmlspecialchars($s['id']) ?>"
+                         data-initials="<?= htmlspecialchars($s['initials']) ?>"
+                         data-av="<?= htmlspecialchars($s['av']) ?>"
+                         data-name="<?= htmlspecialchars($s['name']) ?>"
+                         data-email="<?= htmlspecialchars($s['email']) ?>"
+                         data-cat="<?= htmlspecialchars($s['cat']) ?>"
+                         data-contact="<?= htmlspecialchars($s['contact']) ?>"
+                         data-lead="<?= htmlspecialchars($s['lead']) ?>"
+                         data-badge="<?= htmlspecialchars($s['badge']) ?>"
+                         data-badgetext="<?= htmlspecialchars($s['badgeText']) ?>"
+                         data-status="<?= htmlspecialchars(strtolower($s['status'])) ?>"
+                         data-phone="<?= htmlspecialchars($s['phone']) ?>"
+                         data-addr="<?= htmlspecialchars($s['addr']) ?>"
+                         data-terms="<?= htmlspecialchars($s['terms']) ?>"
+                         data-products="<?= htmlspecialchars($s['products']) ?>"
+                         data-ontimew="<?= htmlspecialchars($s['ontimeW']) ?>"
+                         data-ontime="<?= htmlspecialchars($s['ontime']) ?>"
+                         data-qualityw="<?= htmlspecialchars($s['qualityW']) ?>"
+                         data-quality="<?= htmlspecialchars($s['quality']) ?>"
+                         data-orders="<?= htmlspecialchars($s['orders']) ?>"
+                         data-spend="<?= htmlspecialchars($s['spend']) ?>"
+                         onclick="selectSupplier(this)">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs <?= $s['av'] ?>"><?= $s['initials'] ?></div>
+                        <div>
+                            <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors"><?= htmlspecialchars($s['name']) ?></p>
+                            <p class="text-xs text-gray-400 font-medium mt-0.5"><?= htmlspecialchars($s['email']) ?></p>
+                        </div>
+                        <span class="text-xs font-semibold text-gray-500"><?= htmlspecialchars($s['cat']) ?></span>
+                        <span class="text-xs font-medium text-gray-650"><?= htmlspecialchars($s['contact']) ?></span>
+                        <span class="text-xs font-medium text-gray-900"><?= htmlspecialchars($s['lead']) ?></span>
+                        <div class="text-right">
+                            <span class="px-3 py-1 <?= $s['badge'] ?> border rounded-full text-[10px] font-bold uppercase tracking-wider"><?= htmlspecialchars($s['badgeText']) ?></span>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
                 
                 <!-- Pagination -->
@@ -307,20 +348,17 @@ foreach ($admin_suppliers as $s) {
 </div>
 
 <script>
-const suppliers = <?php echo json_encode($admin_suppliers); ?>;
-
 function barColor(w){ return w>=90?'#10b981':w>=75?'#f59e0b':'#ef4444'; }
 function barText(w){ return w>=90?'#047857':w>=75?'#b45309':'#b91c1c'; }
 
-function select(el, idx, openDrawer = true) {
+function selectSupplier(el, openDrawer = true) {
+  if (!el) return;
   document.querySelectorAll('.supplier-row').forEach(r => {
     r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
     r.classList.add('bg-white', 'border-gray-100');
   });
-  if (el) {
-    el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
-    el.classList.remove('bg-white', 'border-gray-100');
-  }
+  el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+  el.classList.remove('bg-white', 'border-gray-100');
   
   // Open drawer
   if (openDrawer) {
@@ -333,60 +371,70 @@ function select(el, idx, openDrawer = true) {
     }
   }
   
-  const s = suppliers[idx];
   const av = document.getElementById('d-av');
-  av.textContent = s.initials;
-  av.className = 'w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-bold border shadow-lg mb-4 ' + s.av;
+  av.textContent = el.dataset.initials;
+  av.className = 'w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-bold border shadow-lg mb-4 ' + el.dataset.av;
   
-  document.getElementById('d-name').textContent = s.name;
-  document.getElementById('d-email').textContent = s.email;
+  document.getElementById('d-name').textContent = el.dataset.name;
+  document.getElementById('d-email').textContent = el.dataset.email;
   
   const badge = document.getElementById('d-badge');
-  badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ' + s.badge;
-  badge.textContent = s.badgeText;
+  badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ' + el.dataset.badge;
+  badge.textContent = el.dataset.badgetext;
   
-  document.getElementById('d-contact').textContent = s.contact;
-  document.getElementById('d-phone').textContent = s.phone;
-  document.getElementById('d-addr').textContent = s.addr;
-  document.getElementById('d-terms').textContent = s.terms;
+  document.getElementById('d-contact').textContent = el.dataset.contact;
+  document.getElementById('d-phone').textContent = el.dataset.phone;
+  document.getElementById('d-addr').textContent = el.dataset.addr;
+  document.getElementById('d-terms').textContent = el.dataset.terms;
   
-  document.getElementById('d-products').innerHTML = s.products;
+  document.getElementById('d-products').innerHTML = el.dataset.products;
   
   // Performance
-  document.getElementById('d-bar-ot').style.width = s.ontimeW + '%';
-  document.getElementById('d-bar-ot').style.backgroundColor = barColor(s.ontimeW);
-  document.getElementById('d-ot').textContent = s.ontime;
-  document.getElementById('d-ot').style.color = barText(s.ontimeW);
+  const ontimeW = parseInt(el.dataset.ontimew);
+  document.getElementById('d-bar-ot').style.width = ontimeW + '%';
+  document.getElementById('d-bar-ot').style.backgroundColor = barColor(ontimeW);
+  document.getElementById('d-ot').textContent = el.dataset.ontime;
+  document.getElementById('d-ot').style.color = barText(ontimeW);
   
-  document.getElementById('d-bar-qual').style.width = s.qualityW + '%';
-  document.getElementById('d-bar-qual').style.backgroundColor = barColor(s.qualityW);
-  document.getElementById('d-qual').textContent = s.quality;
-  document.getElementById('d-qual').style.color = barText(s.qualityW);
+  const qualityW = parseInt(el.dataset.qualityw);
+  document.getElementById('d-bar-qual').style.width = qualityW + '%';
+  document.getElementById('d-bar-qual').style.backgroundColor = barColor(qualityW);
+  document.getElementById('d-qual').textContent = el.dataset.quality;
+  document.getElementById('d-qual').style.color = barText(qualityW);
   
-  document.getElementById('d-pos').textContent = s.orders;
-  document.getElementById('d-spend').textContent = s.spend;
+  document.getElementById('d-pos').textContent = el.dataset.orders;
+  document.getElementById('d-spend').textContent = el.dataset.spend;
 
-  document.getElementById('d-edit-link').href = '/admin-supplier-edit?id=' + s.id;
+  document.getElementById('d-edit-link').href = '/admin-supplier-edit?id=' + el.dataset.id;
 }
 
-function renderSupplierList() {
-  const list = document.getElementById('supplier-list');
-  list.innerHTML = suppliers.map((s, idx) => `
-    <div id="supplier-row-${idx}" class="supplier-row group grid grid-cols-[40px_1.5fr_1fr_1fr_120px_100px] gap-4 items-center p-4 rounded-2xl transition-all cursor-pointer bg-white border border-gray-100 hover:border-brand/30 hover:bg-gray-50/50" onclick="select(this, ${idx})">
-        <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ${s.av}">${s.initials}</div>
-        <div>
-            <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">${s.name}</p>
-            <p class="text-xs text-gray-400 font-medium mt-0.5">${s.email}</p>
-        </div>
-        <span class="text-xs font-semibold text-gray-500">${s.cat}</span>
-        <span class="text-xs font-medium text-gray-650">${s.contact}</span>
-        <span class="text-xs font-medium text-gray-900">${s.lead}</span>
-        <div class="text-right">
-            <span class="px-3 py-1 ${s.badge} border rounded-full text-[10px] font-bold uppercase tracking-wider">${s.badgeText}</span>
-        </div>
-    </div>
-  `).join('');
+function applyFilters() {
+    const q = (document.getElementById('supp-search')?.value || '').toLowerCase().trim();
+    const cat = (document.getElementById('supp-cat')?.value || '').toLowerCase();
+    const status = (document.getElementById('supp-status')?.value || '').toLowerCase();
+
+    document.querySelectorAll('.supplier-row').forEach(r => {
+        let visible = true;
+        
+        if (cat !== 'all' && r.dataset.cat.toLowerCase() !== cat) {
+            visible = false;
+        }
+        if (status !== 'all' && r.dataset.status.toLowerCase() !== status) {
+            visible = false;
+        }
+        if (q && !r.dataset.name.toLowerCase().includes(q) &&
+                 !r.dataset.email.toLowerCase().includes(q) &&
+                 !r.dataset.contact.toLowerCase().includes(q)) {
+            visible = false;
+        }
+        
+        r.style.display = visible ? '' : 'none';
+    });
 }
+
+document.getElementById('supp-search')?.addEventListener('input', applyFilters);
+document.getElementById('supp-cat')?.addEventListener('change', applyFilters);
+document.getElementById('supp-status')?.addEventListener('change', applyFilters);
 
 function closeSupplierDetailPane() {
   const pane = document.getElementById('supplier-detail-pane');
@@ -403,7 +451,7 @@ function closeSupplierDetailPane() {
 }
 
 // Initial Render
-renderSupplierList();
-select(document.getElementById('supplier-row-0'), 0, false);
+const firstSupplier = document.querySelector('.supplier-row');
+if (firstSupplier) selectSupplier(firstSupplier, false);
 closeSupplierDetailPane();
 </script>

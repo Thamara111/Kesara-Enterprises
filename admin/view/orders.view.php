@@ -4,7 +4,8 @@ if (isset($pdo) && $pdo !== null) {
     try {
         $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, u.business_name AS company, u.first_name, u.last_name, u.email 
                              FROM orders o 
-                             JOIN users u ON o.user_id = u.id");
+                             JOIN users u ON o.user_id = u.id 
+                             WHERE o.deleted_at IS NULL");
         $orders_db = $stmt->fetchAll();
 
         foreach ($orders_db as $ord) {
@@ -185,7 +186,45 @@ foreach ($admin_orders as $o) {
 
             <!-- Order List Cards -->
             <div id="order-list" class="space-y-3 pb-8">
-                <!-- Cards injected by JS / Backend -->
+                <?php if (empty($admin_orders)): ?>
+                <div id="empty-state" class="flex flex-col items-center justify-center py-16 text-center hidden">
+                    <div class="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
+                        <i class="ti ti-search-off text-2xl text-gray-300"></i>
+                    </div>
+                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">No orders found</p>
+                    <p class="text-[11px] text-gray-300 mt-1">Try adjusting your filters</p>
+                </div>
+                <?php else: ?>
+                <?php foreach ($admin_orders as $idx => $o): ?>
+                <div id="order-card-<?= $idx ?>" class="order-card border border-gray-100 rounded-3xl p-6 bg-white cursor-pointer relative"
+                     data-idx="<?= $idx ?>"
+                     data-id="<?= htmlspecialchars($o['id']) ?>"
+                     data-formatted-id="<?= htmlspecialchars($o['formattedId']) ?>"
+                     data-status="<?= htmlspecialchars($o['status']) ?>"
+                     data-badge="<?= htmlspecialchars($o['badge']) ?>"
+                     data-badgetext="<?= htmlspecialchars($o['badgeText']) ?>"
+                     data-company="<?= htmlspecialchars($o['company']) ?>"
+                     data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
+                     data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
+                     data-date="<?= htmlspecialchars($o['date']) ?>"
+                     data-total="<?= htmlspecialchars($o['total']) ?>"
+                     data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
+                     data-timeline="<?= htmlspecialchars(json_encode($o['timeline'])) ?>"
+                     onclick="selectOrder(this)">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-sm font-bold text-gray-900"><?= htmlspecialchars($o['formattedId']) ?></h3>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5"><?= htmlspecialchars($o['company']) ?></p>
+                        </div>
+                        <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'PENDING', $o['badgeText'])) ?></span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs font-medium">
+                        <span class="text-gray-400"><?= htmlspecialchars(explode(',', $o['date'])[0]) ?></span>
+                        <span class="font-extrabold text-gray-950">LKR <?= htmlspecialchars(explode('.', $o['total'])[0]) ?></span>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -337,8 +376,6 @@ foreach ($admin_orders as $o) {
 <div id="toast-container"></div>
 
 <script>
-const orders = <?php echo json_encode($admin_orders); ?>;
-
 function getInitials(name) {
     const parts = name.split(' ');
     let initials = '';
@@ -346,11 +383,11 @@ function getInitials(name) {
     return initials.substring(0, 2);
 }
 
-function selectOrder(el, idx, openDrawer = true) {
-    document.querySelectorAll('.order-card').forEach(c => c.classList.remove('selected'));
-    if (el) el.classList.add('selected');
+function selectOrder(el, openDrawer = true) {
+    if (!el) return;
     
-    const o = orders[idx];
+    document.querySelectorAll('.order-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
     
     // Open detail pane drawer if requested
     if (openDrawer) {
@@ -363,22 +400,24 @@ function selectOrder(el, idx, openDrawer = true) {
         }
     }
     
-    document.getElementById('d-id').textContent = o.formattedId;
-    document.getElementById('d-company').textContent = o.company;
+    document.getElementById('d-id').textContent = el.dataset.formattedId;
+    document.getElementById('d-company').textContent = el.dataset.company;
     
     const badge = document.getElementById('d-badge');
-    badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ' + o.badge;
-    badge.textContent = o.badgeText;
+    badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ' + el.dataset.badge;
+    badge.textContent = el.dataset.badgetext;
     
-    document.querySelector('.w-12.h-12.bg-brand-light').textContent = getInitials(o.clientName);
-    document.getElementById('d-client').textContent = o.clientName;
-    document.getElementById('d-email').textContent = o.clientEmail;
+    document.querySelector('.w-12.h-12.bg-brand-light').textContent = getInitials(el.dataset.clientname);
+    document.getElementById('d-client').textContent = el.dataset.clientname;
+    document.getElementById('d-email').textContent = el.dataset.clientemail;
     
-    document.getElementById('d-total').textContent = 'LKR ' + o.total;
+    document.getElementById('d-total').textContent = 'LKR ' + el.dataset.total;
     
     // Render Items
     const itemsContainer = document.getElementById('d-items');
-    itemsContainer.innerHTML = o.items.map(item => `
+    let items = [];
+    try { items = JSON.parse(el.dataset.items || '[]'); } catch (e) {}
+    itemsContainer.innerHTML = items.map(item => `
         <div class="py-4 flex justify-between items-center text-xs first:pt-0 last:pb-0">
             <div>
                 <p class="font-bold text-gray-900">${item.n}</p>
@@ -390,7 +429,9 @@ function selectOrder(el, idx, openDrawer = true) {
     
     // Render Timeline
     const timelineContainer = document.getElementById('d-timeline');
-    timelineContainer.innerHTML = o.timeline.map((step, sIdx) => {
+    let timeline = [];
+    try { timeline = JSON.parse(el.dataset.timeline || '[]'); } catch (e) {}
+    timelineContainer.innerHTML = timeline.map((step, sIdx) => {
         let dotClass = 'bg-white border-gray-250 text-gray-300';
         let titleClass = 'text-gray-400';
         let descClass = 'text-gray-300';
@@ -418,29 +459,30 @@ function selectOrder(el, idx, openDrawer = true) {
     
     // Actions Footer
     const actionContainer = document.getElementById('d-actions');
-    const status_lower = o.status.toLowerCase();
+    const status_lower = el.dataset.status.toLowerCase();
+    const oid = el.dataset.id;
     
     if (status_lower === 'pending') {
         actionContainer.innerHTML = `
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="updateStatus(${o.id}, 'processing')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Accept Payment</button>
-                <button onclick="updateStatus(${o.id}, 'cancelled')" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
+                <button onclick="updateStatus(${oid}, 'processing')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Accept Payment</button>
+                <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
             </div>
         `;
     } else if (status_lower === 'processing') {
         actionContainer.innerHTML = `
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="updateStatus(${o.id}, 'shipped')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Dispatch Cargo</button>
-                <button onclick="updateStatus(${o.id}, 'cancelled')" class="bg-white border border-gray-200 text-red-650 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
+                <button onclick="updateStatus(${oid}, 'shipped')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Dispatch Cargo</button>
+                <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-650 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
             </div>
         `;
     } else if (status_lower === 'shipped') {
         actionContainer.innerHTML = `
-            <button onclick="updateStatus(${o.id}, 'delivered')" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Confirm Delivery</button>
+            <button onclick="updateStatus(${oid}, 'delivered')" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Confirm Delivery</button>
         `;
     } else {
         actionContainer.innerHTML = `
-            <p class="text-xs text-gray-400 font-medium text-center py-2 uppercase tracking-wider"><i class="ti ti-lock mr-1"></i> Order Closed (${o.status})</p>
+            <p class="text-xs text-gray-400 font-medium text-center py-2 uppercase tracking-wider"><i class="ti ti-lock mr-1"></i> Order Closed (${el.dataset.status})</p>
         `;
     }
 }
@@ -450,70 +492,45 @@ let activeStatus = 'all';
 let searchQuery   = '';
 let sortOrder     = 'newest';
 
-// Render a supplied subset of orders, preserving their original index for selectOrder()
-function renderOrderList(subset) {
-    const list = document.getElementById('order-list');
-    if (!subset || subset.length === 0) {
-        list.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-16 text-center">
-                <div class="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
-                    <i class="ti ti-search-off text-2xl text-gray-300"></i>
-                </div>
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">No orders found</p>
-                <p class="text-[11px] text-gray-300 mt-1">Try adjusting your filters</p>
-            </div>`;
-        return;
-    }
-    list.innerHTML = subset.map(({ o, idx }) => `
-        <div id="order-card-${idx}" class="order-card border border-gray-100 rounded-3xl p-6 bg-white cursor-pointer relative" onclick="selectOrder(this, ${idx})">
-            <div class="flex justify-between items-start mb-4">
-                <div>
-                    <h3 class="text-sm font-bold text-gray-900">${o.formattedId}</h3>
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">${o.company}</p>
-                </div>
-                <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider ${o.badge}">${o.badgeText.replace('PENDING PAYMENT','PENDING')}</span>
-            </div>
-            <div class="flex justify-between items-center text-xs font-medium">
-                <span class="text-gray-400">${o.date.split(',')[0]}</span>
-                <span class="font-extrabold text-gray-950">LKR ${o.total.split('.')[0]}</span>
-            </div>
-        </div>
-    `).join('');
-}
-
 function applyFilters() {
     const q = searchQuery.toLowerCase().trim();
+    const list = document.getElementById('order-list');
+    const rows = Array.from(document.querySelectorAll('.order-card'));
+    let visibleCount = 0;
 
-    // 1. Index orders so we can pass the original idx to selectOrder()
-    let result = orders.map((o, idx) => ({ o, idx }));
+    rows.forEach(r => {
+        let visible = true;
+        
+        if (activeStatus !== 'all' && r.dataset.status.toLowerCase() !== activeStatus) {
+            visible = false;
+        }
 
-    // 2. Status filter
-    if (activeStatus !== 'all') {
-        result = result.filter(({ o }) => o.status.toLowerCase() === activeStatus);
-    }
+        if (q && !r.dataset.formattedId.toLowerCase().includes(q) &&
+                 !r.dataset.company.toLowerCase().includes(q) &&
+                 !r.dataset.clientname.toLowerCase().includes(q)) {
+            visible = false;
+        }
 
-    // 3. Search filter  (order ID or company name)
-    if (q) {
-        result = result.filter(({ o }) =>
-            o.formattedId.toLowerCase().includes(q) ||
-            o.company.toLowerCase().includes(q) ||
-            o.clientName.toLowerCase().includes(q)
-        );
-    }
+        r.style.display = visible ? '' : 'none';
+        if (visible) visibleCount++;
+    });
 
-    // 4. Sort
-    result.sort((a, b) => {
-        const da = new Date(a.o.date);
-        const db = new Date(b.o.date);
+    rows.sort((a, b) => {
+        const da = new Date(a.dataset.date);
+        const db = new Date(b.dataset.date);
         return sortOrder === 'newest' ? db - da : da - db;
     });
 
-    renderOrderList(result);
+    rows.forEach(r => list.appendChild(r));
 
-    // Auto-select first visible card without opening the drawer
-    if (result.length > 0) {
-        const firstCard = document.getElementById('order-card-' + result[0].idx);
-        selectOrder(firstCard, result[0].idx, false);
+    let emptyState = document.getElementById('empty-state');
+    if (emptyState) {
+        emptyState.style.display = visibleCount === 0 ? 'flex' : 'none';
+    }
+
+    const firstVisible = rows.find(r => r.style.display !== 'none');
+    if (firstVisible) {
+        selectOrder(firstVisible, false);
     }
 }
 

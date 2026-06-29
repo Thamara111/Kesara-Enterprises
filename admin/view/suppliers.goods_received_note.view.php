@@ -166,7 +166,16 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                 </div>
 
                 <?php foreach ($lines as $idx => $line): ?>
-                <div class="grid grid-cols-[1fr_80px_80px_110px_120px] gap-4 items-center py-4 border-b border-gray-50 last:border-b-0">
+                <div class="grn-line-item grid grid-cols-[1fr_80px_80px_110px_120px] gap-4 items-center py-4 border-b border-gray-50 last:border-b-0"
+                     id="grn-line-<?= $idx ?>"
+                     data-idx="<?= $idx ?>"
+                     data-name="<?= htmlspecialchars($line['name']) ?>"
+                     data-ordered="<?= $line['ordered'] ?>"
+                     data-prev="<?= $line['prev'] ?>"
+                     data-remaining="<?= $line['remaining'] ?>"
+                     data-inv-before="<?= $line['invBefore'] ?>"
+                     data-threshold="<?= $line['threshold'] ?>"
+                     data-unit="<?= htmlspecialchars($line['unit']) ?>">
                     <div>
                         <p class="text-sm font-bold text-gray-900"><?= htmlspecialchars($line['name']) ?></p>
                         <p class="text-[11px] text-gray-400 font-medium mt-0.5">Expected remaining: <?= $line['remaining'] ?> <?= $line['unit'] ?></p>
@@ -352,14 +361,23 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
 </div>
 
 <script>
-const lines = <?php echo json_encode($lines); ?>;
-
 function updateLine(idx) {
+  const lineEl = document.getElementById('grn-line-'+idx);
+  if (!lineEl) return;
+  const line = {
+      remaining: parseInt(lineEl.dataset.remaining),
+      prev: parseInt(lineEl.dataset.prev),
+      ordered: parseInt(lineEl.dataset.ordered),
+      invBefore: parseInt(lineEl.dataset.invBefore),
+      threshold: parseInt(lineEl.dataset.threshold),
+      unit: lineEl.dataset.unit,
+      name: lineEl.dataset.name
+  };
   const input = document.getElementById('qty-'+idx);
-  const qty = Math.min(parseInt(input.value)||0, lines[idx].remaining);
+  const qty = Math.min(parseInt(input.value)||0, line.remaining);
   input.value = qty;
-  const totalRcvd = lines[idx].prev + qty;
-  const remaining = lines[idx].ordered - totalRcvd;
+  const totalRcvd = line.prev + qty;
+  const remaining = line.ordered - totalRcvd;
   const statusEl = document.getElementById('status-'+idx);
   const labelEl = document.getElementById('total-label-'+idx);
   
@@ -367,31 +385,31 @@ function updateLine(idx) {
     statusEl.querySelector('.badge').className = 'badge px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-[10px] font-bold';
     statusEl.querySelector('.badge').textContent = 'Full receipt';
     labelEl.className = 'text-[10px] font-bold text-emerald-600 mt-1';
-    labelEl.textContent = totalRcvd + ' / ' + lines[idx].ordered;
+    labelEl.textContent = totalRcvd + ' / ' + line.ordered;
   } else if (qty === 0) {
     statusEl.querySelector('.badge').className = 'badge px-3 py-1 bg-red-50 text-red-700 border border-red-100 rounded-full text-[10px] font-bold';
     statusEl.querySelector('.badge').textContent = 'None received';
     labelEl.className = 'text-[10px] font-bold text-red-600 mt-1';
-    labelEl.textContent = lines[idx].prev + ' / ' + lines[idx].ordered;
+    labelEl.textContent = line.prev + ' / ' + line.ordered;
   } else {
     statusEl.querySelector('.badge').className = 'badge px-3 py-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-full text-[10px] font-bold';
     statusEl.querySelector('.badge').textContent = 'Short by ' + remaining;
     labelEl.className = 'text-[10px] font-bold text-amber-600 mt-1';
-    labelEl.textContent = totalRcvd + ' / ' + lines[idx].ordered;
+    labelEl.textContent = totalRcvd + ' / ' + line.ordered;
   }
   
-  const newInv = lines[idx].invBefore + qty;
-  const pct = Math.min(100, Math.round(newInv / lines[idx].threshold * 100));
+  const newInv = line.invBefore + qty;
+  const pct = Math.min(100, Math.round(newInv / line.threshold * 100));
   
   const barEl = document.getElementById('inv-'+idx+'-bar');
   barEl.style.width = pct + '%';
   barEl.className = 'h-full rounded-full transition-all duration-500 ' + (pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500');
 
-  document.getElementById('inv-'+idx+'-after').textContent = lines[idx].invBefore + ' → ' + newInv;
+  document.getElementById('inv-'+idx+'-after').textContent = line.invBefore + ' → ' + newInv;
   
-  const aboveThresh = newInv >= lines[idx].threshold;
+  const aboveThresh = newInv >= line.threshold;
   const labelTextEl = document.getElementById('inv-'+idx+'-label');
-  labelTextEl.textContent = '+' + qty + ' ' + lines[idx].unit + ' · ' + (aboveThresh ? 'above threshold' : 'still below threshold');
+  labelTextEl.textContent = '+' + qty + ' ' + line.unit + ' · ' + (aboveThresh ? 'above threshold' : 'still below threshold');
   labelTextEl.className = 'text-[10px] font-bold mt-2 ' + (aboveThresh ? 'text-emerald-600' : 'text-amber-600');
   
   updateShortageWarn();
@@ -399,10 +417,15 @@ function updateLine(idx) {
 
 function updateShortageWarn() {
   const shortages = [];
-  lines.forEach((l,i) => {
+  document.querySelectorAll('.grn-line-item').forEach(lineEl => {
+    const i = lineEl.dataset.idx;
+    const ordered = parseInt(lineEl.dataset.ordered);
+    const prev = parseInt(lineEl.dataset.prev);
+    const name = lineEl.dataset.name;
+    const unit = lineEl.dataset.unit;
     const qty = parseInt(document.getElementById('qty-'+i).value)||0;
-    const rem = l.ordered - l.prev - qty;
-    if (rem > 0) shortages.push(l.name + ': ' + rem + ' ' + l.unit + ' short');
+    const rem = ordered - prev - qty;
+    if (rem > 0) shortages.push(name + ': ' + rem + ' ' + unit + ' short');
   });
   const warn = document.getElementById('shortage-warn');
   if (shortages.length) {
@@ -440,7 +463,7 @@ function openGRNRefPane() {
 
 document.getElementById('open-grn-ref').addEventListener('click', openGRNRefPane);
 
-lines.forEach((_, idx) => updateLine(idx));
+document.querySelectorAll('.grn-line-item').forEach(el => updateLine(el.dataset.idx));
 
 closeGRNRefPane();
 </script>
