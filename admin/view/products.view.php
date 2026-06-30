@@ -3,10 +3,21 @@ $admin_products = [];
 $all_categories = [];
 if (isset($pdo) && $pdo !== null) {
     try {
+        $checkColors = $pdo->query("SHOW COLUMNS FROM products LIKE 'colors'");
+        if (!$checkColors->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN colors VARCHAR(255) DEFAULT NULL");
+        $checkSizes = $pdo->query("SHOW COLUMNS FROM products LIKE 'sizes'");
+        if (!$checkSizes->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN sizes VARCHAR(255) DEFAULT NULL");
+        $checkDiscount = $pdo->query("SHOW COLUMNS FROM products LIKE 'discount'");
+        if (!$checkDiscount->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN discount DECIMAL(10,2) DEFAULT 0.00");
+        $checkGsm = $pdo->query("SHOW COLUMNS FROM products LIKE 'gsm'");
+        if (!$checkGsm->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN gsm VARCHAR(100) DEFAULT NULL");
+        $checkWaistband = $pdo->query("SHOW COLUMNS FROM products LIKE 'waistband'");
+        if (!$checkWaistband->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN waistband VARCHAR(150) DEFAULT NULL");
+
         $cat_stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
         $all_categories = $cat_stmt->fetchAll();
 
-        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors 
+        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.gsm, p.waistband 
                              FROM products p 
                              LEFT JOIN categories c ON p.category_id = c.id 
                              WHERE p.deleted_at IS NULL");
@@ -47,6 +58,10 @@ if (isset($pdo) && $pdo !== null) {
                 'desc' => $pr['desc'] ?? '',
                 'images' => json_decode($pr['images'] ?? '[]', true) ?: [],
                 'colors' => $pr['colors'] ?? '',
+                'sizes' => $pr['sizes'] ?? '',
+                'discount' => (float)($pr['discount'] ?? 0),
+                'gsm' => $pr['gsm'] ?? '',
+                'waistband' => $pr['waistband'] ?? '',
                 'tiers' => $formatted_tiers
             ];
         }
@@ -125,6 +140,10 @@ if (empty($all_categories)) {
                          data-desc="<?= htmlspecialchars($p['desc']) ?>"
                          data-images="<?= htmlspecialchars(json_encode($p['images'])) ?>"
                          data-colors="<?= htmlspecialchars($p['colors']) ?>"
+                         data-sizes="<?= htmlspecialchars($p['sizes']) ?>"
+                         data-discount="<?= htmlspecialchars($p['discount']) ?>"
+                         data-gsm="<?= htmlspecialchars($p['gsm']) ?>"
+                         data-waistband="<?= htmlspecialchars($p['waistband']) ?>"
                          data-tiers="<?= htmlspecialchars(json_encode($p['tiers'])) ?>"
                          onclick="selectProd(this)">
                         <div class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all overflow-hidden">
@@ -185,6 +204,20 @@ if (empty($all_categories)) {
                         </select>
                     </div>
                 </div>
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">GSM</label>
+                        <input type="text" id="f-gsm" class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Waistband</label>
+                        <input type="text" id="f-waistband" class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Discount (%)</label>
+                    <input type="number" step="0.01" id="f-discount" class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm" value="0">
+                </div>
                 <div class="space-y-2">
                     <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Product Description</label>
                     <textarea id="f-desc" rows="4" class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-medium outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm resize-none"></textarea>
@@ -196,13 +229,15 @@ if (empty($all_categories)) {
                 <h4 class="text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em] border-b border-gray-100 pb-2">Variations</h4>
                 <div class="space-y-4">
                     <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Available Sizes</label>
-                    <div class="flex flex-wrap gap-2">
-                        <button class="chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase hover:bg-brand hover:text-white transition-all">XS</button>
-                        <button class="chip chip-active px-4 py-2 bg-brand text-white border border-brand rounded-xl text-[10px] font-bold uppercase transition-all">S</button>
-                        <button class="chip chip-active px-4 py-2 bg-brand text-white border border-brand rounded-xl text-[10px] font-bold uppercase transition-all">M</button>
-                        <button class="chip chip-active px-4 py-2 bg-brand text-white border border-brand rounded-xl text-[10px] font-bold uppercase transition-all">L</button>
-                        <button class="chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase hover:bg-brand hover:text-white transition-all">XL</button>
+                    <div class="flex flex-wrap gap-2" id="size-chips">
+                        <button type="button" onclick="toggleSizeChip(this, 'XS')" class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">XS</button>
+                        <button type="button" onclick="toggleSizeChip(this, 'S')" class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">S</button>
+                        <button type="button" onclick="toggleSizeChip(this, 'M')" class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">M</button>
+                        <button type="button" onclick="toggleSizeChip(this, 'L')" class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">L</button>
+                        <button type="button" onclick="toggleSizeChip(this, 'XL')" class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">XL</button>
+                        <button type="button" onclick="toggleSizeChip(this, 'XXL')" class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">XXL</button>
                     </div>
+                    <input type="hidden" id="f-sizes" name="sizes" value="">
                 </div>
                 <div class="space-y-4">
                     <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Available Colours</label>
@@ -312,6 +347,9 @@ function selectProd(el, openDrawer = true) {
     document.getElementById('f-sku').value = el.dataset.originalSku || '';
     document.getElementById('f-cat').value = el.dataset.originalCat || '';
     document.getElementById('f-desc').value = el.dataset.desc || '';
+    document.getElementById('f-discount').value = el.dataset.discount || '0';
+    document.getElementById('f-gsm').value = el.dataset.gsm || '';
+    document.getElementById('f-waistband').value = el.dataset.waistband || '';
 
     // Set existing images across 6 slots
     let prodImages = [];
@@ -322,27 +360,38 @@ function selectProd(el, openDrawer = true) {
         document.getElementById('f-image-file-' + i).value = ''; // Reset file input
         updateProductPreviewFromUrl(imgUrl, i);
     }
-
     // Set colors
-    const colorsStr = el.dataset.colors || '';
-    document.getElementById('f-colors').value = colorsStr;
-    const colorsArray = colorsStr.split(',').map(c => c.trim().toLowerCase());
+    const colors = el.dataset.colors ? el.dataset.colors.split(',').map(c => c.trim()) : [];
+    document.getElementById('f-colors').value = el.dataset.colors || '';
     document.querySelectorAll('.color-chip').forEach(btn => {
-        if (colorsArray.includes(btn.textContent.trim().toLowerCase())) {
-            btn.classList.add('chip-active');
+        if (colors.includes(btn.textContent.trim())) {
+            btn.classList.add('bg-brand', 'text-white', 'border-brand');
+            btn.classList.remove('bg-white');
         } else {
-            btn.classList.remove('chip-active');
+            btn.classList.remove('bg-brand', 'text-white', 'border-brand');
+            btn.classList.add('bg-white');
         }
     });
 
-    // Show delete button for existing products, hide if id is 0/temp
+    // Set sizes
+    const sizes = el.dataset.sizes ? el.dataset.sizes.split(',').map(s => s.trim()) : [];
+    document.getElementById('f-sizes').value = el.dataset.sizes || '';
+    document.querySelectorAll('.size-chip').forEach(btn => {
+        if (sizes.includes(btn.textContent.trim())) {
+            btn.classList.add('bg-brand', 'text-white', 'border-brand');
+            btn.classList.remove('bg-white');
+        } else {
+            btn.classList.remove('bg-brand', 'text-white', 'border-brand');
+            btn.classList.add('bg-white');
+        }
+    });
+
+    // Set tiers
     if (id > 0) {
         document.getElementById('btn-prod-delete').classList.remove('hidden');
     } else {
         document.getElementById('btn-prod-delete').classList.add('hidden');
     }
-
-    // Tiers
     let tiers = [];
     try { tiers = JSON.parse(el.dataset.tiers || '[]'); } catch (e) {}
     renderTiers(tiers);
@@ -393,6 +442,9 @@ function showNew() {
     document.getElementById('f-name').value = '';
     document.getElementById('f-sku').value = '';
     document.getElementById('f-desc').value = '';
+    document.getElementById('f-discount').value = '0';
+    document.getElementById('f-gsm').value = '';
+    document.getElementById('f-waistband').value = '';
     document.getElementById('tier-rows').innerHTML = '';
     addTier();
     
@@ -406,7 +458,14 @@ function showNew() {
     // Reset colors
     document.getElementById('f-colors').value = '';
     document.querySelectorAll('.color-chip').forEach(btn => {
-        btn.classList.remove('chip-active');
+        btn.classList.remove('bg-brand', 'text-white', 'border-brand');
+        btn.classList.add('bg-white');
+    });
+    
+    document.getElementById('f-sizes').value = '';
+    document.querySelectorAll('.size-chip').forEach(btn => {
+        btn.classList.remove('bg-brand', 'text-white', 'border-brand');
+        btn.classList.add('bg-white');
     });
 
     document.getElementById('btn-prod-delete').classList.add('hidden');
@@ -422,16 +481,28 @@ function showNew() {
 }
 
 function toggleColorChip(btn, color) {
-    btn.classList.toggle('chip-active');
-    updateColorsValue();
+    btn.classList.toggle('bg-brand');
+    btn.classList.toggle('text-white');
+    btn.classList.toggle('border-brand');
+    btn.classList.toggle('bg-white');
+    
+    updateHiddenField('color-chips', 'f-colors');
 }
 
-function updateColorsValue() {
-    const activeColors = [];
-    document.querySelectorAll('.color-chip.chip-active').forEach(btn => {
-        activeColors.push(btn.textContent.trim());
-    });
-    document.getElementById('f-colors').value = activeColors.join(', ');
+function toggleSizeChip(btn, size) {
+    btn.classList.toggle('bg-brand');
+    btn.classList.toggle('text-white');
+    btn.classList.toggle('border-brand');
+    btn.classList.toggle('bg-white');
+    
+    updateHiddenField('size-chips', 'f-sizes');
+}
+
+function updateHiddenField(containerId, inputId) {
+    const container = document.getElementById(containerId);
+    const activeBtns = container.querySelectorAll('button.bg-brand');
+    const values = Array.from(activeBtns).map(b => b.textContent.trim());
+    document.getElementById(inputId).value = values.join(',');
 }
 
 function closeProductFormPane() {
@@ -494,6 +565,9 @@ function saveProduct() {
     const sku = document.getElementById('f-sku').value;
     const category_name = document.getElementById('f-cat').value;
     const description = document.getElementById('f-desc').value;
+    const discount = document.getElementById('f-discount').value;
+    const gsm = document.getElementById('f-gsm').value;
+    const waistband = document.getElementById('f-waistband').value;
 
     // Get pricing tiers from inputs
     const tiers = [];
@@ -525,6 +599,10 @@ function saveProduct() {
     formData.append('status', 'In Stock');
     formData.append('tiers', JSON.stringify(tiers));
     formData.append('colors', document.getElementById('f-colors').value);
+    formData.append('sizes', document.getElementById('f-sizes').value);
+    formData.append('discount', discount);
+    formData.append('gsm', gsm);
+    formData.append('waistband', waistband);
 
     // Append 6 slots
     for (let i = 0; i < 6; i++) {

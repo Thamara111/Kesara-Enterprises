@@ -20,6 +20,22 @@ if (isset($pdo) && $pdo !== null) {
         if (!$checkColors->fetch()) {
             $pdo->exec("ALTER TABLE products ADD COLUMN colors VARCHAR(255) DEFAULT NULL");
         }
+        $checkDiscount = $pdo->query("SHOW COLUMNS FROM products LIKE 'discount'");
+        if (!$checkDiscount->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN discount DECIMAL(10,2) DEFAULT 0.00");
+        }
+        $checkSizes = $pdo->query("SHOW COLUMNS FROM products LIKE 'sizes'");
+        if (!$checkSizes->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN sizes VARCHAR(255) DEFAULT NULL");
+        }
+        $checkGsm = $pdo->query("SHOW COLUMNS FROM products LIKE 'gsm'");
+        if (!$checkGsm->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN gsm VARCHAR(100) DEFAULT NULL");
+        }
+        $checkWaistband = $pdo->query("SHOW COLUMNS FROM products LIKE 'waistband'");
+        if (!$checkWaistband->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN waistband VARCHAR(150) DEFAULT NULL");
+        }
     } catch (\Exception $e) {
         // Ignored
     }
@@ -36,7 +52,7 @@ if ($method === 'GET') {
     $products = [];
     if (isset($pdo) && $pdo !== null) {
         try {
-            $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images 
+            $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.gsm, p.waistband 
                                  FROM products p 
                                  LEFT JOIN categories c ON p.category_id = c.id
                                  ORDER BY p.name ASC");
@@ -65,6 +81,11 @@ if ($method === 'GET') {
                     'status' => $pr['status'],
                     'desc' => $pr['desc'] ?? '',
                     'images' => json_decode($pr['images'] ?? '[]', true) ?: [],
+                    'colors' => $pr['colors'] ?? '',
+                    'sizes' => $pr['sizes'] ?? '',
+                    'discount' => (float)($pr['discount'] ?? 0),
+                    'gsm' => $pr['gsm'] ?? '',
+                    'waistband' => $pr['waistband'] ?? '',
                     'tiers' => $formatted_tiers
                 ];
             }
@@ -75,7 +96,7 @@ if ($method === 'GET') {
         }
     } else {
         $products = [
-            [ 'id' => 0, 'name' => 'Classic Cotton Brief', 'sku' => 'KB-001', 'cat' => "Men's Briefs", 'moq' => 50, 'price' => 95, 'status' => 'In Stock', 'desc' => "Classic cut men's brief. Suitable for all-day wear.", 'images' => [], 'tiers' => [['q' => 50, 'p' => 120], ['q' => 100, 'p' => 108], ['q' => 500, 'p' => 95]] ]
+            [ 'id' => 0, 'name' => 'Classic Cotton Brief', 'sku' => 'KB-001', 'cat' => "Men's Briefs", 'moq' => 50, 'price' => 95, 'status' => 'In Stock', 'desc' => "Classic cut men's brief. Suitable for all-day wear.", 'images' => [], 'colors' => '', 'sizes' => 'S,M,L,XL', 'discount' => 0, 'gsm' => '180 GSM', 'waistband' => 'Elastic', 'tiers' => [['q' => 50, 'p' => 120], ['q' => 100, 'p' => 108], ['q' => 500, 'p' => 95]] ]
         ];
     }
     echo json_encode(["status" => "success", "data" => $products]);
@@ -132,6 +153,11 @@ if ($method === 'POST') {
     $moq = isset($input['moq']) ? (int)$input['moq'] : 50;
     $base_price = isset($input['base_price']) ? (float)$input['base_price'] : 0;
     $status = trim($input['status'] ?? 'In Stock');
+    $colors = trim($input['colors'] ?? '');
+    $sizes = trim($input['sizes'] ?? '');
+    $discount = isset($input['discount']) ? (float)$input['discount'] : 0;
+    $gsm = trim($input['gsm'] ?? '');
+    $waistband = trim($input['waistband'] ?? '');
     
     $tiers = $input['tiers'] ?? []; 
     if (is_string($tiers)) {
@@ -223,13 +249,13 @@ if ($method === 'POST') {
 
             if ($id > 0) {
                 // Update product
-                $stmt = $pdo->prepare("UPDATE products SET name = ?, sku = ?, category_id = ?, description = ?, moq = ?, base_price = ?, status = ?, images = ? WHERE id = ?");
-                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $id]);
+                $stmt = $pdo->prepare("UPDATE products SET name = ?, sku = ?, category_id = ?, description = ?, moq = ?, base_price = ?, status = ?, images = ?, colors = ?, sizes = ?, discount = ?, gsm = ?, waistband = ? WHERE id = ?");
+                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $gsm, $waistband, $id]);
                 $product_id = $id;
             } else {
                 // Insert product
-                $stmt = $pdo->prepare("INSERT INTO products (name, sku, category_id, description, moq, base_price, status, images) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json]);
+                $stmt = $pdo->prepare("INSERT INTO products (name, sku, category_id, description, moq, base_price, status, images, colors, sizes, discount, gsm, waistband) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $gsm, $waistband]);
                 $product_id = $pdo->lastInsertId();
             }
 
