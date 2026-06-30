@@ -22,9 +22,7 @@ if (isset($pdo) && $pdo !== null) {
         
         if ($order) {
             // Fetch order items with product details and default variations
-            $stmt_items = $pdo->prepare("SELECT oi.*, p.name AS product_name, p.sku,
-                                                COALESCE((SELECT size FROM inventory WHERE product_id = p.id LIMIT 1), 'M') AS size,
-                                                COALESCE((SELECT colour FROM inventory WHERE product_id = p.id LIMIT 1), 'White') AS colour
+            $stmt_items = $pdo->prepare("SELECT oi.*, p.name AS product_name, p.sku
                                          FROM order_items oi 
                                          JOIN products p ON oi.product_id = p.id 
                                          WHERE oi.order_id = ?");
@@ -145,7 +143,7 @@ require_once __DIR__ . "/layouts/header.php";
                         <div class="py-4 flex justify-between items-center gap-4">
                             <div>
                                 <h3 class="text-sm font-bold text-gray-900"><?= htmlspecialchars($item['product_name']) ?></h3>
-                                <p class="text-[11px] text-gray-400 font-medium"><?= htmlspecialchars($item['colour']) ?> · Size <?= htmlspecialchars($item['size']) ?> · SKU <?= htmlspecialchars($item['sku']) ?> · <?= htmlspecialchars($item['quantity']) ?> units @ LKR <?= number_format($item['unit_price']) ?>/pc</p>
+                                <p class="text-[11px] text-gray-400 font-medium"><?= htmlspecialchars($item['color'] ?? 'Standard Color') ?> · Size <?= htmlspecialchars($item['size'] ?? 'M') ?> · SKU <?= htmlspecialchars($item['sku']) ?> · <?= htmlspecialchars($item['quantity']) ?> units @ LKR <?= number_format($item['unit_price']) ?>/pc</p>
                             </div>
                             <span class="text-sm font-bold text-gray-900 whitespace-nowrap">LKR <?= number_format($item['quantity'] * $item['unit_price']) ?></span>
                         </div>

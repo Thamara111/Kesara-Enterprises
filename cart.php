@@ -148,7 +148,7 @@ function loadCartFromStorage() {
 
 function saveCartToStorage() {
     // Only save id and qty
-    const toSave = cartItems.map(item => ({id: item.id, qty: item.qty}));
+    const toSave = cartItems.map(item => ({id: item.id, qty: item.qty, color: item.color, size: item.size}));
     localStorage.setItem('kesara_cart', JSON.stringify(toSave));
 }
 
@@ -182,10 +182,12 @@ async function initializeCart() {
                 return {
                     id: dbP.id,
                     name: dbP.name,
-                    meta: dbP.meta,
+                    meta: `${item.color || 'Standard Color'} • Size ${item.size || 'M'}`,
                     moq: dbP.moq,
                     tiers: dbP.tiers,
-                    qty: finalQty
+                    qty: finalQty,
+                    color: item.color,
+                    size: item.size
                 };
             }).filter(i => i !== null);
             saveCartToStorage(); // Save validated quantities
@@ -252,9 +254,9 @@ function render() {
         </div>
       </div>
       <div class="flex items-center bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-sm">
-        <button onclick="changeQty(${i},-10)" class="w-10 h-10 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all"><i class="ti ti-minus text-xs"></i></button>
-        <span class="w-12 text-center text-xs font-bold text-gray-900">${item.qty}</span>
-        <button onclick="changeQty(${i},10)" class="w-10 h-10 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all"><i class="ti ti-plus text-xs"></i></button>
+          <button onclick="changeQty(${i}, -10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all"><i class="ti ti-minus text-xs"></i></button>
+          <span class="w-10 text-center text-sm font-bold text-gray-900">${item.qty}</span>
+          <button onclick="changeQty(${i}, 10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all"><i class="ti ti-plus text-xs"></i></button>
       </div>
       <div class="text-right w-full md:w-auto">
         <p class="text-sm font-bold ${belowMoq ? 'text-red-500' : 'text-gray-900'}">LKR ${sub.toLocaleString()}</p>
@@ -304,14 +306,17 @@ function render() {
 }
 
 function changeQty(index, delta) {
-  cartItems[index].qty += delta;
-  if(cartItems[index].qty < 0) cartItems[index].qty = 0;
-  saveCartToStorage();
-  render();
+  const item = cartItems[index];
+  if(item) {
+      item.qty += delta;
+      if (item.qty < item.moq) item.qty = item.moq;
+      saveCartToStorage();
+      render();
+  }
 }
 
-function removeItem(i) {
-  cartItems.splice(i, 1);
+function removeItem(index) {
+  cartItems.splice(index, 1);
   saveCartToStorage();
   render();
 }

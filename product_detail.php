@@ -62,24 +62,26 @@ if (!$product) {
     ];
 }
 
-// Map specifications based on SKU
-$specs = [
-    'KB-001' => ['material' => '100% Combed Cotton', 'gsm' => '180 GSM', 'waistband' => 'Elastic, Branded', 'packaging' => '12 pcs per polybag', 'lead' => '3–5 Business Days'],
-    'KB-008' => ['material' => '95% Combed Cotton, 5% Spandex', 'gsm' => '200 GSM', 'waistband' => 'Reinforced Elastic', 'packaging' => '12 pcs per polybag', 'lead' => '4–6 Business Days'],
-    'KL-003' => ['material' => 'Soft-touch Cotton Blend', 'gsm' => '160 GSM', 'waistband' => 'Seamless Elastic', 'packaging' => '10 pcs per pack', 'lead' => '3–5 Business Days'],
-    'KC-012' => ['material' => '100% Combed Cotton', 'gsm' => '150 GSM', 'waistband' => 'Soft Elastic', 'packaging' => '6 pcs per pack', 'lead' => '3–5 Business Days'],
-    'KB-015' => ['material' => 'Modal Premium Fabric', 'gsm' => '190 GSM', 'waistband' => 'Dynamic Waistband', 'packaging' => '12 pcs per polybag', 'lead' => '3–5 Business Days'],
-    'KB-022' => ['material' => 'Breathable Sports Mesh', 'gsm' => '170 GSM', 'waistband' => 'Moisture-wicking Elastic', 'packaging' => '12 pcs per polybag', 'lead' => '3–5 Business Days'],
-    'KB-034' => ['material' => 'Standard Combed Cotton', 'gsm' => '180 GSM', 'waistband' => 'Standard Elastic', 'packaging' => '12 pcs per polybag', 'lead' => '3–5 Business Days'],
-    'KL-009' => ['material' => 'Microfiber Seamless', 'gsm' => '140 GSM', 'waistband' => 'Invisible Elastic', 'packaging' => '10 pcs per pack', 'lead' => '3–5 Business Days']
+// Parse JSON specs if we added them in future, for now use empty or generic
+$prod_specs = [
+    'material' => 'Cotton Blend', 
+    'gsm' => !empty($product['gsm']) ? $product['gsm'] : '180 GSM', 
+    'waistband' => !empty($product['waistband']) ? $product['waistband'] : 'Elastic', 
+    'packaging' => 'Bulk pack', 
+    'lead' => '3–5 Business Days'
 ];
-$prod_specs = $specs[$product['sku']] ?? ['material' => '100% Combed Cotton', 'gsm' => '180 GSM', 'waistband' => 'Elastic', 'packaging' => 'Bulk pack', 'lead' => '3–5 Business Days'];
+// Extract discount
+$discount = isset($product['discount']) ? (float)$product['discount'] : 0;
 
-// Extract unique sizes and colours from variations
-$sizes = array_unique(array_filter(array_column($variations, 'size')));
+// Extract sizes
+if (!empty(trim($product['sizes'] ?? ''))) {
+    $sizes = array_filter(array_map('trim', explode(',', $product['sizes'])));
+} else {
+    $sizes = array_unique(array_filter(array_column($variations, 'size')));
+}
 
-if (!empty($product['colors'])) {
-    $colours = array_map('trim', explode(',', $product['colors']));
+if (!empty(trim($product['colors'] ?? ''))) {
+    $colours = array_filter(array_map('trim', explode(',', $product['colors'])));
 } else {
     $colours = array_unique(array_filter(array_column($variations, 'colour')));
 }
@@ -211,7 +213,13 @@ require_once __DIR__ . "/layouts/header.php";
                 </div>
 
                 <h1 class="text-3xl font-bold text-gray-900 mb-2 leading-tight"><?= htmlspecialchars($product['name']) ?></h1>
-                <p class="text-xs font-medium text-gray-400 tracking-wider mb-8">SKU: <?= htmlspecialchars($product['sku']) ?> &nbsp;·&nbsp; <?= htmlspecialchars($category_name) ?></p>
+                <p class="text-xs font-medium text-gray-400 tracking-wider mb-4">SKU: <?= htmlspecialchars($product['sku']) ?> &nbsp;·&nbsp; <?= htmlspecialchars($category_name) ?></p>
+
+                <?php if ($discount > 0): ?>
+                    <div class="mb-6 inline-block px-3 py-1 bg-red-50 border border-red-100 rounded-lg text-red-600 font-bold text-xs uppercase tracking-widest">
+                        <?= $discount ?>% OFF
+                    </div>
+                <?php endif; ?>
 
                 <hr class="border-gray-50 mb-8">
 
@@ -233,7 +241,14 @@ require_once __DIR__ . "/layouts/header.php";
                                 <span class="px-2 py-0.5 bg-brand text-brand-light text-[9px] font-bold rounded-full">YOUR QTY</span>
                                 <?php endif; ?>
                             </div>
-                            <span class="<?= $is_active ? 'text-brand font-extrabold' : 'text-gray-900 font-bold' ?>">LKR <?= number_format($t['price']) ?> / pc</span>
+                            <span class="<?= $is_active ? 'text-brand font-extrabold' : 'text-gray-900 font-bold' ?>">
+                                <?php if ($discount > 0): ?>
+                                    <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($t['price']) ?></span>
+                                    LKR <?= number_format($t['price'] * (1 - $discount / 100)) ?> / pc
+                                <?php else: ?>
+                                    LKR <?= number_format($t['price']) ?> / pc
+                                <?php endif; ?>
+                            </span>
                         </div>
                         <?php endforeach; ?>
                         
@@ -242,7 +257,14 @@ require_once __DIR__ . "/layouts/header.php";
                             <div class="flex items-center gap-3">
                                 <span class="font-bold">Base Wholesale Price</span>
                             </div>
-                            <span class="text-brand font-extrabold">LKR <?= number_format($product['base_price']) ?> / pc</span>
+                            <span class="text-brand font-extrabold">
+                                <?php if ($discount > 0): ?>
+                                    <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($product['base_price']) ?></span>
+                                    LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
+                                <?php else: ?>
+                                    LKR <?= number_format($product['base_price']) ?> / pc
+                                <?php endif; ?>
+                            </span>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -254,8 +276,7 @@ require_once __DIR__ . "/layouts/header.php";
                         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Colour</label>
                         <div class="flex flex-wrap gap-3">
                             <?php foreach ($colours as $c): ?>
-                            <?php $is_selected = ($c === $default_colour); ?>
-                            <button class="w-8 h-8 rounded-full <?= getColorClass($c) ?> <?= $is_selected ? 'ring-2 ring-brand ring-offset-2' : 'hover:ring-2 hover:ring-gray-300' ?> ring-offset-2 transition-all" title="<?= htmlspecialchars($c) ?>"></button>
+                            <button id="color-btn-<?= $idx ?>" type="button" onclick="selectColor(<?= $idx ?>, '<?= htmlspecialchars($c) ?>')" class="color-select-btn w-8 h-8 rounded-full <?= getColorClass($c) ?> <?= $is_selected ? 'ring-2 ring-brand ring-offset-2' : 'hover:ring-2 hover:ring-gray-300' ?> ring-offset-2 transition-all" title="<?= htmlspecialchars($c) ?>"></button>
                             <?php endforeach; ?>
                             
                             <?php if (empty($colours)): ?>
@@ -268,17 +289,17 @@ require_once __DIR__ . "/layouts/header.php";
                         <div class="flex flex-wrap gap-2">
                             <?php 
                                 $size_options = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-                                foreach ($size_options as $so):
+                                foreach ($size_options as $idx => $so):
                                     $is_available = in_array($so, $sizes) || empty($sizes);
                                     $is_selected = ($so === $default_size);
                                     
                                     if (!$is_available):
                             ?>
-                            <button class="w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-gray-50 text-gray-300 cursor-not-allowed line-through"><?= htmlspecialchars($so) ?></button>
+                            <button type="button" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-gray-50 text-gray-300 cursor-not-allowed line-through"><?= htmlspecialchars($so) ?></button>
                             <?php elseif ($is_selected): ?>
-                            <button class="w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-brand text-brand-light shadow-sm shadow-brand/20"><?= htmlspecialchars($so) ?></button>
+                            <button id="size-btn-<?= $idx ?>" type="button" onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-brand text-brand-light shadow-sm shadow-brand/20"><?= htmlspecialchars($so) ?></button>
                             <?php else: ?>
-                            <button class="w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold border border-gray-100 hover:border-brand hover:text-brand transition-colors"><?= htmlspecialchars($so) ?></button>
+                            <button id="size-btn-<?= $idx ?>" type="button" onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold border border-gray-100 hover:border-brand hover:text-brand transition-colors"><?= htmlspecialchars($so) ?></button>
                             <?php endif; ?>
                             <?php endforeach; ?>
                         </div>
@@ -371,6 +392,7 @@ if (empty($js_tiers)) {
 }
 echo json_encode($js_tiers);
 ?>;
+const discount = <?= (float)$discount ?>;
 const moq = <?= (int)$product['moq'] ?>;
 let qty = <?= (int)$product['moq'] ?>;
 
@@ -382,10 +404,15 @@ function updateUI() {
   const tier = getTier(qty);
   const belowMOQ = qty < moq;
   
+  let activePrice = tier.price;
+  if (discount > 0) {
+      activePrice = activePrice * (1 - (discount / 100));
+  }
+  
   document.getElementById('qty-display').textContent = qty;
   document.getElementById('order-qty').textContent = qty + ' units';
-  document.getElementById('unit-price').textContent = 'LKR ' + tier.price;
-  document.getElementById('subtotal').textContent = 'LKR ' + (qty * tier.price).toLocaleString();
+  document.getElementById('unit-price').textContent = 'LKR ' + activePrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+  document.getElementById('subtotal').textContent = 'LKR ' + (qty * activePrice).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
   
   const warn = document.getElementById('moq-warn');
   if(belowMOQ) {
@@ -427,6 +454,35 @@ function changeQty(delta) {
   updateUI();
 }
 
+let selectedColor = '<?= htmlspecialchars($default_colour) ?>';
+let selectedSize = '<?= htmlspecialchars($default_size) ?>';
+
+function selectColor(idx, color) {
+    selectedColor = color;
+    document.querySelectorAll('.color-select-btn').forEach(btn => {
+        btn.classList.remove('ring-2', 'ring-brand', 'ring-offset-2');
+        btn.classList.add('hover:ring-2', 'hover:ring-gray-300');
+    });
+    const btn = document.getElementById('color-btn-' + idx);
+    if (btn) {
+        btn.classList.add('ring-2', 'ring-brand', 'ring-offset-2');
+        btn.classList.remove('hover:ring-2', 'hover:ring-gray-300');
+    }
+}
+
+function selectSize(idx, size) {
+    selectedSize = size;
+    document.querySelectorAll('.size-select-btn:not(.cursor-not-allowed)').forEach(btn => {
+        btn.classList.remove('bg-brand', 'text-brand-light', 'shadow-sm', 'shadow-brand/20');
+        btn.classList.add('border', 'border-gray-100', 'hover:border-brand', 'hover:text-brand');
+    });
+    const btn = document.getElementById('size-btn-' + idx);
+    if (btn) {
+        btn.classList.add('bg-brand', 'text-brand-light', 'shadow-sm', 'shadow-brand/20');
+        btn.classList.remove('border', 'border-gray-100', 'hover:border-brand', 'hover:text-brand');
+    }
+}
+
 function addToCart() {
     if (qty < moq) {
         alert("Minimum Order Quantity is " + moq);
@@ -440,11 +496,11 @@ function addToCart() {
     }
     
     // Check if already in cart
-    let existing = cart.find(i => i.id === productId);
+    let existing = cart.find(i => i.id === productId && i.color === selectedColor && i.size === selectedSize);
     if (existing) {
         existing.qty += qty;
     } else {
-        cart.push({ id: productId, qty: qty });
+        cart.push({ id: productId, qty: qty, color: selectedColor, size: selectedSize });
     }
     
     localStorage.setItem('kesara_cart', JSON.stringify(cart));

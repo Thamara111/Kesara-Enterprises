@@ -13,9 +13,11 @@ if ($pdo) {
                              GROUP BY c.id");
         $categories = $stmt->fetchAll();
 
-        // Fetch featured products (first 4 products)
+        // Fetch featured products (first 4 latest products)
         $stmt = $pdo->query("SELECT p.id, p.name, p.sku, p.moq, p.base_price, p.status, p.images 
                              FROM products p 
+                             WHERE p.deleted_at IS NULL
+                             ORDER BY p.id DESC
                              LIMIT 4");
         $featured_products = $stmt->fetchAll();
     } catch (\Exception $e) {
@@ -23,25 +25,7 @@ if ($pdo) {
     }
 }
 
-// Fallback to mock data if DB is offline or empty
-if (empty($categories)) {
-    $categories = [
-        ['name' => 'Briefs', 'slug' => 'briefs', 'icon' => 'ti-shirt', 'image' => '', 'style_count' => 12],
-        ['name' => 'Boxers', 'slug' => 'boxers', 'icon' => 'ti-shirt', 'image' => '', 'style_count' => 8],
-        ['name' => 'Trunks', 'slug' => 'trunks', 'icon' => 'ti-shirt', 'image' => '', 'style_count' => 10],
-        ['name' => 'Ladies', 'slug' => 'ladies', 'icon' => 'ti-heart', 'image' => '', 'style_count' => 14],
-        ['name' => 'Children', 'slug' => 'children', 'icon' => 'ti-star', 'image' => '', 'style_count' => 9],
-    ];
-}
 
-if (empty($featured_products)) {
-    $featured_products = [
-        ['name' => 'Classic Cotton Brief', 'sku' => 'KB-001', 'moq' => 50, 'base_price' => 120.00, 'status' => 'In Stock'],
-        ['name' => 'Stretch Boxer', 'sku' => 'KB-008', 'moq' => 100, 'base_price' => 195.00, 'status' => 'In Stock'],
-        ['name' => 'Ladies Hipster', 'sku' => 'KL-003', 'moq' => 50, 'base_price' => 145.00, 'status' => 'Low Stock'],
-        ['name' => 'Modal Trunk', 'sku' => 'KB-015', 'moq' => 100, 'base_price' => 260.00, 'status' => 'In Stock'],
-    ];
-}
 
 $page_meta = [
     'title' => 'Kesara Enterprises | Wholesale Underwear Supplier Sri Lanka',

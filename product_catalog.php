@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . "/database/connection.php";
 
 $filter_search   = trim($_GET['search']   ?? '');
@@ -18,7 +18,7 @@ if ($pdo) {
 $catalog_products = [];
 if ($pdo) {
     try {
-        $where2  = ["1=1"];
+        $where2  = ["p.deleted_at IS NULL"];
         $params2 = [];
         if ($filter_search !== '') {
             $where2[]  = "(p.name LIKE ? OR p.sku LIKE ?)";
@@ -56,46 +56,6 @@ if ($pdo) {
     } catch (\Exception $e) {}
 }
 
-if (empty($catalog_products)) {
-    $all_mock = [
-        ['name'=>'Classic Brief',  'sku'=>'KB-001','moq'=>50, 'price'=>120.00,'status'=>'In Stock', 'images'=>'[]','category_name'=>'Briefs','category_slug'=>'briefs'],
-        ['name'=>'Stretch Boxer',  'sku'=>'KB-008','moq'=>100,'price'=>195.00,'status'=>'In Stock', 'images'=>'[]','category_name'=>'Boxers','category_slug'=>'boxers'],
-        ['name'=>'Ladies Hipster', 'sku'=>'KL-003','moq'=>50, 'price'=>145.00,'status'=>'Low Stock','images'=>'[]','category_name'=>'Ladies','category_slug'=>'ladies'],
-        ['name'=>'Kids Trunk Set', 'sku'=>'KC-012','moq'=>60, 'price'=>98.00, 'status'=>'In Stock', 'images'=>'[]','category_name'=>'Trunks','category_slug'=>'trunks'],
-        ['name'=>'Modal Trunk',    'sku'=>'KB-015','moq'=>100,'price'=>260.00,'status'=>'In Stock', 'images'=>'[]','category_name'=>'Trunks','category_slug'=>'trunks'],
-        ['name'=>'Sports Brief',   'sku'=>'KB-022','moq'=>50, 'price'=>175.00,'status'=>'Low Stock','images'=>'[]','category_name'=>'Briefs','category_slug'=>'briefs'],
-        ['name'=>'Cotton Trunk',   'sku'=>'KB-034','moq'=>80, 'price'=>210.00,'status'=>'In Stock', 'images'=>'[]','category_name'=>'Trunks','category_slug'=>'trunks'],
-        ['name'=>'Seamless Brief', 'sku'=>'KL-009','moq'=>50, 'price'=>180.00,'status'=>'In Stock', 'images'=>'[]','category_name'=>'Briefs','category_slug'=>'briefs'],
-        ['name'=>'Lace Brief',     'sku'=>'KL-011','moq'=>50, 'price'=>165.00,'status'=>'In Stock', 'images'=>'[]','category_name'=>'Ladies','category_slug'=>'ladies'],
-        ['name'=>'Slim Boxer',     'sku'=>'KB-040','moq'=>100,'price'=>220.00,'status'=>'In Stock', 'images'=>'[]','category_name'=>'Boxers','category_slug'=>'boxers'],
-        ['name'=>'Kids Brief',     'sku'=>'KC-005','moq'=>60, 'price'=>75.00, 'status'=>'In Stock', 'images'=>'[]','category_name'=>'Kids',  'category_slug'=>'kids'],
-        ['name'=>'Kids Boxer',     'sku'=>'KC-018','moq'=>60, 'price'=>85.00, 'status'=>'On Order', 'images'=>'[]','category_name'=>'Kids',  'category_slug'=>'kids'],
-    ];
-    $status_map2 = ['in_stock'=>'In Stock','low_stock'=>'Low Stock','on_order'=>'On Order'];
-    $catalog_products = array_values(array_filter($all_mock, function($p) use ($filter_search,$filter_category,$filter_stock,$filter_moq,$status_map2) {
-        if ($filter_search !== '' && stripos($p['name'],$filter_search)===false && stripos($p['sku'],$filter_search)===false) return false;
-        if ($filter_category !== '' && $p['category_slug'] !== $filter_category) return false;
-        if (!empty($filter_stock)) {
-            $allowed = array_map(fn($k) => $status_map2[$k] ?? $k, $filter_stock);
-            if (!in_array($p['status'], $allowed, true)) return false;
-        }
-        if ($filter_moq !== null && $p['moq'] < $filter_moq) return false;
-        return true;
-    }));
-    usort($catalog_products, function($a,$b) use ($filter_sort) {
-        return match($filter_sort) {
-            'price_asc'  => $a['price'] <=> $b['price'],
-            'price_desc' => $b['price'] <=> $a['price'],
-            'alpha'      => strcmp($a['name'],$b['name']),
-            default      => 0,
-        };
-    });
-    if (empty($all_categories)) {
-        $seen = [];
-        foreach ($all_mock as $p) { if (!isset($seen[$p['category_slug']])) $seen[$p['category_slug']] = ['name'=>$p['category_name'],'slug'=>$p['category_slug']]; }
-        $all_categories = array_values($seen);
-    }
-}
 
 $items_per_page = 8;
 $total_items    = count($catalog_products);
