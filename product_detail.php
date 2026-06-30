@@ -1,6 +1,29 @@
 <?php
 require_once __DIR__ . "/database/connection.php";
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$is_logged_in   = isset($_SESSION['user_id']);
+$buyer_approved = false;
+
+if ($is_logged_in && isset($pdo)) {
+    try {
+        $auth_stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? LIMIT 1");
+        $auth_stmt->execute([$_SESSION['user_id']]);
+        $auth_user = $auth_stmt->fetch();
+
+        if ($auth_user && $auth_user['status'] === 'approved') {
+            $buyer_approved = true;
+        }
+    } catch (\Exception $e) {
+        // Fail closed — treat as not authorized on DB error
+        $buyer_approved = false;
+    }
+}
+
+
 $sku = $_GET['sku'] ?? 'KB-001';
 
 // Query product
@@ -343,13 +366,53 @@ require_once __DIR__ . "/layouts/header.php";
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button onclick="addToCart()" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2">
-                        <i class="ti ti-shopping-cart-plus text-xl"></i>
-                        Add to Order
-                    </a>
-                    <button class="bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl hover:bg-gray-50 hover:border-brand hover:text-brand transition-all transform hover:-translate-y-px active:scale-95">
-                        Request Quote
-                    </button>
+                    <?php if ($buyer_approved): ?>
+                        <!-- ✅ Approved buyer: show full action buttons -->
+                        <button onclick="addToCart()"
+                            class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark
+                                   transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20
+                                   active:scale-95 flex items-center justify-center gap-2">
+                            <i class="ti ti-shopping-cart-plus text-xl"></i>
+                            Add to Order
+                        </button>
+                        <button onclick="requestQuote()"
+                            class="bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl
+                                   hover:bg-gray-50 hover:border-brand hover:text-brand transition-all
+                                   transform hover:-translate-y-px active:scale-95">
+                            Request Quote
+                        </button>
+
+                    <?php elseif ($is_logged_in && !$buyer_approved): ?>
+                        <!-- ⏳ Logged in but account still pending/suspended -->
+                        <div class="col-span-2 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200
+                                    rounded-2xl text-amber-800">
+                            <i class="ti ti-clock-hour-4 text-xl mt-0.5 shrink-0"></i>
+                            <div>
+                                <p class="text-sm font-bold">Account Pending Approval</p>
+                                <p class="text-xs font-medium mt-1 text-amber-700">
+                                    Your wholesale account is under review. We typically approve within 24 hours.
+                                    <a href="/contact" class="underline hover:text-amber-900">Contact us</a> if you need urgent access.
+                                </p>
+                            </div>
+                        </div>
+
+                    <?php else: ?>
+                        <!-- 🔒 Guest: prompt to sign in or register -->
+                        <a href="/login"
+                            class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark
+                                   transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20
+                                   active:scale-95 flex items-center justify-center gap-2">
+                            <i class="ti ti-lock text-xl"></i>
+                            Sign In to Order
+                        </a>
+                        <a href="/login?mode=register"
+                            class="bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl
+                                   hover:bg-gray-50 hover:border-brand hover:text-brand transition-all
+                                   transform hover:-translate-y-px active:scale-95 flex items-center justify-center gap-2">
+                            <i class="ti ti-user-plus text-xl"></i>
+                            Apply for Wholesale
+                        </a>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Trust Badges -->

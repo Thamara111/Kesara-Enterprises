@@ -183,6 +183,7 @@ async function initializeCart() {
                     id: dbP.id,
                     name: dbP.name,
                     meta: `${item.color || 'Standard Color'} • Size ${item.size || 'M'}`,
+                    image: dbP.image,
                     moq: dbP.moq,
                     tiers: dbP.tiers,
                     qty: finalQty,
@@ -241,8 +242,8 @@ function render() {
     const row = document.createElement('div');
     row.className = 'py-8 flex flex-col md:grid md:grid-cols-[80px_1fr_120px_120px_40px] gap-6 items-center';
     row.innerHTML = `
-      <div class="w-20 h-20 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-center shrink-0">
-        <i class="ti ti-shirt text-3xl text-gray-200"></i>
+      <div class="w-20 h-20 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
+        ${item.image ? `<img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover">` : `<i class="ti ti-shirt text-3xl text-gray-200"></i>`}
       </div>
       <div class="w-full text-center md:text-left">
         <h3 class="text-[15px] font-bold text-gray-900 mb-1">${item.name}</h3>

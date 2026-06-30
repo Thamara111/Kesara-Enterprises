@@ -14,7 +14,7 @@ try {
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
     
     // Fetch products
-    $stmt = $pdo->prepare("SELECT id, name, sku FROM products WHERE id IN ($placeholders) AND deleted_at IS NULL");
+    $stmt = $pdo->prepare("SELECT id, name, sku, images FROM products WHERE id IN ($placeholders) AND deleted_at IS NULL");
     $stmt->execute($ids);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -43,10 +43,14 @@ try {
             $tiers = [['min' => 1, 'max' => null, 'price' => 0]];
         }
 
+        $images = json_decode($p['images'] ?? '[]', true) ?: [];
+        $image = !empty($images) ? $images[0] : null;
+
         $result[] = [
             'id' => (int)$product_id,
             'name' => $p['name'],
             'meta' => 'SKU ' . $p['sku'],
+            'image' => $image,
             'moq' => (int)$moq,
             'tiers' => $tiers
         ];
