@@ -28,9 +28,51 @@ if ($method === 'GET') {
 }
 
 if ($method === 'POST') {
+    $action = $_GET['action'] ?? '';
     $input = json_decode(file_get_contents("php://input"), true);
     if (!$input) {
         $input = $_POST;
+    }
+
+    if ($action === 'update_status') {
+        $order_id = (int)($input['id'] ?? 0);
+        $status = $input['status'] ?? '';
+        $user_id = $_SESSION['user_id'] ?? 1;
+
+        if ($order_id > 0 && !empty($status)) {
+            if (isset($pdo) && $pdo !== null) {
+                try {
+                    $pdo->beginTransaction();
+                    $stmt = $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?");
+                    $stmt->execute([$status, $order_id]);
+                    
+                    // Create log
+                    $note = "Status updated to " . ucfirst($status) . ".";
+                    if ($status === 'processing') $note = "Payment accepted \u2014 order is now processing.";
+                    if ($status === 'shipped') $note = "Order dispatched and marked as shipped.";
+                    if ($status === 'delivered') $note = "Delivery confirmed successfully.";
+                    if ($status === 'cancelled') $note = "Order has been cancelled.";
+                    
+                    $log_stmt = $pdo->prepare("INSERT INTO order_status_log (order_id, status, note, changed_by) VALUES (?, ?, ?, ?)");
+                    $log_stmt->execute([$order_id, $status, $note, $user_id]);
+                    
+                    $pdo->commit();
+                    http_response_code(200);
+                    echo json_encode(["status" => "success", "message" => "Status updated."]);
+                } catch (\Exception $e) {
+                    if ($pdo->inTransaction()) $pdo->rollBack();
+                    http_response_code(500);
+                    echo json_encode(["status" => "error", "message" => "DB error: " . $e->getMessage()]);
+                }
+            } else {
+                http_response_code(200);
+                echo json_encode(["status" => "success", "message" => "Demo Mode"]);
+            }
+        } else {
+            http_response_code(400);
+            echo json_encode(["status" => "error", "message" => "Invalid parameters"]);
+        }
+        exit;
     }
 
     // Determine User ID (fallback to 1 if not logged in)
@@ -48,20 +90,28 @@ if ($method === 'POST') {
         try {
             $pdo->beginTransaction();
 
+            $checkOrderColor = $pdo->query("SHOW COLUMNS FROM order_items LIKE 'color'");
+            if (!$checkOrderColor->fetch()) {
+                $pdo->exec("ALTER TABLE order_items ADD COLUMN color VARCHAR(50) DEFAULT NULL");
+                $pdo->exec("ALTER TABLE order_items ADD COLUMN size VARCHAR(50) DEFAULT NULL");
+            }
+
             // 1. Insert into orders
             $stmt = $pdo->prepare("INSERT INTO orders (user_id, status, total_amount) VALUES (?, 'pending', ?)");
             $stmt->execute([$user_id, $total_amount]);
             $order_id = $pdo->lastInsertId();
 
             // 2. Insert order items
-            $stmt_item = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)");
+            $stmt_item = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, color, size) VALUES (?, ?, ?, ?, ?, ?)");
             foreach ($items as $item) {
                 $pid = (int)($item['product_id'] ?? 0);
                 $qty = (int)($item['quantity'] ?? 0);
                 $price = (float)($item['unit_price'] ?? 0);
+                $color = trim($item['color'] ?? '');
+                $size = trim($item['size'] ?? '');
 
                 if ($pid > 0 && $qty > 0 && $price > 0) {
-                    $stmt_item->execute([$order_id, $pid, $qty, $price]);
+                    $stmt_item->execute([$order_id, $pid, $qty, $price, $color, $size]);
                 }
             }
 

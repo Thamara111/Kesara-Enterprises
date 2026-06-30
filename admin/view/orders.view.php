@@ -602,8 +602,26 @@ function updateStatus(id, status) {
         delivered:  'Delivery confirmed successfully.',
         cancelled:  'Order has been cancelled.'
     };
-    const variant = status === 'cancelled' ? 'error' : 'success';
-    showToast(labels[status] || `Status updated to ${status}.`, variant);
+    
+    fetch('/api/orders.php?action=update_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id, status: status })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            const variant = status === 'cancelled' ? 'error' : 'success';
+            showToast(labels[status] || `Status updated to ${status}.`, variant);
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast(data.message || 'Error updating status', 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('Network error updating status.', 'error');
+    });
 }
 
 function closeOrderDetailPane() {

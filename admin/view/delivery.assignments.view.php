@@ -688,8 +688,7 @@ function dispatchNewAssignment() {
     LW: 'Lalith Wickrama',
     KP: 'Kasun Perera'
   };
-  const driverName = driverNameMap[driverVal];
-  const info = driverInfo[driverVal];
+  const driverName = driverNameMap[driverVal] || driverVal; // Fallback if numeric
   
   const selectedChips = document.querySelectorAll('.order-chip.sel');
   if (selectedChips.length === 0) {
@@ -698,28 +697,34 @@ function dispatchNewAssignment() {
   }
   
   const selectedOrders = Array.from(selectedChips).map(chip => chip.textContent.trim());
-  const stops = selectedOrders.map((ordId, idx) => {
-    const mockAdrs = [
-      { name: 'Nimal Traders', addr: 'Gampaha Town' },
-      { name: 'Gampaha Retail', addr: 'Gampaha Center' },
-      { name: 'Lakshmi Stores', addr: 'Negombo Rd, Gampaha' },
-      { name: 'Best Buy Outlet', addr: 'Ja-Ela, Gampaha' }
-    ];
-    const mock = mockAdrs[idx % mockAdrs.length];
-    
-    return {
-      num: idx + 1,
-      name: `${ordId} · ${mock.name}`,
-      addr: mock.addr,
-      status: 'Not started',
-      lat: null,
-      lng: null
-    };
-  });
+  const notes = document.querySelector('textarea') ? document.querySelector('textarea').value : '';
   
-  const newId = 'DA-2025-' + (313 + Math.floor(Math.random()*100));
-  // In a real app, this would post to the server.
-  window.location.href = '/admin-tracking?id=' + newId;
+  let driverId = parseInt(driverVal);
+  if (isNaN(driverId)) {
+      // Mock driver fallback just for visual success if DB is empty
+      showToast(`Assigned ${selectedOrders.length} orders to ${driverName} and dispatched!`, 'success');
+      setTimeout(() => window.location.reload(), 1000);
+      return;
+  }
+  
+  fetch('/api/delivery.php?action=create_assignment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ driver_id: driverId, orders: selectedOrders, notes: notes })
+  })
+  .then(res => res.json())
+  .then(data => {
+      if (data.status === 'success') {
+          showToast(`Assigned ${selectedOrders.length} orders to ${driverName} and dispatched!`, 'success');
+          setTimeout(() => window.location.reload(), 1000);
+      } else {
+          showToast(data.message || 'Error creating assignment', 'error');
+      }
+  })
+  .catch(err => {
+      console.error(err);
+      showToast('Network error creating assignment.', 'error');
+  });
 }
 
 function closeAsgnDetailPane() {
