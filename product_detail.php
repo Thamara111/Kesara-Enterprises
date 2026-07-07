@@ -572,8 +572,103 @@ function addToCart() {
     window.location.href = '/cart.php';
 }
 
+function requestQuote() {
+    const productName = "<?= htmlspecialchars($product['name']) ?>";
+    const quantity = qty;
+    const color = selectedColor;
+    const size = selectedSize;
+    
+    // Set pre-filled message
+    document.getElementById('quoteMessage').value = `Hello, I would like to request a wholesale price quote for ${quantity} units of ${productName} (Size: ${size}, Color: ${color}). Please let me know the availability and best tiered pricing.`;
+    
+    // Open modal
+    document.getElementById('quoteModal').classList.remove('hidden');
+    document.getElementById('quoteModal').classList.add('flex');
+}
+
+function closeQuoteModal() {
+    document.getElementById('quoteModal').classList.add('hidden');
+    document.getElementById('quoteModal').classList.remove('flex');
+}
+
+function submitQuoteRequest(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitQuoteBtn');
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+
+    const data = {
+        name: document.getElementById('quoteName').value,
+        business_name: document.getElementById('quoteBusiness').value,
+        email: document.getElementById('quoteEmail').value,
+        phone: document.getElementById('quotePhone').value,
+        inquiry_type: 'Wholesale Quote',
+        message: document.getElementById('quoteMessage').value
+    };
+
+    fetch('/api/inquiries.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(resData => {
+        if (resData.status === 'success') {
+            alert('Your quote request has been submitted successfully! Our wholesale team will contact you shortly.');
+            closeQuoteModal();
+        } else {
+            alert('Error: ' + (resData.message || 'Validation failed.'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Network error submitting quote request.');
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.textContent = 'Submit Request';
+    });
+}
+
 // Initial render
 updateUI();
 </script>
+
+<!-- Quote Request Modal -->
+<div id="quoteModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 items-center justify-center p-4 hidden">
+    <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-lg w-full">
+        <h2 class="text-xl font-bold text-gray-900 mb-2">Request Wholesale Quote</h2>
+        <p class="text-xs text-gray-500 mb-6">Enter your details and our team will get back to you with custom pricing.</p>
+        
+        <form onsubmit="submitQuoteRequest(event)" class="space-y-4">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Contact Name *</label>
+                <input type="text" id="quoteName" required placeholder="e.g. Kamal Perera" class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Business Name</label>
+                    <input type="text" id="quoteBusiness" placeholder="e.g. ABC Retailers" class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Phone Number</label>
+                    <input type="text" id="quotePhone" placeholder="e.g. +94 77 123 4567" class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Email Address *</label>
+                <input type="email" id="quoteEmail" required placeholder="e.g. contact@business.com" class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Quote Request Message *</label>
+                <textarea id="quoteMessage" rows="3" required class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20 resize-none"></textarea>
+            </div>
+            <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <button type="button" onclick="closeQuoteModal()" class="px-6 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50">Cancel</button>
+                <button type="submit" id="submitQuoteBtn" class="px-6 py-2.5 bg-brand text-brand-light rounded-xl text-sm font-bold shadow-lg shadow-brand/20">Submit Request</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <?php require_once __DIR__ . "/layouts/footer.php"; ?>

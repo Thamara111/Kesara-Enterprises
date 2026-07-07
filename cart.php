@@ -105,7 +105,7 @@ require_once __DIR__ . "/layouts/header.php";
                         <button id="checkout-btn" onclick="submitOrder()" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center">
                             Proceed to Checkout
                         </button>
-                        <button class="w-full bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl hover:bg-gray-50 hover:border-brand hover:text-brand transition-all transform hover:-translate-y-px active:scale-95 flex items-center justify-center gap-2">
+                        <button onclick="downloadQuote()" class="w-full bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl hover:bg-gray-50 hover:border-brand hover:text-brand transition-all transform hover:-translate-y-px active:scale-95 flex items-center justify-center gap-2">
                             <i class="ti ti-file-text text-xl"></i>
                             Download as Quote
                         </button>
@@ -343,6 +343,91 @@ function submitOrder() {
   setTimeout(() => {
       window.location.href = '/checkout';
   }, 500);
+}
+
+function downloadQuote() {
+  if (cartItems.length === 0) {
+      alert("Your cart is empty. Add items to download a quote.");
+      return;
+  }
+  
+  let total = 0;
+  let itemsHtml = cartItems.map(item => {
+      let price = getPriceForQty(item.qty, item.tiers);
+      let subtotal = item.qty * price;
+      total += subtotal;
+      return `
+          <tr>
+              <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                  <strong>${item.name}</strong><br>
+                  <small>${item.meta}</small>
+              </td>
+              <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${item.qty}</td>
+              <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">LKR ${price.toFixed(2)}</td>
+              <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">LKR ${subtotal.toFixed(2)}</td>
+          </tr>
+      `;
+  }).join('');
+
+  let printWindow = window.open('', '_blank');
+  printWindow.document.write(\`
+      <html>
+      <head>
+          <title>Wholesale Price Quote - Kesara Enterprises</title>
+          <style>
+              body { font-family: sans-serif; color: #333; padding: 40px; }
+              .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0F6E56; padding-bottom: 20px; margin-bottom: 30px; }
+              .logo { font-size: 24px; font-weight: bold; color: #0F6E56; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th { background-color: #f5f5f5; padding: 10px; text-align: left; }
+              .totals { margin-top: 30px; text-align: right; font-size: 18px; }
+              .footer { margin-top: 50px; font-size: 11px; color: #777; text-align: center; border-top: 1px solid #ddd; padding-top: 20px; }
+          </style>
+      </head>
+      <body>
+          <div class="header">
+              <div>
+                  <div class="logo">Kesara Enterprises</div>
+                  <div>Wholesale Underwear Supplier Sri Lanka</div>
+                  <div>Colombo, Sri Lanka</div>
+              </div>
+              <div style="text-align: right;">
+                  <h2>PRICE QUOTE</h2>
+                  <div>Date: \${new Date().toLocaleDateString()}</div>
+                  <div>Reference: QT-\${Date.now().toString().slice(-6)}</div>
+              </div>
+          </div>
+          <p>Thank you for requesting a wholesale access quote. Below are the details for your estimated order:</p>
+          <table>
+              <thead>
+                  <tr>
+                      <th>Product Details</th>
+                      <th style="text-align: center;">Quantity</th>
+                      <th style="text-align: right;">Unit Price</th>
+                      <th style="text-align: right;">Subtotal</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  \${itemsHtml}
+              </tbody>
+          </table>
+          <div class="totals">
+              <strong>Estimated Total: LKR \${total.toFixed(2)}</strong>
+          </div>
+          <div class="footer">
+              <p>This is an estimated price quote. Final tax invoice and delivery charges will be calculated during order processing.</p>
+              <p>© \${new Date().getFullYear()} Kesara Enterprises. All rights reserved.</p>
+          </div>
+          <script>
+              window.onload = function() {
+                  window.print();
+                  window.close();
+              }
+          <\/script>
+      </body>
+      </html>
+  \`);
+  printWindow.document.close();
 }
 
 // Initial Render

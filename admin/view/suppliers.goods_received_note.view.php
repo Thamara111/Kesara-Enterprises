@@ -1,9 +1,94 @@
 <?php
 /**
- * Goods Received Note View - Database Integration
+ * Goods Received Note View - Database Integration & Form Processing
  */
 
-$po_id = isset($_GET['po_id']) ? (int)$_GET['po_id'] : 0;
+$success_msg = "";
+$error_msg = "";
+
+$po_id = isset($_POST['po_id']) ? (int)$_POST['po_id'] : (isset($_GET['po_id']) ? (int)$_GET['po_id'] : 0);
+
+// Handle Form Submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_grn' && isset($pdo)) {
+    $received_by = trim($_POST['received_by'] ?? 'Kamal Rathnayake');
+    $received_at = trim($_POST['received_date'] ?? date('Y-m-d'));
+    $note = trim($_POST['note'] ?? '');
+    $qtys_received = $_POST['qtys_received'] ?? []; // Map of item_id -> quantity_received
+    $admin_id = $_SESSION['admin_id'] ?? 1;
+
+    try {
+        $pdo->beginTransaction();
+
+        // 1. Insert GRN record
+        $stmt = $pdo->prepare("INSERT INTO goods_received_notes (po_id, received_by, received_at, note) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$po_id, $received_by, $received_at, $note]);
+        $grn_id = $pdo->lastInsertId();
+
+        // 2. Update PO line item quantities and Inventory
+        foreach ($qtys_received as $poi_id => $qty_rcvd) {
+            $qty_rcvd = (int)$qty_rcvd;
+            if ($qty_rcvd <= 0) continue;
+
+            // Fetch PO item details
+            $item_stmt = $pdo->prepare("SELECT product_id, item_name, qty_ordered, qty_received FROM purchase_order_items WHERE id = ?");
+            $item_stmt->execute([$poi_id]);
+            $item = $item_stmt->fetch();
+            if (!$item) continue;
+
+            // Update qty_received in PO items
+            $up_poi = $pdo->prepare("UPDATE purchase_order_items SET qty_received = qty_received + ? WHERE id = ?");
+            $up_poi->execute([$qty_rcvd, $poi_id]);
+
+            // Find or create inventory item for this product
+            if ($item['product_id']) {
+                $inv_stmt = $pdo->prepare("SELECT id, quantity FROM inventory WHERE product_id = ? LIMIT 1");
+                $inv_stmt->execute([$item['product_id']]);
+                $inv = $inv_stmt->fetch();
+
+                if (!$inv) {
+                    // Create inventory item
+                    $ins_inv = $pdo->prepare("INSERT INTO inventory (product_id, size, colour, quantity, restock_min) VALUES (?, 'M', 'Standard', 0, 200)");
+                    $ins_inv->execute([$item['product_id']]);
+                    $inv_id = $pdo->lastInsertId();
+                    $qty_before = 0;
+                } else {
+                    $inv_id = $inv['id'];
+                    $qty_before = (int)$inv['quantity'];
+                }
+
+                $qty_after = $qty_before + $qty_rcvd;
+
+                // Update inventory quantity
+                $up_inv = $pdo->prepare("UPDATE inventory SET quantity = ? WHERE id = ?");
+                $up_inv->execute([$qty_after, $inv_id]);
+
+                // Log inventory change
+                $log_stmt = $pdo->prepare("INSERT INTO inventory_log (inventory_id, adj_type, qty_before, qty_after, note, admin_id) VALUES (?, 'add', ?, ?, ?, ?)");
+                $log_stmt->execute([$inv_id, $qty_before, $qty_after, "Received via GRN-2025-" . str_pad($grn_id, 4, '0', STR_PAD_LEFT) . " against PO-2025-" . str_pad($po_id, 4, '0', STR_PAD_LEFT), $admin_id]);
+            }
+        }
+
+        // 3. Automatically check and update PO status (partial or received)
+        $check_stmt = $pdo->prepare("SELECT COUNT(*) FROM purchase_order_items WHERE po_id = ? AND qty_ordered > qty_received");
+        $check_stmt->execute([$po_id]);
+        $remaining_items = (int)$check_stmt->fetchColumn();
+
+        $new_status = ($remaining_items === 0) ? 'received' : 'partial';
+        $up_po = $pdo->prepare("UPDATE purchase_orders SET status = ?, received_at = ? WHERE id = ?");
+        $up_po->execute([$new_status, $received_at, $po_id]);
+
+        $pdo->commit();
+        $success_msg = "Goods receipt confirmed and inventory updated successfully!";
+        
+        // Redirect to PO view
+        echo "<script>window.location.href = '/admin-purchase-orders';</script>";
+        exit;
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        $error_msg = "Transaction failed: " . $e->getMessage();
+    }
+}
+
 // Fallback if not specified: get the first non-received PO
 if ($po_id === 0 && isset($pdo) && $pdo !== null) {
     try {
@@ -46,7 +131,7 @@ if ($po_id > 0 && isset($pdo) && $pdo !== null) {
             $past_grns = $grn_stmt->fetchAll();
         }
     } catch (\Exception $e) {
-        $db_error = $e->getMessage();
+        $error_msg = "Database Load Error: " . $e->getMessage();
     }
 }
 
@@ -54,6 +139,7 @@ $lines = [];
 if (!empty($po_items)) {
     foreach ($po_items as $item) {
         $lines[] = [
+            'id' => $item['id'],
             'ordered' => (int)$item['qty_ordered'],
             'prev' => (int)$item['qty_received'],
             'remaining' => max(0, (int)$item['qty_ordered'] - (int)$item['qty_received']),
@@ -65,24 +151,24 @@ if (!empty($po_items)) {
     }
 }
 
-if (empty($lines)) {
-    $lines = [
-      [ 'ordered'=>500, 'prev'=>300, 'remaining'=>200, 'invBefore'=>820, 'threshold'=>1000, 'unit'=>'rolls', 'name'=>'Branded elastic' ],
-      [ 'ordered'=>1000, 'prev'=>600, 'remaining'=>400, 'invBefore'=>240, 'threshold'=>1000, 'unit'=>'rolls', 'name'=>'Plain elastic 2cm' ]
-    ];
-}
-
-$po_num = $po_data ? 'PO-2025-' . str_pad($po_data['id'], 4, '0', STR_PAD_LEFT) : 'PO-2025-0041';
-$po_supplier = $po_data ? htmlspecialchars($po_data['supplier_name']) : 'Premium Elastic';
-$po_raised = $po_data ? date('d M Y', strtotime($po_data['ordered_at'])) : '8 May 2025';
-$po_total_val = $po_data ? (float)$po_data['total'] : 94000.00;
-$po_value = 'LKR ' . ($po_total_val >= 1000 ? number_format($po_total_val/1000, 0) . 'K' : number_format($po_total_val, 2));
+$po_num = $po_data ? 'PO-2025-' . str_pad($po_data['id'], 4, '0', STR_PAD_LEFT) : 'PO-2025-0000';
+$po_supplier = $po_data ? htmlspecialchars($po_data['supplier_name']) : 'N/A';
+$po_raised = $po_data ? date('d M Y', strtotime($po_data['ordered_at'])) : 'N/A';
+$po_total_val = $po_data ? (float)$po_data['total'] : 0.00;
+$po_value = 'LKR ' . number_format($po_total_val, 2);
 $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
 ?>
-<!-- Goods Received Note View -->
-<h2 class="sr-only">Goods received note form mockup for Kesara Enterprises wholesale admin platform</h2>
 
-<div class="flex-1 flex overflow-hidden">
+<?php if (!empty($error_msg)): ?>
+    <div class="m-8 p-4 bg-red-50 border border-red-100 rounded-2xl text-xs font-semibold text-red-700">
+        <?= htmlspecialchars($error_msg) ?>
+    </div>
+<?php endif; ?>
+
+<form method="POST" class="flex-1 flex overflow-hidden">
+    <input type="hidden" name="action" value="confirm_grn">
+    <input type="hidden" name="po_id" value="<?= $po_id ?>">
+    
     <!-- Form Pane (Left) -->
     <div class="flex-1 flex flex-col min-w-0 bg-white border-r border-gray-100 overflow-hidden">
         <!-- Scrollable content wrapper -->
@@ -90,9 +176,9 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
             
             <!-- Breadcrumbs -->
             <div class="flex items-center gap-2 text-xs text-gray-500">
-                <span class="hover:text-brand cursor-pointer font-semibold transition-colors" onclick="location.href='admin_index.php?view=purchase_orders'">Purchase orders</span>
+                <a href="/admin-purchase-orders" class="hover:text-brand cursor-pointer font-semibold transition-colors">Purchase orders</a>
                 <i class="ti ti-chevron-right text-[10px]" aria-hidden="true"></i>
-                <span class="hover:text-brand cursor-pointer font-semibold transition-colors" onclick="location.href='admin_index.php?view=purchase_orders'"><?= $po_num ?></span>
+                <a href="/admin-purchase-orders" class="hover:text-brand cursor-pointer font-semibold transition-colors"><?= $po_num ?></a>
                 <i class="ti ti-chevron-right text-[10px]" aria-hidden="true"></i>
                 <span class="text-gray-900 font-extrabold">New GRN</span>
             </div>
@@ -104,9 +190,9 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                     <p class="text-sm text-gray-500 mt-1"><?= $grn_ref ?> · against <?= $po_num ?></p>
                 </div>
                 <div class="flex gap-3">
-                    <button id="open-grn-ref" class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">View Ref</button>
-                    <button class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm" onclick="sendPrompt('What should the purchase orders page show for Kesara Enterprises admin?')">Cancel</button>
-                    <button class="px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20" onclick="confirmGRN()">Confirm Receipt & Update Stock ↗</button>
+                    <button type="button" id="open-grn-ref" class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">View Ref</button>
+                    <a href="/admin-purchase-orders" class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm flex items-center justify-center">Cancel</a>
+                    <button type="submit" class="px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20">Confirm Receipt & Update Stock</button>
                 </div>
             </div>
 
@@ -125,32 +211,17 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1.5">
                         <label class="text-xs font-bold text-gray-500">Date Received <span class="text-red-500">*</span></label>
-                        <input type="date" value="2025-05-13" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
+                        <input type="date" name="received_date" value="<?= date('Y-m-d') ?>" required class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
                     </div>
                     <div class="space-y-1.5">
                         <label class="text-xs font-bold text-gray-500">Received By <span class="text-red-500">*</span></label>
-                        <input type="text" value="Kamal Rathnayake" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
+                        <input type="text" name="received_by" value="Kamal Rathnayake" required class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-1.5">
-                        <label class="text-xs font-bold text-gray-500">Delivery Note / Ref No.</label>
-                        <input type="text" placeholder="Supplier's delivery note number" value="DN-PE-4421" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
-                    </div>
-                    <div class="space-y-1.5">
-                        <label class="text-xs font-bold text-gray-500">Condition on Arrival</label>
-                        <select class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none cursor-pointer">
-                            <option selected>Good — no damage</option>
-                            <option>Minor damage noted</option>
-                            <option>Significant damage — rejected</option>
-                        </select>
-                    </div>
-                </div>
-
                 <div class="space-y-1.5">
                     <label class="text-xs font-bold text-gray-500">Notes</label>
-                    <textarea rows="2" placeholder="Any notes about this delivery..." class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none resize-none">Second batch delivered on time. All items inspected and counted.</textarea>
+                    <textarea name="note" rows="2" placeholder="Any notes about this delivery..." class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none resize-none">Batch delivered. Inspected and counted.</textarea>
                 </div>
             </div>
 
@@ -183,7 +254,7 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                     <span class="text-sm text-gray-500 text-center font-bold"><?= $line['ordered'] ?></span>
                     <span class="text-sm text-gray-500 text-center font-bold"><?= $line['prev'] ?></span>
                     <div class="flex items-center gap-1.5 justify-center">
-                        <input type="number" id="qty-<?= $idx ?>" value="<?= $line['remaining'] ?>" min="0" max="<?= $line['remaining'] ?>" 
+                        <input type="number" name="qtys_received[<?= $line['id'] ?>]" id="qty-<?= $idx ?>" value="<?= $line['remaining'] ?>" min="0" max="<?= $line['remaining'] ?>" 
                             class="w-16 px-2 py-1 bg-gray-50 border border-gray-200 rounded-lg text-sm text-center font-extrabold text-gray-900 outline-none focus:bg-white focus:border-brand/20" oninput="updateLine(<?= $idx ?>)">
                         <span class="text-xs text-gray-400 font-medium"><?= $line['unit'] ?></span>
                     </div>
@@ -201,41 +272,20 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                 </div>
             </div>
 
-            <!-- Quality Check Section -->
-            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-5">
-                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Quality Check</h3>
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="space-y-1.5">
-                        <label class="text-xs font-bold text-gray-500">Qty Rejected (Damaged)</label>
-                        <input type="number" value="0" min="0" placeholder="0" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
-                        <p class="text-[10px] text-gray-400 font-medium">Rejected items are not added to stock</p>
-                    </div>
-                    <div class="space-y-1.5">
-                        <label class="text-xs font-bold text-gray-500">Rejection Reason</label>
-                        <select class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none cursor-pointer">
-                            <option selected>None</option>
-                            <option>Damaged in transit</option>
-                            <option>Wrong specification</option>
-                            <option>Quality below standard</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-
             <!-- Action buttons bottom -->
             <div class="flex justify-end gap-3 pt-4 border-t border-gray-50">
-                <button class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm">Save as draft</button>
-                <button class="px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20" onclick="confirmGRN()">Confirm receipt &amp; update stock ↗</button>
+                <a href="/admin-purchase-orders" class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm flex items-center justify-center">Cancel</a>
+                <button type="submit" class="px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20">Confirm Receipt & Update Stock</button>
             </div>
         </div>
     </div>
 
     <!-- Side Reference Pane (Right) -->
     <!-- Backdrop -->
-    <div id="grn-ref-backdrop" class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300" onclick="closeGRNRefPane()"></div>
+    <div id="grn-ref-backdrop" class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px]" onclick="closeGRNRefPane()"></div>
     <div id="grn-ref-pane" class="fixed inset-y-0 right-0 z-50 w-[300px] max-w-full bg-white flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
         <div class="p-8 flex-1 overflow-y-auto space-y-8 relative">
-            <button onclick="closeGRNRefPane()" class="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none" aria-label="Close details">
+            <button type="button" onclick="closeGRNRefPane()" class="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none" aria-label="Close details">
                 <i class="ti ti-x text-xl"></i>
             </button>
             <!-- PO Reference Section -->
@@ -257,10 +307,6 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                     <div class="flex justify-between items-center">
                         <span class="text-xs text-gray-500 font-medium">PO value</span>
                         <span class="text-xs font-bold text-gray-900"><?= $po_value ?></span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs text-gray-500 font-medium">GRNs so far</span>
-                        <span class="text-xs font-bold text-gray-900"><?= count($past_grns) ?></span>
                     </div>
                 </div>
             </section>
@@ -290,75 +336,9 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                     <?php endforeach; ?>
                 </div>
             </section>
-
-            <div class="h-px bg-gray-100"></div>
-
-            <!-- Past GRNs -->
-            <section>
-                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Past GRNs on this PO</h3>
-                <?php if (empty($past_grns)): ?>
-                <p class="text-xs text-gray-400 italic">No past GRNs recorded on this PO.</p>
-                <?php else: ?>
-                <div class="space-y-3">
-                    <?php foreach ($past_grns as $grn): ?>
-                    <div class="p-4 bg-gray-50 border border-gray-100 rounded-2xl shadow-sm">
-                        <p class="text-xs font-bold text-gray-900">GRN-2025-<?= str_pad($grn['id'], 5, '0', STR_PAD_LEFT) ?></p>
-                        <p class="text-[10px] text-gray-400 font-medium mt-0.5"><?= date('d M Y', strtotime($grn['received_at'])) ?> · <?= htmlspecialchars($grn['received_by']) ?></p>
-                        <?php if ($grn['note']): ?>
-                        <p class="text-xs text-gray-600 mt-2 leading-relaxed italic"><?= htmlspecialchars($grn['note']) ?></p>
-                        <?php endif; ?>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-                <?php endif; ?>
-            </section>
-
-            <div class="h-px bg-gray-100"></div>
-
-            <!-- Actions Checkbox flow list -->
-            <section>
-                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">What happens on confirm</h3>
-                <div class="space-y-3">
-                    <div class="flex gap-2.5 items-start text-xs text-gray-600">
-                        <i class="ti ti-circle-check text-emerald-500 text-base flex-shrink-0 mt-0.5" aria-hidden="true"></i>
-                        <span>GRN record saved with timestamp</span>
-                    </div>
-                    <div class="flex gap-2.5 items-start text-xs text-gray-600">
-                        <i class="ti ti-circle-check text-emerald-500 text-base flex-shrink-0 mt-0.5" aria-hidden="true"></i>
-                        <span>Inventory quantities updated immediately</span>
-                    </div>
-                    <div class="flex gap-2.5 items-start text-xs text-gray-600">
-                        <i class="ti ti-circle-check text-emerald-500 text-base flex-shrink-0 mt-0.5" aria-hidden="true"></i>
-                        <span>PO status updated to partial or received</span>
-                    </div>
-                    <div class="flex gap-2.5 items-start text-xs text-gray-600">
-                        <i class="ti ti-circle-check text-emerald-500 text-base flex-shrink-0 mt-0.5" aria-hidden="true"></i>
-                        <span>Inventory adjustment log entry written</span>
-                    </div>
-                    <div class="flex gap-2.5 items-start text-xs text-gray-600">
-                        <i class="ti ti-circle-check text-emerald-500 text-base flex-shrink-0 mt-0.5" aria-hidden="true"></i>
-                        <span>Supplier on-time score recalculated</span>
-                    </div>
-                </div>
-            </section>
         </div>
     </div>
-</div>
-
-<!-- Confirm Overlay Dialog Modal -->
-<div id="confirm-overlay" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 items-center justify-center p-4" style="display: none;">
-    <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-sm w-full text-center flex flex-col items-center">
-        <div class="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center mb-4">
-            <i class="ti ti-circle-check text-2xl" aria-hidden="true"></i>
-        </div>
-        <h3 class="text-lg font-bold text-gray-900 tracking-tight"><?= $grn_ref ?> confirmed</h3>
-        <p class="text-xs text-gray-500 mt-2 mb-6 leading-relaxed">Stock has been updated successfully.</p>
-        <div class="grid grid-cols-2 gap-3 w-full">
-            <button class="px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold shadow-lg shadow-brand/10 hover:opacity-90 transition-all" onclick="sendPrompt('What should the purchase orders page show for Kesara Enterprises admin?')">Back to PO ↗</button>
-            <button class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all" onclick="sendPrompt('What should the inventory management page include for Kesara Enterprises admin?')">View inventory ↗</button>
-        </div>
-    </div>
-</div>
+</form>
 
 <script>
 function updateLine(idx) {
@@ -434,11 +414,6 @@ function updateShortageWarn() {
   } else {
     warn.style.display = 'none';
   }
-}
-
-function confirmGRN() {
-  const overlay = document.getElementById('confirm-overlay');
-  overlay.style.display = 'flex';
 }
 
 function closeGRNRefPane() {

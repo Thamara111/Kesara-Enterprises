@@ -1,23 +1,89 @@
 <?php
 /**
- * Purchase Orders View - Database Integration
+ * Purchase Orders View - Database Integration & Interaction
  */
+
+$success_msg = "";
+$error_msg = "";
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    $action = $_POST['action'];
+    $po_id = (int)($_POST['po_id'] ?? 0);
+    
+    if ($action === 'raise_po' && isset($pdo)) {
+        $supplier_id = (int)$_POST['supplier_id'];
+        $expected_at = $_POST['expected_at'];
+        $item_names = $_POST['item_names'] ?? [];
+        $item_qtys = $_POST['item_qtys'] ?? [];
+        $item_costs = $_POST['item_costs'] ?? [];
+        
+        $total = 0;
+        for ($i = 0; $i < count($item_names); $i++) {
+            $total += (int)$item_qtys[$i] * (float)$item_costs[$i];
+        }
+        
+        try {
+            $pdo->beginTransaction();
+            
+            $stmt = $pdo->prepare("INSERT INTO purchase_orders (supplier_id, status, ordered_at, expected_at, total) VALUES (?, 'sent', NOW(), ?, ?)");
+            $stmt->execute([$supplier_id, $expected_at, $total]);
+            $new_po_id = $pdo->lastInsertId();
+            
+            $item_stmt = $pdo->prepare("INSERT INTO purchase_order_items (po_id, product_id, item_name, qty_ordered, qty_received, unit_cost) VALUES (?, NULL, ?, ?, 0, ?)");
+            for ($i = 0; $i < count($item_names); $i++) {
+                if (empty($item_names[$i])) continue;
+                $item_stmt->execute([$new_po_id, $item_names[$i], (int)$item_qtys[$i], (float)$item_costs[$i]]);
+            }
+            
+            $pdo->commit();
+            $success_msg = "Purchase Order raised successfully!";
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            $error_msg = "Error creating Purchase Order: " . $e->getMessage();
+        }
+    } elseif ($action === 'cancel_po' && $po_id > 0 && isset($pdo)) {
+        try {
+            $stmt = $pdo->prepare("DELETE FROM purchase_orders WHERE id = ?");
+            $stmt->execute([$po_id]);
+            $success_msg = "Purchase Order cancelled and deleted successfully.";
+        } catch (Exception $e) {
+            $error_msg = "Error cancelling Purchase Order: " . $e->getMessage();
+        }
+    } elseif ($action === 'resend_po' && $po_id > 0 && isset($pdo)) {
+        try {
+            $stmt = $pdo->prepare("UPDATE purchase_orders SET status = 'sent', ordered_at = NOW() WHERE id = ?");
+            $stmt->execute([$po_id]);
+            $success_msg = "Purchase Order resent/dispatched successfully.";
+        } catch (Exception $e) {
+            $error_msg = "Error resending Purchase Order: " . $e->getMessage();
+        }
+    }
+}
+
 $admin_pos = [];
+$suppliers_list = [];
+$total_pos = 0;
+$sent_pending_count = 0;
+$partial_count = 0;
+$overdue_count = 0;
+
 if (isset($pdo) && $pdo !== null) {
     try {
+        $suppliers_list = $pdo->query("SELECT id, name FROM suppliers ORDER BY name ASC")->fetchAll();
+        
         $stmt = $pdo->query("SELECT po.id, po.status, po.ordered_at, po.expected_at, po.received_at, po.total, 
                                     s.name AS supplier_name, s.contact_person, s.payment_terms
                              FROM purchase_orders po
                              JOIN suppliers s ON po.supplier_id = s.id
                              ORDER BY po.ordered_at DESC");
         $pos_db = $stmt->fetchAll();
+        $total_pos = count($pos_db);
 
         foreach ($pos_db as $po) {
             $po_id_formatted = 'PO-2025-' . str_pad($po['id'], 4, '0', STR_PAD_LEFT);
             $ordered_date = date('d M Y', strtotime($po['ordered_at']));
             $expected_date = date('d M Y', strtotime($po['expected_at']));
             
-            // Map statuses
             $status = strtolower($po['status']);
             $badge = 'bg-gray-50 border-gray-100 text-gray-700';
             $badgeText = ucfirst($status);
@@ -29,11 +95,13 @@ if (isset($pdo) && $pdo !== null) {
                 $badgeText = 'Overdue';
                 $alertType = 'overdue';
                 $expectedColorClass = 'text-red-600';
+                $overdue_count++;
             } elseif ($status === 'partial') {
                 $badge = 'bg-amber-50 border-amber-100 text-amber-700';
                 $badgeText = 'Partial';
                 $alertType = 'warn';
                 $expectedColorClass = 'text-amber-700';
+                $partial_count++;
             } elseif ($status === 'received') {
                 $badge = 'bg-emerald-50 border-emerald-100 text-emerald-700';
                 $badgeText = 'Received';
@@ -42,6 +110,9 @@ if (isset($pdo) && $pdo !== null) {
                 $badge = 'bg-blue-50 border-blue-100 text-blue-700';
                 $badgeText = 'Sent';
                 $alertType = 'info';
+                $sent_pending_count++;
+            } else {
+                $sent_pending_count++;
             }
             
             // Fetch items
@@ -50,231 +121,75 @@ if (isset($pdo) && $pdo !== null) {
             $items_db = $item_stmt->fetchAll();
             
             $items = [];
-            $total_ordered = 0;
-            $total_received = 0;
-            
             foreach ($items_db as $it) {
                 $qty_ordered = (int)$it['qty_ordered'];
                 $qty_received = (int)$it['qty_received'];
-                $total_ordered += $qty_ordered;
-                $total_received += $qty_received;
+                $val = 'LKR ' . number_format($qty_ordered * (float)$it['unit_cost'], 2);
                 
-                $pct_val = $qty_ordered > 0 ? min(100, round(($qty_received / $qty_ordered) * 100)) . '%' : '0%';
-                
-                $item_val = $qty_ordered * (float)$it['unit_cost'];
-                $item_val_formatted = 'LKR ' . ($item_val >= 1000 ? number_format($item_val/1000, 0) . 'K' : number_format($item_val, 2));
+                $pct = 'Pending';
+                if ($qty_received > 0) {
+                    $pct = round(($qty_received / $qty_ordered) * 100) . '%';
+                }
                 
                 $items[] = [
-                    'name' => htmlspecialchars($it['item_name']),
-                    'desc' => number_format($qty_ordered) . ' ordered · ' . number_format($qty_received) . ' received',
-                    'val' => $item_val_formatted,
-                    'pct' => $pct_val
+                    'name' => $it['item_name'],
+                    'desc' => $qty_ordered . ' ordered · ' . $qty_received . ' received',
+                    'val' => $val,
+                    'pct' => $pct
                 ];
             }
             
-            // Expected date details and alert texts
-            if ($status === 'overdue') {
-                $overdue_days = max(1, round((time() - strtotime($po['expected_at'])) / (60 * 60 * 24)));
-                $alertText = "This PO is {$overdue_days} days overdue. Contact " . htmlspecialchars($po['supplier_name']) . " to confirm delivery date.";
-            } elseif ($status === 'partial') {
-                $rec_pct = $total_ordered > 0 ? round(($total_received / $total_ordered) * 100) : 0;
-                $alertText = "{$rec_pct}% received. Remaining " . (100 - $rec_pct) . "% expected {$expected_date}.";
-            } elseif ($status === 'received') {
-                $rec_date = $po['received_at'] ? date('d M Y', strtotime($po['received_at'])) : date('d M Y');
-                $alertText = "Fully received {$rec_date}. Closed.";
-            } else {
-                $rem_days = max(0, round((strtotime($po['expected_at']) - time()) / (60 * 60 * 24)));
-                $alertText = "PO sent " . date('d M', strtotime($po['ordered_at'])) . ". Awaiting delivery by {$expected_date} ({$rem_days} days remaining).";
-            }
-            
-            // Format Total
-            $po_total = (float)$po['total'];
-            $total_formatted = 'LKR ' . ($po_total >= 1000 ? number_format($po_total/1000, 0) . 'K' : number_format($po_total, 2));
-            
-            // Create timeline
             $timeline = [
-                ['t' => 'PO raised', 'd' => date('d M Y', strtotime($po['ordered_at'])), 's' => 'done'],
-                ['t' => 'Sent to supplier', 'd' => date('d M Y', strtotime($po['ordered_at'])), 's' => 'done']
+                ['t' => 'Purchase Order Created', 'd' => $ordered_date, 's' => 'done'],
+                ['t' => 'PO Dispatched to Supplier', 'd' => $ordered_date, 's' => 'done']
             ];
             
-            if ($status === 'overdue') {
-                $timeline[] = ['t' => 'Overdue — not yet received', 'd' => 'Expected ' . date('d M', strtotime($po['expected_at'])), 's' => 'warn'];
-                $timeline[] = ['t' => 'GRN and close', 'd' => '', 's' => 'pend'];
+            if ($status === 'received') {
+                $timeline[] = ['t' => 'Goods Fully Received', 'd' => $po['received_at'] ? date('d M Y', strtotime($po['received_at'])) : $expected_date, 's' => 'done'];
             } elseif ($status === 'partial') {
-                $timeline[] = ['t' => 'Partial delivery received', 'd' => 'GRN-2025-' . str_pad($po['id'], 4, '0', STR_PAD_LEFT) . 'A', 's' => 'now'];
-                $timeline[] = ['t' => 'Full receipt & GRN close', 'd' => '', 's' => 'pend'];
-            } elseif ($status === 'received') {
-                $timeline[] = ['t' => 'Goods fully received', 'd' => date('d M Y', strtotime($po['received_at'])), 's' => 'done'];
-                $timeline[] = ['t' => 'GRN closed', 'd' => 'GRN-2025-' . str_pad($po['id'], 4, '0', STR_PAD_LEFT), 's' => 'done'];
+                $timeline[] = ['t' => 'Partial Delivery Received', 'd' => date('d M Y'), 's' => 'now'];
+                $timeline[] = ['t' => 'Awaiting Remaining Goods', 'd' => 'Expected soon', 's' => 'pend'];
+            } elseif ($status === 'overdue') {
+                $timeline[] = ['t' => 'Delivery Overdue', 'd' => 'Missed ' . $expected_date, 's' => 'warn'];
             } else {
-                $timeline[] = ['t' => 'Sent to supplier', 'd' => date('d M', strtotime($po['ordered_at'])) . ', awaiting delivery', 's' => 'now'];
-                $timeline[] = ['t' => 'Goods received', 'd' => '', 's' => 'pend'];
-                $timeline[] = ['t' => 'GRN and close', 'd' => '', 's' => 'pend'];
+                $timeline[] = ['t' => 'Awaiting Delivery', 'd' => 'Expected ' . $expected_date, 's' => 'now'];
             }
+
+            $total_formatted = 'LKR ' . number_format((float)$po['total'], 2);
             
+            $alertText = "This purchase order was sent on " . $ordered_date . ". Expected delivery date is " . $expected_date . ".";
+            if ($status === 'overdue') {
+                $alertText = "CRITICAL: Shipment is overdue. Expected delivery date was " . $expected_date . ". Contact supplier immediately.";
+            } elseif ($status === 'partial') {
+                $alertText = "Warning: Received partial delivery. Remaining items expected soon.";
+            } elseif ($status === 'received') {
+                $alertText = "Success: All items received and logged into inventory.";
+            }
+
             $admin_pos[] = [
+                'id' => $po['id'],
                 'num' => $po_id_formatted,
-                'date' => 'Raised ' . $ordered_date,
+                'date' => $ordered_date,
+                'status' => $status,
                 'badge' => $badge,
                 'badgeText' => $badgeText,
                 'supp' => $po['supplier_name'],
-                'contact' => $po['contact_person'],
-                'payment' => $po['payment_terms'],
+                'contact' => $po['contact_person'] ?? 'Primary contact',
+                'payment' => $po['payment_terms'] ?? 'Net 30',
                 'expected' => $expected_date,
-                'expectedColorClass' => $expectedColorClass,
+                'expectedColor' => $expectedColorClass,
                 'total' => $total_formatted,
                 'alert' => $alertType,
                 'alertText' => $alertText,
-                'items' => $items,
-                'timeline' => $timeline
+                'items' => json_encode($items),
+                'timeline' => json_encode($timeline)
             ];
         }
     } catch (\Exception $e) {
-        $db_error = $e->getMessage();
-    }
-}
-
-if (empty($admin_pos)) {
-    $admin_pos = [
-      [ 
-        'num' => 'PO-2025-0042', 
-        'date' => 'Raised 4 May 2025', 
-        'badge' => 'bg-red-50 border-red-100 text-red-700', 
-        'badgeText' => 'Overdue', 
-        'supp' => 'SL Cotton Mills', 
-        'contact' => 'Roshan Silva', 
-        'payment' => 'Net 30', 
-        'expected' => '9 May 2025', 
-        'expectedColorClass' => 'text-red-600', 
-        'total' => 'LKR 480K', 
-        'alert' => 'overdue', 
-        'alertText' => 'This PO is 3 days overdue. Contact SL Cotton Mills to confirm delivery date.',
-        'items' => [
-          [ 'name' => 'Combed cotton 180GSM', 'desc' => '2,000m ordered · 0 received', 'val' => 'LKR 320K', 'pct' => '0%' ],
-          [ 'name' => 'Modal fabric 160GSM', 'desc' => '800m ordered · 0 received', 'val' => 'LKR 160K', 'pct' => '0%' ]
-        ],
-        'timeline' => [
-          [ 't' => 'PO raised', 'd' => '4 May 2025', 's' => 'done' ],
-          [ 't' => 'Sent to supplier', 'd' => '4 May 2025', 's' => 'done' ],
-          [ 't' => 'Overdue — not yet received', 'd' => 'Expected 9 May', 's' => 'warn' ],
-          [ 't' => 'GRN and close', 'd' => '', 's' => 'pend' ]
-        ]
-      ],
-      [ 
-        'num' => 'PO-2025-0041', 
-        'date' => 'Raised 8 May 2025', 
-        'badge' => 'bg-amber-50 border-amber-100 text-amber-700', 
-        'badgeText' => 'Partial', 
-        'supp' => 'Premium Elastic Co.', 
-        'contact' => 'Nishantha Kumar', 
-        'payment' => 'Net 15', 
-        'expected' => '15 May 2025', 
-        'expectedColorClass' => 'text-amber-700', 
-        'total' => 'LKR 94K', 
-        'alert' => 'warn', 
-        'alertText' => '60% received. Remaining 40% expected 15 May.',
-        'items' => [
-          [ 'name' => 'Branded elastic waistband', 'desc' => '500 rolls ordered · 300 received', 'val' => 'LKR 75K', 'pct' => '60%' ],
-          [ 'name' => 'Plain elastic 2cm', 'desc' => '1,000 rolls ordered · 600 received', 'val' => 'LKR 19K', 'pct' => '60%' ]
-        ],
-        'timeline' => [
-          [ 't' => 'PO raised', 'd' => '8 May 2025', 's' => 'done' ],
-          [ 't' => 'Sent to supplier', 'd' => '8 May 2025, email', 's' => 'done' ],
-          [ 't' => 'Partial delivery received', 'd' => '11 May · GRN-2025-0041A', 's' => 'now' ],
-          [ 't' => 'Full receipt & GRN close', 'd' => '', 's' => 'pend' ]
-        ]
-      ],
-      [ 
-        'num' => 'PO-2025-0040', 
-        'date' => 'Raised 7 May 2025', 
-        'badge' => 'bg-blue-50 border-blue-100 text-blue-700', 
-        'badgeText' => 'Sent', 
-        'supp' => 'Kandy Textiles', 
-        'contact' => 'Priya Weerakoon', 
-        'payment' => 'Net 45', 
-        'expected' => '20 May 2025', 
-        'expectedColorClass' => 'text-gray-900', 
-        'total' => 'LKR 210K', 
-        'alert' => 'info', 
-        'alertText' => 'PO sent 7 May. Awaiting delivery by 20 May (8 days remaining).',
-        'items' => [
-          [ 'name' => 'Cotton fabric 180GSM white', 'desc' => '1,500m ordered · 0 received', 'val' => 'LKR 210K', 'pct' => 'Pending' ]
-        ],
-        'timeline' => [
-          [ 't' => 'PO raised', 'd' => '7 May 2025', 's' => 'done' ],
-          [ 't' => 'Sent to supplier', 'd' => '7 May, awaiting delivery', 's' => 'now' ],
-          [ 't' => 'Goods received', 'd' => '', 's' => 'pend' ],
-          [ 't' => 'GRN and close', 'd' => '', 's' => 'pend' ]
-        ]
-      ],
-      [ 
-        'num' => 'PO-2025-0039', 
-        'date' => 'Raised 6 May 2025', 
-        'badge' => 'bg-blue-50 border-blue-100 text-blue-700', 
-        'badgeText' => 'Sent', 
-        'supp' => 'Pacific Packaging', 
-        'contact' => 'Saman Dias', 
-        'payment' => 'Net 30', 
-        'expected' => '22 May 2025', 
-        'expectedColorClass' => 'text-gray-900', 
-        'total' => 'LKR 38K', 
-        'alert' => 'info', 
-        'alertText' => 'PO sent 6 May. Awaiting delivery by 22 May.',
-        'items' => [
-          [ 'name' => 'Polybags 30×40cm', 'desc' => '5,000 pcs ordered', 'val' => 'LKR 25K', 'pct' => 'Pending' ],
-          [ 'name' => 'Printed cartons', 'desc' => '200 boxes ordered', 'val' => 'LKR 13K', 'pct' => 'Pending' ]
-        ],
-        'timeline' => [
-          [ 't' => 'PO raised', 'd' => '6 May 2025', 's' => 'done' ],
-          [ 't' => 'Sent to supplier', 'd' => '6 May, awaiting delivery', 's' => 'now' ],
-          [ 't' => 'Goods received', 'd' => '', 's' => 'pend' ],
-          [ 't' => 'GRN and close', 'd' => '', 's' => 'pend' ]
-        ]
-      ],
-      [ 
-        'num' => 'PO-2025-0038', 
-        'date' => 'Raised 22 Apr 2025', 
-        'badge' => 'bg-emerald-50 border-emerald-100 text-emerald-700', 
-        'badgeText' => 'Received', 
-        'supp' => 'Sri Lanka Cotton Mills', 
-        'contact' => 'Roshan Silva', 
-        'payment' => 'Net 30', 
-        'expected' => '1 May 2025', 
-        'expectedColorClass' => 'text-gray-900', 
-        'total' => 'LKR 620K', 
-        'alert' => 'ok', 
-        'alertText' => 'Fully received 30 Apr 2025. GRN-2025-0038 closed.',
-        'items' => [
-          [ 'name' => 'Combed cotton 180GSM', 'desc' => '2,500m ordered · 2,500 received', 'val' => 'LKR 400K', 'pct' => '100%' ],
-          [ 'name' => 'Spandex blend 200GSM', 'desc' => '1,000m ordered · 1,000 received', 'val' => 'LKR 220K', 'pct' => '100%' ]
-        ],
-        'timeline' => [
-          [ 't' => 'PO raised', 'd' => '22 Apr 2025', 's' => 'done' ],
-          [ 't' => 'Sent to supplier', 'd' => '22 Apr 2025', 's' => 'done' ],
-          [ 't' => 'Goods fully received', 'd' => '30 Apr 2025', 's' => 'done' ],
-          [ 't' => 'GRN closed', 'd' => 'GRN-2025-0038', 's' => 'done' ]
-        ]
-      ]
-    ];
-}
-
-$total_pos = count($admin_pos);
-$sent_pending_count = 0;
-$partial_count = 0;
-$overdue_count = 0;
-foreach ($admin_pos as $p) {
-    $stat_lower = strtolower($p['badgeText']);
-    if ($stat_lower === 'sent' || $stat_lower === 'pending' || $stat_lower === 'draft') {
-        $sent_pending_count++;
-    } elseif ($stat_lower === 'partial') {
-        $partial_count++;
-    } elseif ($stat_lower === 'overdue') {
-        $overdue_count++;
+        $error_msg = "Database Error: " . $e->getMessage();
     }
 }
 ?>
-<!-- Purchase Orders View -->
-<h2 class="sr-only">Purchase orders management page mockup for Kesara Enterprises wholesale admin platform</h2>
 
 <div class="flex-1 flex overflow-hidden">
     <!-- List Pane -->
@@ -286,21 +201,32 @@ foreach ($admin_pos as $p) {
                 <p class="text-sm text-gray-500 mt-1">Manage wholesale procurement and supplier shipments</p>
             </div>
             <div class="flex gap-3">
-                <button class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
+                <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
                     <i class="ti ti-download text-lg"></i>
-                    Export
+                    Export / Print List
                 </button>
-                <button onclick="sendPrompt('How should I design the raise new purchase order form for Kesara Enterprises admin?')" class="inline-flex items-center gap-2 px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-semibold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
+                <button onclick="openRaisePOModal()" class="inline-flex items-center gap-2 px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-semibold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
                     <i class="ti ti-plus text-lg"></i>
                     Raise PO ↗
                 </button>
             </div>
         </div>
 
+        <?php if (!empty($success_msg)): ?>
+            <div class="m-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-xs font-semibold text-emerald-700">
+                <?= htmlspecialchars($success_msg) ?>
+            </div>
+        <?php endif; ?>
+        <?php if (!empty($error_msg)): ?>
+            <div class="m-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-xs font-semibold text-red-700">
+                <?= htmlspecialchars($error_msg) ?>
+            </div>
+        <?php endif; ?>
+
         <!-- Stats Grid -->
         <div class="grid grid-cols-4 gap-4 p-6 bg-gray-50/50">
             <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total (2025)</p>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total</p>
                 <p class="text-2xl font-bold text-gray-900"><?= $total_pos ?></p>
             </div>
             <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-blue-500">
@@ -317,195 +243,153 @@ foreach ($admin_pos as $p) {
             </div>
         </div>
 
-        <!-- Filters -->
-        <div class="px-6 py-4 border-b border-gray-100 bg-white flex flex-col gap-4">
-            <div class="flex gap-3">
-                <div class="relative flex-1 group">
-                    <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand transition-colors"></i>
-                    <input type="text" placeholder="Search PO number or supplier..." 
-                        class="w-full pl-11 pr-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-brand/20 transition-all outline-none">
-                </div>
-                <select class="px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 outline-none cursor-pointer">
-                    <option>All Suppliers</option>
-                    <option>SL Cotton Mills</option>
-                    <option>Premium Elastic</option>
-                    <option>Pacific Packaging</option>
-                </select>
-                <input type="date" class="px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 outline-none cursor-pointer">
-            </div>
-            <div class="flex gap-2">
-                <button onclick="chipFilter(this)" class="px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-brand text-brand-light shadow-md shadow-brand/10 chip on">All</button>
-                <button onclick="chipFilter(this)" class="px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:border-brand/30 chip">Draft</button>
-                <button onclick="chipFilter(this)" class="px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:border-brand/30 chip">Sent</button>
-                <button onclick="chipFilter(this)" class="px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:border-brand/30 chip">Partial</button>
-                <button onclick="chipFilter(this)" class="px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:border-brand/30 chip">Received</button>
-                <button onclick="chipFilter(this)" class="px-4 py-1.5 rounded-full text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:border-brand/30 chip">Overdue</button>
-            </div>
+        <!-- Filters Chips -->
+        <div class="p-6 border-b border-gray-100 flex items-center gap-2 overflow-x-auto bg-white">
+            <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-brand text-brand-light rounded-xl text-xs font-bold shadow-md shadow-brand/10 on transition-all">All</button>
+            <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-all">Sent</button>
+            <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-all">Partial</button>
+            <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-all">Received</button>
+            <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-all">Overdue</button>
         </div>
 
-        <!-- List Content -->
-        <div class="flex-1 overflow-auto p-6">
-            <div class="min-w-[750px]">
-                <div class="grid grid-cols-[1fr_100px_100px_120px_110px] gap-4 px-4 py-3 bg-gray-50 rounded-xl mb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                    <span>PO / Supplier</span>
-                    <span>Expected</span>
-                    <span>Value</span>
-                    <span>Received</span>
-                    <span class="text-right">Status</span>
-                </div>
-
-                <div id="po-list" class="space-y-2">
-                    <?php foreach ($admin_pos as $idx => $p): ?>
-                    <?php
-                        $progressWidth = '0%';
-                        if ($p['badgeText'] === 'Fully received' || $p['badgeText'] === 'Received') {
-                          $progressWidth = '100%';
-                        } else if ($p['badgeText'] === 'Partial' || $p['badgeText'] === 'Partial receipt') {
-                          $progressWidth = '60%';
-                        }
-                        
-                        $expectedText = $p['expected'];
-                        if ($p['alert'] === 'overdue') {
-                          $expectedText .= ' <i class="ti ti-alert-triangle text-sm"></i>';
-                        }
-                    ?>
-                    <div class="po-row group grid grid-cols-[1fr_100px_100px_120px_110px] gap-4 items-center p-4 rounded-2xl transition-all cursor-pointer bg-white border border-gray-100 hover:border-brand/30 hover:bg-gray-50"
-                         data-idx="<?= $idx ?>"
-                         data-num="<?= htmlspecialchars($p['num']) ?>"
-                         data-date="<?= htmlspecialchars($p['date']) ?>"
-                         data-badge="<?= htmlspecialchars($p['badge']) ?>"
-                         data-badge-text="<?= htmlspecialchars($p['badgeText']) ?>"
-                         data-supp="<?= htmlspecialchars($p['supp']) ?>"
-                         data-contact="<?= htmlspecialchars($p['contact']) ?>"
-                         data-payment="<?= htmlspecialchars($p['payment']) ?>"
-                         data-expected="<?= htmlspecialchars($p['expected']) ?>"
-                         data-expected-color="<?= htmlspecialchars($p['expectedColorClass']) ?>"
-                         data-total="<?= htmlspecialchars($p['total']) ?>"
-                         data-alert="<?= htmlspecialchars($p['alert']) ?>"
-                         data-alert-text="<?= htmlspecialchars($p['alertText']) ?>"
-                         data-items="<?= htmlspecialchars(json_encode($p['items'])) ?>"
-                         data-timeline="<?= htmlspecialchars(json_encode($p['timeline'])) ?>"
-                         onclick="selectPO(this)">
-                        <div>
-                            <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors"><?= htmlspecialchars($p['num']) ?></p>
-                            <p class="text-xs text-gray-500"><?= htmlspecialchars($p['supp']) ?></p>
-                        </div>
-                        <span class="text-xs font-semibold <?= $p['alert'] === 'overdue' ? 'text-red-600' : 'text-gray-500' ?> flex items-center gap-1"><?= $expectedText ?></span>
-                        <span class="text-xs font-bold text-gray-900"><?= htmlspecialchars($p['total']) ?></span>
-                        <div class="flex items-center gap-2">
-                            <div class="h-1.5 w-16 bg-gray-100 rounded-full overflow-hidden flex-shrink-0">
-                                <div class="h-full bg-brand rounded-full transition-all duration-500" style="width: <?= $progressWidth ?>"></div>
-                            </div>
-                            <span class="text-[10px] font-bold text-gray-400"><?= $progressWidth ?></span>
-                        </div>
-                        <div class="text-right">
-                            <span class="px-3 py-1 <?= htmlspecialchars($p['badge']) ?> rounded-full text-[10px] font-bold uppercase tracking-wider"><?= htmlspecialchars($p['badgeText']) ?></span>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
+        <!-- List Pane Body -->
+        <div class="flex-1 overflow-y-auto min-w-0">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/20">
+                        <th class="py-4 px-6">PO Code</th>
+                        <th class="py-4 px-6">Supplier</th>
+                        <th class="py-4 px-6">Expected At</th>
+                        <th class="py-4 px-6">Total Amount</th>
+                        <th class="py-4 px-6 text-right">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
                     <?php if (empty($admin_pos)): ?>
-                        <div class="text-xs text-gray-400 text-center py-10 italic">No purchase orders found.</div>
+                        <tr>
+                            <td colspan="5" class="py-8 px-6 text-center text-sm text-gray-400 italic">No purchase orders found.</td>
+                        </tr>
+                    <?php else: ?>
+                        <?php foreach ($admin_pos as $po): ?>
+                            <tr class="po-row border-b border-gray-100 hover:bg-gray-50/50 cursor-pointer transition-all"
+                                id="po-row-<?= $po['id'] ?>"
+                                onclick="selectPO(this)"
+                                data-id="<?= $po['id'] ?>"
+                                data-num="<?= htmlspecialchars($po['num']) ?>"
+                                data-date="<?= htmlspecialchars($po['date']) ?>"
+                                data-badge="<?= htmlspecialchars($po['badge']) ?>"
+                                data-badge-text="<?= htmlspecialchars($po['badgeText']) ?>"
+                                data-supp="<?= htmlspecialchars($po['supp']) ?>"
+                                data-contact="<?= htmlspecialchars($po['contact']) ?>"
+                                data-payment="<?= htmlspecialchars($po['payment']) ?>"
+                                data-expected="<?= htmlspecialchars($po['expected']) ?>"
+                                data-expected-color="<?= htmlspecialchars($po['expectedColor']) ?>"
+                                data-total="<?= htmlspecialchars($po['total']) ?>"
+                                data-alert="<?= htmlspecialchars($po['alert']) ?>"
+                                data-alert-text="<?= htmlspecialchars($po['alertText']) ?>"
+                                data-items="<?= htmlspecialchars($po['items']) ?>"
+                                data-timeline="<?= htmlspecialchars($po['timeline']) ?>">
+                                <td class="py-4 px-6 font-bold text-sm text-gray-900"><?= $po['num'] ?></td>
+                                <td class="py-4 px-6 text-sm text-gray-700"><?= $po['supp'] ?></td>
+                                <td class="py-4 px-6 text-sm text-gray-500"><?= $po['expected'] ?></td>
+                                <td class="py-4 px-6 text-sm font-extrabold text-brand"><?= $po['total'] ?></td>
+                                <td class="py-4 px-6 text-right">
+                                    <span class="px-3 py-1 rounded-full text-[10px] font-bold border <?= $po['badge'] ?>"><?= $po['badgeText'] ?></span>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
                     <?php endif; ?>
-                </div>
-                
-                <!-- Pagination -->
-                <div class="mt-8 flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                    <span class="text-xs font-bold text-gray-400">SHOWING <?= count($admin_pos) ?> OF <?= $total_pos ?> POS</span>
-                    <div class="flex gap-2">
-                        <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-brand transition-colors"><i class="ti ti-chevron-left"></i></button>
-                        <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs">1</button>
-                        <button class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-brand transition-colors"><i class="ti ti-chevron-right"></i></button>
-                    </div>
-                </div>
-            </div>
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <!-- Detail Pane -->
-    <!-- Backdrop -->
+    <!-- PO Details Backdrop -->
     <div id="po-detail-backdrop" class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300" onclick="closePODetailPane()"></div>
-    <div id="po-detail-pane" class="fixed inset-y-0 right-0 z-50 w-[400px] max-w-full bg-white border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
-        <div class="p-8 flex-1 overflow-y-auto space-y-8">
-            <!-- Header Block -->
-            <div class="flex flex-col items-center text-center relative">
-                <button onclick="closePODetailPane()" class="absolute top-0 right-0 p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none" aria-label="Close details">
-                    <i class="ti ti-x text-xl"></i>
-                </button>
-                <div class="w-16 h-16 rounded-3xl flex items-center justify-center text-2xl font-bold bg-brand/5 border border-brand/20 shadow-lg shadow-brand/10 text-brand mb-4">
-                    <i class="ti ti-file-invoice"></i>
+
+    <!-- PO Details Pane (Right) -->
+    <div id="po-detail-pane" class="fixed inset-y-0 right-0 z-50 w-[420px] max-w-full bg-white flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
+        <div id="detail-print-area" class="p-8 flex-1 overflow-y-auto space-y-8 relative">
+            <button onclick="closePODetailPane()" class="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none" aria-label="Close details">
+                <i class="ti ti-x text-xl"></i>
+            </button>
+
+            <!-- PO Title Details -->
+            <div>
+                <span id="d-po-date" class="text-xs text-gray-400 font-medium"></span>
+                <h2 id="d-po-num" class="text-xl font-bold text-gray-900 tracking-tight mt-1"></h2>
+                <div class="flex gap-2 items-center">
+                    <span id="d-badge" class="mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest"></span>
                 </div>
-                <h2 id="d-po-num" class="text-xl font-bold text-gray-900 tracking-tight"></h2>
-                <p id="d-po-date" class="text-sm text-gray-500 mt-1"></p>
-                <span id="d-badge" class="mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border"></span>
             </div>
 
-            <!-- Alert Card -->
-            <div id="d-alert" class="p-4 rounded-2xl flex items-start gap-3 border text-xs">
-                <i class="text-lg flex-shrink-0" aria-hidden="true"></i>
-                <span id="d-alert-text" class="leading-relaxed"></span>
+            <!-- Warning Banner -->
+            <div id="d-alert" class="p-4 rounded-2xl flex items-start gap-3 border text-xs bg-blue-50 border-blue-100 text-blue-700">
+                <i class="ti ti-info-circle text-lg flex-shrink-0" aria-hidden="true"></i>
+                <span id="d-alert-text" class="leading-relaxed font-medium"></span>
             </div>
 
-            <!-- Supplier Section -->
-            <section>
-                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Supplier Details</h3>
-                <div class="space-y-4">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs text-gray-500 font-medium">Name</span>
-                        <span id="d-supp" class="text-xs font-bold text-gray-900"></span>
+            <!-- Supplier Contact Details -->
+            <section class="space-y-4">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Supplier Partner</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-gray-500 font-medium">Supplier Name</span>
+                        <span id="d-supp" class="font-bold text-gray-900"></span>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs text-gray-500 font-medium">Contact</span>
-                        <span id="d-contact" class="text-xs font-bold text-gray-900"></span>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-gray-500 font-medium">Contact Person</span>
+                        <span id="d-contact" class="font-bold text-gray-900"></span>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs text-gray-500 font-medium">Payment Terms</span>
-                        <span id="d-payment" class="text-xs font-bold text-gray-900 px-2 py-1 bg-gray-100 rounded-lg"></span>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-gray-500 font-medium">Payment Terms</span>
+                        <span id="d-payment" class="font-bold text-gray-900"></span>
                     </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs text-gray-500 font-medium">Expected By</span>
-                        <span id="d-expected" class="text-xs font-bold"></span>
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="text-gray-500 font-medium">Expected Arrival</span>
+                        <span id="d-expected" class="font-bold"></span>
                     </div>
                 </div>
             </section>
 
+            <div class="h-px bg-gray-100"></div>
+
             <!-- Line Items Section -->
             <section>
                 <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Line Items</h3>
-                <div id="d-items" class="space-y-4">
-                    <!-- Dynamic Items injected here -->
-                </div>
+                <div id="d-items" class="space-y-4"></div>
                 <div class="pt-4 mt-4 flex justify-between items-center border-t border-gray-100">
                     <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Value</span>
                     <span id="d-total" class="text-lg font-black text-brand tracking-tight"></span>
                 </div>
             </section>
 
+            <div class="h-px bg-gray-100"></div>
+
             <!-- Status Timeline Section -->
             <section>
                 <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Status Timeline</h3>
-                <div id="d-timeline" class="space-y-6 pl-4 relative before:absolute before:left-[5.5px] before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
-                    <!-- Dynamic Timeline items injected here -->
-                </div>
+                <div id="d-timeline" class="space-y-6 pl-4 relative before:absolute before:left-[5.5px] before:top-2 before:bottom-2 before:w-px before:bg-gray-100"></div>
             </section>
         </div>
 
         <!-- Action Footer (Sticky) -->
-        <div class="p-6 border-t border-gray-100 bg-gray-50/50 space-y-3">
-            <button onclick="sendPrompt('What should the goods received note page show for Kesara Enterprises admin?')" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-brand text-brand-light rounded-xl text-sm font-bold shadow-lg shadow-brand/10 hover:opacity-90 transition-all">
+        <div class="p-6 border-t border-gray-100 bg-gray-50/50 space-y-3 print:hidden">
+            <a id="d-record-grn-link" href="#" class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-brand text-brand-light rounded-xl text-sm font-bold shadow-lg shadow-brand/10 hover:opacity-90 transition-all">
                 <i class="ti ti-truck-delivery text-lg"></i>
-                Record Goods Received ↗
-            </button>
+                Record Goods Received
+            </a>
             <div class="grid grid-cols-2 gap-3">
-                <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all" onclick="downloadPDF('detail-pane', 'Purchase_Order')">
+                <button onclick="printPO()" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all">
                     <i class="ti ti-download text-base"></i>
-                    PDF
+                    Print PO
                 </button>
-                <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all">
+                <button onclick="resendPO()" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all">
                     <i class="ti ti-mail text-base"></i>
                     Resend
                 </button>
             </div>
-            <button id="d-cancel-btn" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-red-100 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition-all">
+            <button id="d-cancel-btn" onclick="cancelPO()" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-red-100 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 transition-all">
                 <i class="ti ti-x text-base"></i>
                 Cancel Purchase Order
             </button>
@@ -513,7 +397,90 @@ foreach ($admin_pos as $p) {
     </div>
 </div>
 
+<!-- Forms for actions -->
+<form id="actionForm" method="POST" class="hidden">
+    <input type="hidden" name="action" id="actionInput">
+    <input type="hidden" name="po_id" id="poIdInput">
+</form>
+
+<!-- Raise PO Modal -->
+<div id="raisePOModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 items-center justify-center p-4 hidden">
+    <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-2xl w-full">
+        <h2 class="text-xl font-bold text-gray-900 mb-6">Raise New Purchase Order</h2>
+        
+        <form method="POST">
+            <input type="hidden" name="action" value="raise_po">
+            
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="space-y-1.5">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select Supplier</label>
+                    <select name="supplier_id" required class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all cursor-pointer">
+                        <?php foreach ($suppliers_list as $supp): ?>
+                            <option value="<?= $supp['id'] ?>"><?= htmlspecialchars($supp['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expected Delivery Date</label>
+                    <input type="date" name="expected_at" required class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all">
+                </div>
+            </div>
+            
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Purchase Items</label>
+                    <button type="button" onclick="addPOItemRow()" class="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-xl text-[10px] font-bold text-brand hover:bg-brand/10 transition-all">+ Add Item</button>
+                </div>
+                
+                <div class="grid grid-cols-[1fr_80px_120px_40px] gap-3 mb-2 text-[9px] font-extrabold text-gray-400 uppercase tracking-wider pl-1">
+                    <span>Item Name / Description</span>
+                    <span class="text-center">Quantity</span>
+                    <span>Unit Cost (LKR)</span>
+                    <span></span>
+                </div>
+
+                <div id="poItemsContainer" class="space-y-3 max-h-60 overflow-y-auto pr-2">
+                    <div class="grid grid-cols-[1fr_80px_120px_40px] gap-3 items-center">
+                        <input type="text" name="item_names[]" placeholder="e.g. Combed Cotton Fabric" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold">
+                        <input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold">
+                        <input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold">
+                        <button type="button" onclick="removePOItemRow(this)" class="text-red-500 hover:text-red-700 text-center"><i class="ti ti-trash text-base"></i></button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <button type="button" onclick="closeRaisePOModal()" class="px-6 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all">Cancel</button>
+                <button type="submit" class="px-6 py-2.5 bg-brand text-brand-light rounded-xl text-sm font-bold shadow-lg shadow-brand/20 hover:opacity-90 transition-all">Raise Order</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Print Styles -->
+<style>
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    #detail-print-area, #detail-print-area * {
+        visibility: visible;
+    }
+    #detail-print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        box-shadow: none;
+    }
+    .print\:hidden {
+        display: none !important;
+    }
+}
+</style>
+
 <script>
+let currentSelectedPOId = 0;
 
 function getItemBadgeClass(pct) {
   if (pct === '100%') return 'bg-emerald-50 border-emerald-100 text-emerald-700';
@@ -545,6 +512,19 @@ function selectPO(el, openDrawer = true) {
   el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
   el.classList.remove('bg-white', 'border-gray-100');
   
+  currentSelectedPOId = el.dataset.id;
+  
+  // Set Record Goods Received URL
+  document.getElementById('d-record-grn-link').href = '/admin-goods-received?po_id=' + el.dataset.id;
+  
+  // Toggle Visibility of GRN button
+  const status_lower = el.dataset.status;
+  if (status_lower === 'received') {
+      document.getElementById('d-record-grn-link').classList.add('hidden');
+  } else {
+      document.getElementById('d-record-grn-link').classList.remove('hidden');
+  }
+
   // Open drawer
   if (openDrawer) {
     const pane = document.getElementById('po-detail-pane');
@@ -583,7 +563,7 @@ function selectPO(el, openDrawer = true) {
   };
   
   const al = document.getElementById('d-alert');
-  const style = alertStyles[el.dataset.alert];
+  const style = alertStyles[el.dataset.alert] || alertStyles['info'];
   al.className = `p-4 rounded-2xl flex items-start gap-3 border text-xs ${style.bg} ${style.border} ${style.text}`;
   al.querySelector('i').className = `ti ${style.icon} text-lg flex-shrink-0`;
   document.getElementById('d-alert-text').textContent = el.dataset.alertText;
@@ -669,6 +649,60 @@ function closePODetailPane() {
     r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
     r.classList.add('bg-white', 'border-gray-100');
   });
+}
+
+// Raise PO Modal Actions
+function openRaisePOModal() {
+    document.getElementById('raisePOModal').classList.remove('hidden');
+    document.getElementById('raisePOModal').classList.add('flex');
+}
+
+function closeRaisePOModal() {
+    document.getElementById('raisePOModal').classList.add('hidden');
+    document.getElementById('raisePOModal').classList.remove('flex');
+}
+
+function addPOItemRow() {
+    const container = document.getElementById('poItemsContainer');
+    const row = document.createElement('div');
+    row.className = 'grid grid-cols-[1fr_80px_120px_40px] gap-3 items-center';
+    row.innerHTML = `
+        <input type="text" name="item_names[]" placeholder="e.g. Branded Elastic" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold">
+        <input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold">
+        <input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold">
+        <button type="button" onclick="removePOItemRow(this)" class="text-red-500 hover:text-red-700 text-center"><i class="ti ti-trash text-base"></i></button>
+    `;
+    container.appendChild(row);
+}
+
+function removePOItemRow(btn) {
+    const rows = document.getElementById('poItemsContainer').children;
+    if (rows.length > 1) {
+        btn.parentElement.remove();
+    } else {
+        alert("At least one purchase item is required.");
+    }
+}
+
+// Actions from Detail Pane
+function printPO() {
+    window.print();
+}
+
+function resendPO() {
+    if (currentSelectedPOId > 0 && confirm("Simulate sending this PO again to the supplier?")) {
+        document.getElementById('actionInput').value = 'resend_po';
+        document.getElementById('poIdInput').value = currentSelectedPOId;
+        document.getElementById('actionForm').submit();
+    }
+}
+
+function cancelPO() {
+    if (currentSelectedPOId > 0 && confirm("Are you sure you want to cancel and delete this Purchase Order?")) {
+        document.getElementById('actionInput').value = 'cancel_po';
+        document.getElementById('poIdInput').value = currentSelectedPOId;
+        document.getElementById('actionForm').submit();
+    }
 }
 
 // Initial Render

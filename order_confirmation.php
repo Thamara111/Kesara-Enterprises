@@ -255,7 +255,7 @@ require_once __DIR__ . "/layouts/header.php";
                 <!-- Actions -->
                 <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm space-y-4">
                     <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Available Actions</h2>
-                    <button class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2">
+                    <button onclick="downloadInvoice()" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2">
                         <i class="ti ti-download text-xl"></i>
                         Download Invoice
                     </button>
@@ -299,5 +299,100 @@ require_once __DIR__ . "/layouts/header.php";
         </div>
     </div>
 </main>
+
+<script>
+const orderData = {
+    id: <?= json_encode('KE-2025-' . str_pad($order['id'], 5, '0', STR_PAD_LEFT)) ?>,
+    businessName: <?= json_encode($order['business_name']) ?>,
+    address: <?= json_encode($order['address']) ?>,
+    phone: <?= json_encode($order['phone']) ?>,
+    email: <?= json_encode($order['email']) ?>,
+    total: <?= json_encode(number_format($total, 2)) ?>,
+    subtotal: <?= json_encode(number_format($subtotal, 2)) ?>,
+    vat: <?= json_encode(number_format($vat, 2)) ?>,
+    items: <?= json_encode($order_items) ?>
+};
+
+function downloadInvoice() {
+    let itemsHtml = orderData.items.map(item => `
+        <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                <strong>${item.product_name}</strong><br>
+                <small>Size: ${item.size} · Colour: ${item.colour}</small>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">LKR ${parseFloat(item.unit_price).toFixed(2)}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">LKR ${(item.quantity * parseFloat(item.unit_price)).toFixed(2)}</td>
+        </tr>
+    `).join('');
+
+    let printWindow = window.open('', '_blank');
+    printWindow.document.write(\`
+        <html>
+        <head>
+            <title>VAT Invoice \${orderData.id} - Kesara Enterprises</title>
+            <style>
+                body { font-family: sans-serif; color: #333; padding: 40px; }
+                .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0F6E56; padding-bottom: 20px; margin-bottom: 30px; }
+                .logo { font-size: 24px; font-weight: bold; color: #0F6E56; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th { background-color: #f5f5f5; padding: 10px; text-align: left; }
+                .totals { margin-top: 30px; text-align: right; font-size: 14px; line-height: 2; }
+                .footer { margin-top: 50px; font-size: 11px; color: #777; text-align: center; border-top: 1px solid #ddd; padding-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div>
+                    <div class="logo">Kesara Enterprises</div>
+                    <div>Wholesale Underwear Supplier Sri Lanka</div>
+                    <div>Colombo, Sri Lanka</div>
+                </div>
+                <div style="text-align: right;">
+                    <h2>VAT INVOICE</h2>
+                    <div>Invoice: \${orderData.id}</div>
+                    <div>Date: \${new Date().toLocaleDateString()}</div>
+                </div>
+            </div>
+            <div style="margin-bottom: 30px;">
+                <strong>Billed To:</strong><br>
+                \${orderData.businessName}<br>
+                \${orderData.address.replace(/\\n/g, '<br>')}<br>
+                Phone: \${orderData.phone} · Email: \${orderData.email}
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Item Details</th>
+                        <th style="text-align: center;">Qty</th>
+                        <th style="text-align: right;">Unit Price</th>
+                        <th style="text-align: right;">Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    \${itemsHtml}
+                </tbody>
+            </table>
+            <div class="totals">
+                <div>Subtotal: LKR \${orderData.subtotal}</div>
+                <div>VAT (18%): LKR \${orderData.vat}</div>
+                <div style="font-size: 18px; font-weight: bold; margin-top: 10px; color: #0F6E56;">Total Amount: LKR \${orderData.total}</div>
+            </div>
+            <div class="footer">
+                <p>This is a computer generated VAT invoice for your wholesale order.</p>
+                <p>© \${new Date().getFullYear()} Kesara Enterprises. All rights reserved.</p>
+            </div>
+            <script>
+                window.onload = function() {
+                    window.print();
+                    window.close();
+                }
+            <\/script>
+        </body>
+        </html>
+    \`);
+    printWindow.document.close();
+}
+</script>
 
 <?php require_once __DIR__ . "/layouts/footer.php"; ?>
