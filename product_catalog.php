@@ -271,7 +271,13 @@ require_once __DIR__."/layouts/header.php";
               <div class="flex items-center justify-between mt-auto">
                 <div class="space-y-1">
                   <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Wholesale Price</p>
-                  <p class="text-sm font-bold text-gray-900">LKR <?php echo is_numeric($p['price'])?number_format($p['price'],2):htmlspecialchars($p['price']); ?></p>
+                  <p class="text-sm font-bold text-gray-900">
+                    <?php if ($can_see_prices): ?>
+                      LKR <?php echo is_numeric($p['price'])?number_format($p['price'],2):htmlspecialchars($p['price']); ?>
+                    <?php else: ?>
+                      <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none" title="Log in to view prices">LKR <?php echo is_numeric($p['price'])?number_format($p['price'],2):htmlspecialchars($p['price']); ?></span>
+                    <?php endif; ?>
+                  </p>
                 </div>
                 <div class="text-right">
                   <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Min Order</p>

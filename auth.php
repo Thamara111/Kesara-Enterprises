@@ -393,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
             btn.disabled = true;
             btn.textContent = 'Submitting Request...';
 
-            fetch('/api/register.php', {
+            fetch('api/register.php', {
                 method: 'POST',
                 body: formData
             })

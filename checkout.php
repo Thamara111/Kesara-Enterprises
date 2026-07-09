@@ -1,5 +1,30 @@
 <?php
 // Mock Checkout Page for Kesara Enterprises
+require_once __DIR__ . "/database/connection.php";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+$is_logged_in = isset($_SESSION['user_id']);
+$buyer_approved = false;
+
+if ($is_logged_in && isset($pdo)) {
+    try {
+        $auth_stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? LIMIT 1");
+        $auth_stmt->execute([$_SESSION['user_id']]);
+        $auth_user = $auth_stmt->fetch();
+        if ($auth_user && $auth_user['status'] === 'approved') {
+            $buyer_approved = true;
+        }
+    } catch (\Exception $e) {
+        $buyer_approved = false;
+    }
+}
+$can_see_prices = $is_logged_in && $buyer_approved;
+
+if (!$can_see_prices) {
+    header("Location: /login");
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -139,7 +164,7 @@ async function initializeCheckout() {
 
     const ids = storageCart.map(i => i.id);
     try {
-        const res = await fetch('/api/cart_items.php', {
+        const res = await fetch('api/cart_items.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({product_ids: ids})
@@ -291,7 +316,7 @@ async function processPayment(e) {
 
     // Submit Order to API
     try {
-        const res = await fetch('/api/orders.php', {
+        const res = await fetch('api/orders.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({

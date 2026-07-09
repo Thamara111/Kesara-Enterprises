@@ -250,6 +250,10 @@ if (isset($pdo) && $pdo !== null) {
             } elseif (stripos($row['company'], 'Fashion') !== false || stripos($row['company_address'], 'Colombo 03') !== false || stripos($row['company_address'], 'Kurunegala') !== false) {
                 $lat = 6.9150;
                 $lng = 79.8510;
+            } else {
+                $hash = crc32($row['company'] ?: 'default');
+                $lat = 6.9000 + (($hash % 100) - 50) / 1000.0;
+                $lng = 79.8700 + ((intval($hash / 100) % 100) - 50) / 1000.0;
             }
             
             $grouped[$key]['stops'][] = [
@@ -408,13 +412,7 @@ let legInterpolatedPaths = []; // array of coordinate arrays for each leg
 
 // Load Initial Data
 function initData() {
-    const cached = localStorage.getItem('ke_assignments');
-    if (cached) {
-        assignments = JSON.parse(cached);
-    } else {
-        assignments = [...defaultAssignments];
-        localStorage.setItem('ke_assignments', JSON.stringify(assignments));
-    }
+    assignments = [...defaultAssignments];
 }
 
 // Show Custom Toast

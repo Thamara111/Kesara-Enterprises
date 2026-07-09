@@ -88,13 +88,13 @@ if ($method === 'POST') {
 
     if (isset($pdo) && $pdo !== null) {
         try {
-            $pdo->beginTransaction();
-
             $checkOrderColor = $pdo->query("SHOW COLUMNS FROM order_items LIKE 'color'");
             if (!$checkOrderColor->fetch()) {
                 $pdo->exec("ALTER TABLE order_items ADD COLUMN color VARCHAR(50) DEFAULT NULL");
                 $pdo->exec("ALTER TABLE order_items ADD COLUMN size VARCHAR(50) DEFAULT NULL");
             }
+
+            $pdo->beginTransaction();
 
             // 1. Insert into orders
             $stmt = $pdo->prepare("INSERT INTO orders (user_id, status, total_amount) VALUES (?, 'pending', ?)");

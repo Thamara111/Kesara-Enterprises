@@ -12,6 +12,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     
     if (($action === 'add_driver' || $action === 'edit_driver') && isset($pdo)) {
         $name = trim($_POST['name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
         $phone = trim($_POST['phone'] ?? '');
         $nic = trim($_POST['nic'] ?? '');
         $licence_class = trim($_POST['licence_class'] ?? 'B');
@@ -20,17 +22,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $vehicle_number = trim($_POST['vehicle_number'] ?? '');
         $status = $_POST['status'] ?? 'available';
         
-        if (empty($name) || empty($phone)) {
-            $error_msg = "Name and Phone number are required.";
+        if (empty($name) || empty($phone) || empty($email)) {
+            $error_msg = "Name, Email, and Phone number are required.";
         } else {
             try {
                 if ($action === 'add_driver') {
-                    $stmt = $pdo->prepare("INSERT INTO delivery_personnel (name, phone, nic, licence_class, licence_expiry, vehicle_type, vehicle_number, status, joined_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURDATE())");
-                    $stmt->execute([$name, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $status]);
+                    $hashed_password = !empty($password) ? password_hash($password, PASSWORD_BCRYPT) : password_hash('driver123', PASSWORD_BCRYPT);
+                    $stmt = $pdo->prepare("INSERT INTO delivery_personnel (name, email, password, phone, nic, licence_class, licence_expiry, vehicle_type, vehicle_number, status, joined_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())");
+                    $stmt->execute([$name, $email, $hashed_password, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $status]);
                     $success_msg = "Delivery personnel added successfully!";
                 } else {
-                    $stmt = $pdo->prepare("UPDATE delivery_personnel SET name = ?, phone = ?, nic = ?, licence_class = ?, licence_expiry = ?, vehicle_type = ?, vehicle_number = ?, status = ? WHERE id = ?");
-                    $stmt->execute([$name, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $status, $driver_id]);
+                    if (!empty($password)) {
+                        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+                        $stmt = $pdo->prepare("UPDATE delivery_personnel SET name = ?, email = ?, password = ?, phone = ?, nic = ?, licence_class = ?, licence_expiry = ?, vehicle_type = ?, vehicle_number = ?, status = ? WHERE id = ?");
+                        $stmt->execute([$name, $email, $hashed_password, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $status, $driver_id]);
+                    } else {
+                        $stmt = $pdo->prepare("UPDATE delivery_personnel SET name = ?, email = ?, phone = ?, nic = ?, licence_class = ?, licence_expiry = ?, vehicle_type = ?, vehicle_number = ?, status = ? WHERE id = ?");
+                        $stmt->execute([$name, $email, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $status, $driver_id]);
+                    }
                     $success_msg = "Profile updated successfully!";
                 }
             } catch (Exception $e) {
@@ -57,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $admin_drivers = [];
 if (isset($pdo) && $pdo !== null) {
     try {
-        $stmt = $pdo->query("SELECT dp.id, dp.name, dp.phone, dp.nic, dp.licence_class, dp.licence_expiry, dp.vehicle_type, dp.vehicle_number, dp.status, dp.joined_date 
+        $stmt = $pdo->query("SELECT dp.id, dp.name, dp.email, dp.phone, dp.nic, dp.licence_class, dp.licence_expiry, dp.vehicle_type, dp.vehicle_number, dp.status, dp.joined_date 
                              FROM delivery_personnel dp ORDER BY dp.name ASC");
         $drivers_db = $stmt->fetchAll();
 
@@ -106,17 +115,64 @@ if (isset($pdo) && $pdo !== null) {
             $vehicle = ucfirst($drv['vehicle_type']) . ' · ' . $drv['vehicle_number'];
             $licence = $drv['licence_class'] . ' · expires ' . date('M Y', strtotime($drv['licence_expiry']));
 
-            $ot = '94%';
-            $otW = 94;
-            $del = 47;
-            $fail = 3;
-            $avg = '5.2 runs';
+            // Calculate dynamic delivered & failed stops counts
+            $del_stmt = $pdo->prepare("SELECT COUNT(*) FROM delivery_assignments WHERE personnel_id = ? AND status = 'completed'");
+            $del_stmt->execute([$drv['id']]);
+            $del = (int)$del_stmt->fetchColumn();
 
-            $recent = [
-              [ 'date' => '12 May', 'desc' => '3 drops · Colombo', 'status' => 'Done', 'failed' => false ],
-              [ 'date' => '11 May', 'desc' => '4 drops · Gampaha', 'status' => 'Done', 'failed' => false ],
-              [ 'date' => '10 May', 'desc' => '2 drops · Colombo', 'status' => '1 failed', 'failed' => true ]
-            ];
+            $fail_stmt = $pdo->prepare("SELECT COUNT(*) FROM delivery_assignments WHERE personnel_id = ? AND status = 'failed'");
+            $fail_stmt->execute([$drv['id']]);
+            $fail = (int)$fail_stmt->fetchColumn();
+
+            $total_asgns = $del + $fail;
+            if ($total_asgns > 0) {
+                $otW = round(($del / $total_asgns) * 100);
+            } else {
+                $otW = 100; // default to 100% if no historical runs
+            }
+            $ot = $otW . '%';
+
+            // Average per day
+            $days_stmt = $pdo->prepare("SELECT COUNT(DISTINCT DATE(assigned_at)) FROM delivery_assignments WHERE personnel_id = ?");
+            $days_stmt->execute([$drv['id']]);
+            $days_active = (int)$days_stmt->fetchColumn() ?: 1;
+            
+            $runs_stmt = $pdo->prepare("SELECT COUNT(*) FROM delivery_assignments WHERE personnel_id = ?");
+            $runs_stmt->execute([$drv['id']]);
+            $total_runs = (int)$runs_stmt->fetchColumn();
+            
+            $avg_val = round($total_runs / $days_active, 1);
+            $avg = "$avg_val runs";
+
+            // Recent runs (last 3 assignments)
+            $rec_stmt = $pdo->prepare("
+                SELECT da.id, da.assigned_at, da.status, u.business_name
+                FROM delivery_assignments da
+                JOIN orders o ON da.order_id = o.id
+                JOIN users u ON o.user_id = u.id
+                WHERE da.personnel_id = ?
+                ORDER BY da.assigned_at DESC
+                LIMIT 3
+            ");
+            $rec_stmt->execute([$drv['id']]);
+            $rec_db = $rec_stmt->fetchAll();
+
+            $recent = [];
+            foreach ($rec_db as $rec_row) {
+                $status_txt = $rec_row['status'] === 'completed' ? 'Done' : ($rec_row['status'] === 'failed' ? 'Failed' : 'Active');
+                $recent[] = [
+                    'date' => date('d M', strtotime($rec_row['assigned_at'])),
+                    'desc' => "1 drop · " . $rec_row['business_name'],
+                    'status' => $status_txt,
+                    'failed' => ($rec_row['status'] === 'failed')
+                ];
+            }
+
+            if (empty($recent)) {
+                $recent = [
+                    [ 'date' => date('d M'), 'desc' => 'No recent runs', 'status' => 'None', 'failed' => false ]
+                ];
+            }
 
             $todayRun = null;
             if ($status_lower === 'on_run') {
@@ -132,6 +188,7 @@ if (isset($pdo) && $pdo !== null) {
                 'av' => $initials,
                 'avColor' => $avColor,
                 'name' => $drv['name'],
+                'email' => $drv['email'] ?? '',
                 'phone' => $drv['phone'],
                 'status' => $drv['status'],
                 'badge' => $badge,
@@ -294,6 +351,7 @@ foreach ($admin_drivers as $d) {
                          data-av="<?= htmlspecialchars($d['av']) ?>"
                          data-av-color="<?= htmlspecialchars($d['avColor']) ?>"
                          data-name="<?= htmlspecialchars($d['name']) ?>"
+                         data-email="<?= htmlspecialchars($d['email']) ?>"
                          data-phone="<?= htmlspecialchars($d['phone']) ?>"
                          data-status="<?= htmlspecialchars($d['status']) ?>"
                          data-badge="<?= htmlspecialchars($d['badge']) ?>"
@@ -469,6 +527,17 @@ foreach ($admin_drivers as $d) {
                 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Email Address *</label>
+                        <input type="email" name="email" id="driverEmail" required placeholder="e.g. nuwan@kesara.lk" class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Password</label>
+                        <input type="password" name="password" id="driverPassword" placeholder="Password (default: driver123)" class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Phone Number *</label>
                         <input type="text" name="phone" id="driverPhone" required placeholder="e.g. +94 77 111 2222" class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                     </div>
@@ -577,6 +646,7 @@ function selectRow(el, openDrawer = true) {
   currentSelectedDriver = {
       id: el.dataset.id,
       name: el.dataset.name,
+      email: el.dataset.email,
       phone: el.dataset.phone,
       nic: el.dataset.nic,
       licence_class: el.dataset.licenceClass,
@@ -702,6 +772,8 @@ function openAddDriverModal() {
     document.getElementById('driverIdInput').value = '';
     
     document.getElementById('driverName').value = '';
+    document.getElementById('driverEmail').value = '';
+    document.getElementById('driverPassword').value = '';
     document.getElementById('driverPhone').value = '';
     document.getElementById('driverNIC').value = '';
     document.getElementById('driverLicenceClass').value = 'B';
@@ -722,6 +794,8 @@ function openEditDriverModal() {
     document.getElementById('driverIdInput').value = currentSelectedDriver.id;
     
     document.getElementById('driverName').value = currentSelectedDriver.name;
+    document.getElementById('driverEmail').value = currentSelectedDriver.email || '';
+    document.getElementById('driverPassword').value = '';
     document.getElementById('driverPhone').value = currentSelectedDriver.phone;
     document.getElementById('driverNIC').value = currentSelectedDriver.nic;
     document.getElementById('driverLicenceClass').value = currentSelectedDriver.licence_class;

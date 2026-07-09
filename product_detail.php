@@ -22,6 +22,7 @@ if ($is_logged_in && isset($pdo)) {
         $buyer_approved = false;
     }
 }
+$can_see_prices = $is_logged_in && $buyer_approved;
 
 
 $sku = $_GET['sku'] ?? 'KB-001';
@@ -265,11 +266,21 @@ require_once __DIR__ . "/layouts/header.php";
                                 <?php endif; ?>
                             </div>
                             <span class="<?= $is_active ? 'text-brand font-extrabold' : 'text-gray-900 font-bold' ?>">
-                                <?php if ($discount > 0): ?>
-                                    <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($t['price']) ?></span>
-                                    LKR <?= number_format($t['price'] * (1 - $discount / 100)) ?> / pc
+                                <?php if ($can_see_prices): ?>
+                                    <?php if ($discount > 0): ?>
+                                        <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($t['price']) ?></span>
+                                        LKR <?= number_format($t['price'] * (1 - $discount / 100)) ?> / pc
+                                    <?php else: ?>
+                                        LKR <?= number_format($t['price']) ?> / pc
+                                    <?php endif; ?>
                                 <?php else: ?>
-                                    LKR <?= number_format($t['price']) ?> / pc
+                                    <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none" title="Log in to view prices">
+                                        <?php if ($discount > 0): ?>
+                                            LKR <?= number_format($t['price'] * (1 - $discount / 100)) ?> / pc
+                                        <?php else: ?>
+                                            LKR <?= number_format($t['price']) ?> / pc
+                                        <?php endif; ?>
+                                    </span>
                                 <?php endif; ?>
                             </span>
                         </div>
@@ -281,11 +292,21 @@ require_once __DIR__ . "/layouts/header.php";
                                 <span class="font-bold">Base Wholesale Price</span>
                             </div>
                             <span class="text-brand font-extrabold">
-                                <?php if ($discount > 0): ?>
-                                    <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($product['base_price']) ?></span>
-                                    LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
+                                <?php if ($can_see_prices): ?>
+                                    <?php if ($discount > 0): ?>
+                                        <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($product['base_price']) ?></span>
+                                        LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
+                                    <?php else: ?>
+                                        LKR <?= number_format($product['base_price']) ?> / pc
+                                    <?php endif; ?>
                                 <?php else: ?>
-                                    LKR <?= number_format($product['base_price']) ?> / pc
+                                    <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none" title="Log in to view prices">
+                                        <?php if ($discount > 0): ?>
+                                            LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
+                                        <?php else: ?>
+                                            LKR <?= number_format($product['base_price']) ?> / pc
+                                        <?php endif; ?>
+                                    </span>
                                 <?php endif; ?>
                             </span>
                         </div>
@@ -351,7 +372,13 @@ require_once __DIR__ . "/layouts/header.php";
                 <div class="bg-gray-50 rounded-2xl p-6 space-y-4 mb-8">
                     <div class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest">
                         <span>Unit Price</span>
-                        <span id="unit-price" class="text-gray-900">LKR <?= !empty($pricing_tiers) ? number_format($pricing_tiers[0]['price']) : number_format($product['base_price']) ?></span>
+                        <span id="unit-price" class="text-gray-900">
+                            <?php if ($can_see_prices): ?>
+                                LKR <?= !empty($pricing_tiers) ? number_format($pricing_tiers[0]['price']) : number_format($product['base_price']) ?>
+                            <?php else: ?>
+                                <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR <?= !empty($pricing_tiers) ? number_format($pricing_tiers[0]['price']) : number_format($product['base_price']) ?></span>
+                            <?php endif; ?>
+                        </span>
                     </div>
                     <div class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest">
                         <span>Total Quantity</span>
@@ -360,7 +387,13 @@ require_once __DIR__ . "/layouts/header.php";
                     <div class="h-px bg-gray-200"></div>
                     <div class="flex justify-between items-center">
                         <span class="text-sm font-bold text-gray-900 uppercase tracking-widest">Subtotal</span>
-                        <span id="subtotal" class="text-2xl font-extrabold text-brand font-sans">LKR <?= number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?></span>
+                        <span id="subtotal" class="text-2xl font-extrabold text-brand font-sans">
+                            <?php if ($can_see_prices): ?>
+                                LKR <?= number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?>
+                            <?php else: ?>
+                                <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR <?= number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?></span>
+                            <?php endif; ?>
+                        </span>
                     </div>
                     <p class="text-[10px] font-medium text-gray-400 leading-tight">VAT and island-wide delivery calculated at final checkout.</p>
                 </div>
@@ -457,6 +490,7 @@ echo json_encode($js_tiers);
 ?>;
 const discount = <?= (float)$discount ?>;
 const moq = <?= (int)$product['moq'] ?>;
+const canSeePrices = <?= $can_see_prices ? 'true' : 'false' ?>;
 let qty = <?= (int)$product['moq'] ?>;
 
 function getTier(q) {
@@ -474,8 +508,13 @@ function updateUI() {
   
   document.getElementById('qty-display').textContent = qty;
   document.getElementById('order-qty').textContent = qty + ' units';
-  document.getElementById('unit-price').textContent = 'LKR ' + activePrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
-  document.getElementById('subtotal').textContent = 'LKR ' + (qty * activePrice).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+  if (canSeePrices) {
+      document.getElementById('unit-price').textContent = 'LKR ' + activePrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+      document.getElementById('subtotal').textContent = 'LKR ' + (qty * activePrice).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+  } else {
+      document.getElementById('unit-price').innerHTML = '<span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR ' + activePrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) + '</span>';
+      document.getElementById('subtotal').innerHTML = '<span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR ' + (qty * activePrice).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) + '</span>';
+  }
   
   const warn = document.getElementById('moq-warn');
   if(belowMOQ) {
@@ -606,7 +645,7 @@ function submitQuoteRequest(e) {
         message: document.getElementById('quoteMessage').value
     };
 
-    fetch('/api/inquiries.php', {
+    fetch('api/inquiries.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)

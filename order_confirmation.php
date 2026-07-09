@@ -5,6 +5,7 @@ $order_id = $_GET['id'] ?? ($_GET['order_id'] ?? 1);
 
 $order = null;
 $order_items = [];
+$status_logs = [];
 $subtotal = 0;
 $vat = 0;
 $total = 0;
@@ -37,6 +38,11 @@ if (isset($pdo) && $pdo !== null) {
             foreach ($order_items as $oi) {
                 $total_units += $oi['quantity'];
             }
+
+            // Fetch order status logs
+            $stmt_logs = $pdo->prepare("SELECT * FROM order_status_log WHERE order_id = ? ORDER BY changed_at ASC");
+            $stmt_logs->execute([$order_id]);
+            $status_logs = $stmt_logs->fetchAll();
         }
     } catch (\Exception $e) {
         // Fallback
@@ -86,6 +92,13 @@ if (!$order) {
     $vat = 10973.00;
     $total = 71933.00;
     $total_units = 420;
+    $status_logs = [
+        [
+            'status' => 'pending',
+            'note' => 'Order placed from public website.',
+            'changed_at' => date('Y-m-d H:i:s', time() - 3600)
+        ]
+    ];
 }
 
 $page_meta = [
@@ -188,21 +201,93 @@ require_once __DIR__ . "/layouts/header.php";
                 <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
                     <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-8">What Happens Next</h2>
                     <div class="relative space-y-12 pl-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
-                        <div class="relative">
-                            <div class="absolute -left-[31px] top-1 w-6 h-6 rounded-full bg-brand text-brand-light flex items-center justify-center text-[11px] font-bold shadow-md shadow-brand/20">1</div>
-                            <h3 class="text-sm font-bold text-gray-900 mb-2 tracking-tight uppercase">Payment Confirmation</h3>
-                            <p class="text-sm text-gray-500 leading-relaxed">Complete your bank transfer to the account details provided. Your order will be processed once payment is confirmed by our accounts team.</p>
-                        </div>
-                        <div class="relative">
-                            <div class="absolute -left-[31px] top-1 w-6 h-6 rounded-full bg-brand-light text-brand flex items-center justify-center text-[11px] font-bold border border-brand/20">2</div>
-                            <h3 class="text-sm font-bold text-gray-900 mb-2 tracking-tight uppercase">Order Processing</h3>
-                            <p class="text-sm text-gray-500 leading-relaxed">Our warehouse team will pick and pack your order within 1–2 business days of payment receipt. You'll receive an email update.</p>
-                        </div>
-                        <div class="relative">
-                            <div class="absolute -left-[31px] top-1 w-6 h-6 rounded-full bg-brand-light text-brand flex items-center justify-center text-[11px] font-bold border border-brand/20">3</div>
-                            <h3 class="text-sm font-bold text-gray-900 mb-2 tracking-tight uppercase">Dispatch and Delivery</h3>
-                            <p class="text-sm text-gray-500 leading-relaxed">You'll receive a dispatch notification with tracking info. Your official VAT invoice will be attached to the physical shipment.</p>
-                        </div>
+                        <?php
+                        $current_status = $order ? strtolower($order['status']) : 'pending';
+                        
+                        $log_map = [];
+                        foreach ($status_logs as $log) {
+                            $log_map[strtolower($log['status'])] = $log;
+                        }
+
+                        $states = ['pending', 'processing', 'shipped', 'delivered'];
+                        $currentStateIdx = array_search($current_status, $states);
+                        if ($currentStateIdx === false) $currentStateIdx = -1;
+
+                        $step_titles = [
+                            'pending' => 'Order Placed',
+                            'processing' => 'Payment & Processing',
+                            'shipped' => 'Dispatched & Shipped',
+                            'delivered' => 'Delivered'
+                        ];
+
+                        $step_descriptions = [
+                            'pending' => 'Your order has been placed. Please complete the bank transfer to proceed.',
+                            'processing' => 'Payment confirmed. Our warehouse team is picking and packing your order.',
+                            'shipped' => 'Your order has been dispatched! It will be delivered in 1-2 business days.',
+                            'delivered' => 'Order delivered. Thank you for shopping with Kesara Enterprises!'
+                        ];
+
+                        if ($current_status === 'cancelled'):
+                            $cancel_log = $log_map['cancelled'] ?? null;
+                            $cancel_date = $cancel_log ? date('d M Y, g:i A', strtotime($cancel_log['changed_at'])) : date('d M Y, g:i A');
+                            $cancel_note = $cancel_log && !empty($cancel_log['note']) ? $cancel_log['note'] : 'This order has been cancelled.';
+                        ?>
+                            <div class="relative">
+                                <div class="absolute -left-[31px] top-1 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-[11px] font-bold shadow-md shadow-red-500/20">
+                                    <i class="ti ti-x"></i>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2 mb-2">
+                                    <h3 class="text-sm font-bold text-red-600 tracking-tight uppercase">Order Cancelled</h3>
+                                    <span class="text-[10px] text-gray-400 font-bold">(<?= $cancel_date ?>)</span>
+                                </div>
+                                <p class="text-sm text-gray-500 leading-relaxed"><?= htmlspecialchars($cancel_note) ?></p>
+                            </div>
+                        <?php
+                        else:
+                            foreach ($states as $idx => $st):
+                                $has_log = isset($log_map[$st]);
+                                $title = $step_titles[$st];
+                                $default_desc = $step_descriptions[$st];
+                                
+                                if ($idx < $currentStateIdx) {
+                                    // Completed step
+                                    $circle_bg = 'bg-brand text-brand-light';
+                                    $circle_icon = '<i class="ti ti-check text-xs"></i>';
+                                    $title_class = 'text-gray-900';
+                                    $log_time = date('d M Y, g:i A', strtotime($log_map[$st]['changed_at']));
+                                    $desc = ($log_map[$st]['note'] && trim($log_map[$st]['note']) !== '') ? $log_map[$st]['note'] : $default_desc;
+                                } elseif ($idx === $currentStateIdx) {
+                                    // Current active step
+                                    $circle_bg = 'bg-brand text-brand-light ring-4 ring-brand-light';
+                                    $circle_icon = '<i class="ti ti-loader text-xs animate-spin"></i>';
+                                    $title_class = 'text-brand';
+                                    $log_time = $has_log ? date('d M Y, g:i A', strtotime($log_map[$st]['changed_at'])) : 'In Progress';
+                                    $desc = ($has_log && $log_map[$st]['note'] && trim($log_map[$st]['note']) !== '') ? $log_map[$st]['note'] : $default_desc;
+                                } else {
+                                    // Pending upcoming step
+                                    $circle_bg = 'bg-brand-light text-brand border border-brand/20';
+                                    $circle_icon = ($idx + 1);
+                                    $title_class = 'text-gray-400';
+                                    $log_time = '';
+                                    $desc = $default_desc;
+                                }
+                        ?>
+                                <div class="relative">
+                                    <div class="absolute -left-[31px] top-1 w-6 h-6 rounded-full <?= $circle_bg ?> flex items-center justify-center text-[11px] font-bold shadow-md">
+                                        <?= $circle_icon ?>
+                                    </div>
+                                    <div class="flex flex-wrap items-baseline gap-2 mb-2">
+                                        <h3 class="text-sm font-bold <?= $title_class ?> tracking-tight uppercase"><?= htmlspecialchars($title) ?></h3>
+                                        <?php if (!empty($log_time)): ?>
+                                            <span class="text-[10px] text-gray-400 font-bold">(<?= $log_time ?>)</span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <p class="text-sm text-gray-500 leading-relaxed"><?= htmlspecialchars($desc) ?></p>
+                                </div>
+                        <?php
+                            endforeach;
+                        endif;
+                        ?>
                     </div>
                 </div>
 

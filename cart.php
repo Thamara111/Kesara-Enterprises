@@ -4,6 +4,10 @@ $page_meta = [
     'description' => 'Review your wholesale order before checkout. Quality innerwear supplied across Sri Lanka.',
 ];
 require_once __DIR__ . "/layouts/head.php";
+if (!$can_see_prices) {
+    header("Location: /login");
+    exit;
+}
 require_once __DIR__ . "/layouts/header.php";
 ?>
 
@@ -24,7 +28,7 @@ require_once __DIR__ . "/layouts/header.php";
                 <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
                     <div class="flex items-center justify-between mb-8 border-b border-gray-50 pb-6">
                         <h1 class="text-2xl font-bold text-gray-900">Order Items</h1>
-                        <span class="px-3 py-1 bg-gray-50 text-gray-400 text-xs font-bold rounded-full border border-gray-100" id="cart-count-badge">3 ITEMS</span>
+                        <span class="px-3 py-1 bg-gray-50 text-gray-400 text-xs font-bold rounded-full border border-gray-100" id="cart-count-badge">0 ITEMS</span>
                     </div>
 
                     <!-- Cart Header -->
@@ -150,11 +154,21 @@ function saveCartToStorage() {
     // Only save id and qty
     const toSave = cartItems.map(item => ({id: item.id, qty: item.qty, color: item.color, size: item.size}));
     localStorage.setItem('kesara_cart', JSON.stringify(toSave));
+    if (typeof window.updateCartBadges === 'function') {
+        window.updateCartBadges();
+    }
 }
 
 // Fetch DB details for the items
 async function initializeCart() {
     const storageCart = loadCartFromStorage();
+    
+    // Set initial count synchronously based on localStorage
+    const cartCountBadge = document.getElementById('cart-count-badge');
+    if (cartCountBadge) {
+        cartCountBadge.textContent = `${storageCart.length} ITEMS`;
+    }
+
     if (storageCart.length === 0) {
         cartItems = [];
         render();
@@ -163,7 +177,7 @@ async function initializeCart() {
 
     const ids = storageCart.map(i => i.id);
     try {
-        const res = await fetch('/api/cart_items.php', {
+        const res = await fetch('api/cart_items.php', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({product_ids: ids})
@@ -193,9 +207,14 @@ async function initializeCart() {
             }).filter(i => i !== null);
             saveCartToStorage(); // Save validated quantities
             render();
+        } else {
+            document.getElementById('cart-items').innerHTML = `<div class="p-4 text-red-500 bg-red-50 rounded-xl border border-red-100 text-sm">Failed to load cart items: ${data.message || 'Unknown error'}</div>`;
+            render();
         }
     } catch (e) {
         console.error("Failed to load cart items:", e);
+        document.getElementById('cart-items').innerHTML = `<div class="p-4 text-red-500 bg-red-50 rounded-xl border border-red-100 text-sm">Network error loading cart: ${e.message}</div>`;
+        render();
     }
 }
 
@@ -353,7 +372,7 @@ function downloadQuote() {
   
   let total = 0;
   let itemsHtml = cartItems.map(item => {
-      let price = getPriceForQty(item.qty, item.tiers);
+      let price = getPrice(item);
       let subtotal = item.qty * price;
       total += subtotal;
       return `
@@ -370,7 +389,7 @@ function downloadQuote() {
   }).join('');
 
   let printWindow = window.open('', '_blank');
-  printWindow.document.write(\`
+  printWindow.document.write(`
       <html>
       <head>
           <title>Wholesale Price Quote - Kesara Enterprises</title>
@@ -393,8 +412,8 @@ function downloadQuote() {
               </div>
               <div style="text-align: right;">
                   <h2>PRICE QUOTE</h2>
-                  <div>Date: \${new Date().toLocaleDateString()}</div>
-                  <div>Reference: QT-\${Date.now().toString().slice(-6)}</div>
+                  <div>Date: ${new Date().toLocaleDateString()}</div>
+                  <div>Reference: QT-${Date.now().toString().slice(-6)}</div>
               </div>
           </div>
           <p>Thank you for requesting a wholesale access quote. Below are the details for your estimated order:</p>
@@ -408,15 +427,15 @@ function downloadQuote() {
                   </tr>
               </thead>
               <tbody>
-                  \${itemsHtml}
+                  ${itemsHtml}
               </tbody>
           </table>
           <div class="totals">
-              <strong>Estimated Total: LKR \${total.toFixed(2)}</strong>
+              <strong>Estimated Total: LKR ${total.toFixed(2)}</strong>
           </div>
           <div class="footer">
               <p>This is an estimated price quote. Final tax invoice and delivery charges will be calculated during order processing.</p>
-              <p>© \${new Date().getFullYear()} Kesara Enterprises. All rights reserved.</p>
+              <p>© ${new Date().getFullYear()} Kesara Enterprises. All rights reserved.</p>
           </div>
           <script>
               window.onload = function() {
@@ -426,7 +445,7 @@ function downloadQuote() {
           <\/script>
       </body>
       </html>
-  \`);
+  `);
   printWindow.document.close();
 }
 

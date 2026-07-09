@@ -135,7 +135,7 @@ $has_delivery = in_array($role, ['admin', 'delivery_manager']);
 
     <!-- Footer / Logout -->
     <div class="p-8 border-t border-white/5">
-        <a href="/" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold text-green-100 hover:bg-green-400/10 transition-all">
+        <a href="/" target="_blank" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold text-green-100 hover:bg-green-400/10 transition-all">
             <i class="ti ti-world text-xl"></i>
             Go to Live Site
         </a>

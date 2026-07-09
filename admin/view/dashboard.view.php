@@ -2,6 +2,19 @@
 /**
  * Admin Dashboard View - Database Integration
  */
+$filter_month = $_GET['filter_month'] ?? 'this_month';
+
+$date_where = "MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())";
+$month_label = date('F');
+
+if ($filter_month === 'last_month') {
+    $date_where = "MONTH(created_at) = MONTH(CURRENT_DATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURRENT_DATE() - INTERVAL 1 MONTH)";
+    $month_label = date('F', strtotime('first day of -1 month'));
+} elseif ($filter_month === 'last_quarter') {
+    $date_where = "created_at >= CURRENT_DATE() - INTERVAL 3 MONTH";
+    $month_label = 'Last Quarter';
+}
+
 $current_month_revenue = 0;
 $current_month_orders = 0;
 $pending_payment_count = 0;
@@ -20,11 +33,11 @@ $status_counts = ['Pending' => 0, 'Processing' => 0, 'Shipped' => 0, 'Delivered'
 if (isset($pdo) && $pdo !== null) {
     try {
         // Current month revenue
-        $stmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'cancelled' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())");
+        $stmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'cancelled' AND $date_where");
         $current_month_revenue = (float)$stmt->fetchColumn();
         
         // Current month orders count
-        $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())");
+        $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE $date_where");
         $current_month_orders = (int)$stmt->fetchColumn();
         
         // Pending payment (orders with status = 'pending')
@@ -114,10 +127,10 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
         <div class="flex items-center gap-4">
             <div class="relative">
                 <i class="ti ti-calendar absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
-                <select class="bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest outline-none appearance-none cursor-pointer">
-                    <option>This Month</option>
-                    <option>Last Month</option>
-                    <option>Last Quarter</option>
+                <select onchange="window.location.href='/admin-dashboard?filter_month=' + this.value" class="bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest outline-none appearance-none cursor-pointer">
+                    <option value="this_month" <?= $filter_month === 'this_month' ? 'selected' : '' ?>>This Month</option>
+                    <option value="last_month" <?= $filter_month === 'last_month' ? 'selected' : '' ?>>Last Month</option>
+                    <option value="last_quarter" <?= $filter_month === 'last_quarter' ? 'selected' : '' ?>>Last Quarter</option>
                 </select>
             </div>
             <button class="bg-gray-900 text-white font-bold px-6 py-3 rounded-2xl text-xs uppercase tracking-widest hover:bg-gray-800 transition-all flex items-center gap-2" onclick="downloadPDF('dashboard-container', 'Dashboard_Overview')">
@@ -131,18 +144,18 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
         <!-- STATS GRID -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
             <div class="bg-white border border-gray-100 rounded-3xl p-5 md:p-8 shadow-sm">
-                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Revenue (<?= date('F') ?>)</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Revenue (<?= htmlspecialchars($month_label) ?>)</p>
                 <div class="flex items-baseline gap-3">
                     <h3 class="text-lg 2xl:text-2xl font-bold 2xl:font-extrabold text-gray-900"><?= $revenue_formatted ?></h3>
-                    <span class="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">+18%</span>
+                    <span class="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 border-none relative inline-block shrink-0 ring-0 ring-offset-0">+18%</span>
                 </div>
                 <p class="text-[10px] font-medium text-gray-300 mt-2">vs previous month</p>
             </div>
             <div class="bg-white border border-gray-100 rounded-3xl p-5 md:p-8 shadow-sm">
-                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Orders (<?= date('F') ?>)</p>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Orders (<?= htmlspecialchars($month_label) ?>)</p>
                 <div class="flex items-baseline gap-3">
                     <h3 class="text-lg 2xl:text-2xl font-extrabold text-gray-900"><?= htmlspecialchars($current_month_orders) ?></h3>
-                    <span class="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">+9</span>
+                    <span class="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full border border-green-100 border-none relative inline-block shrink-0 ring-0 ring-offset-0">+9</span>
                 </div>
                 <p class="text-[10px] font-medium text-gray-300 mt-2">vs previous month</p>
             </div>

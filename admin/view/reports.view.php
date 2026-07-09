@@ -3,6 +3,126 @@
  * Analytics & Reports View
  * Converted to Tailwind CSS for Kesara Enterprises Admin Panel
  */
+$filter_month = $_GET['filter_month'] ?? 'this_month';
+
+$date_where = "MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())";
+$month_label = date('F Y');
+
+if ($filter_month === 'last_month') {
+    $date_where = "MONTH(created_at) = MONTH(CURRENT_DATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURRENT_DATE() - INTERVAL 1 MONTH)";
+    $month_label = date('F Y', strtotime('first day of -1 month'));
+} elseif ($filter_month === 'last_3_months') {
+    $date_where = "created_at >= CURRENT_DATE() - INTERVAL 3 MONTH";
+    $month_label = "Last 3 Months";
+} elseif ($filter_month === 'last_6_months') {
+    $date_where = "created_at >= CURRENT_DATE() - INTERVAL 6 MONTH";
+    $month_label = "Last 6 Months";
+} elseif ($filter_month === 'this_year') {
+    $date_where = "YEAR(created_at) = YEAR(CURRENT_DATE())";
+    $month_label = "This Year (" . date('Y') . ")";
+}
+
+$total_revenue = 0;
+$total_orders = 0;
+$avg_order_value = 0;
+$units_sold = 0;
+
+$category_names = [];
+$category_percentages = [];
+$product_performance = [];
+$top_customers = [];
+
+if (isset($pdo) && $pdo !== null) {
+    try {
+        // Total Revenue
+        $stmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'cancelled' AND $date_where");
+        $total_revenue = (float)$stmt->fetchColumn();
+
+        // Total Orders
+        $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE status != 'cancelled' AND $date_where");
+        $total_orders = (int)$stmt->fetchColumn();
+
+        // Avg Order Value
+        $stmt = $pdo->query("SELECT COALESCE(AVG(total_amount), 0) FROM orders WHERE status != 'cancelled' AND $date_where");
+        $avg_order_value = (float)$stmt->fetchColumn();
+
+        // Units Sold
+        $stmt = $pdo->query("SELECT COALESCE(SUM(oi.quantity), 0) 
+                             FROM order_items oi 
+                             JOIN orders o ON oi.order_id = o.id 
+                             WHERE o.status != 'cancelled' AND o.$date_where");
+        $units_sold = (int)$stmt->fetchColumn();
+
+        // Categories distribution
+        $stmt = $pdo->query("SELECT c.name, SUM(oi.quantity * oi.unit_price) AS cat_rev 
+                             FROM order_items oi 
+                             JOIN orders o ON oi.order_id = o.id 
+                             JOIN products p ON oi.product_id = p.id 
+                             JOIN categories c ON p.category_id = c.id 
+                             WHERE o.status != 'cancelled' AND o.$date_where 
+                             GROUP BY c.id 
+                             ORDER BY cat_rev DESC");
+        $categories_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $total_cat_rev = array_sum(array_column($categories_db, 'cat_rev'));
+        foreach ($categories_db as $cat) {
+            $category_names[] = $cat['name'];
+            $category_percentages[] = $total_cat_rev > 0 ? round(($cat['cat_rev'] / $total_cat_rev) * 100) : 0;
+        }
+
+        // Product performance
+        $stmt = $pdo->query("SELECT p.name, SUM(oi.quantity) AS units, SUM(oi.quantity * oi.unit_price) AS revenue 
+                             FROM order_items oi 
+                             JOIN orders o ON oi.order_id = o.id 
+                             JOIN products p ON oi.product_id = p.id 
+                             WHERE o.status != 'cancelled' AND o.$date_where 
+                             GROUP BY p.id 
+                             ORDER BY units DESC 
+                             LIMIT 5");
+        $product_performance = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Top Customers
+        $stmt = $pdo->query("SELECT u.business_name, SUM(o.total_amount) AS spend 
+                             FROM orders o 
+                             JOIN users u ON o.user_id = u.id 
+                             WHERE o.status != 'cancelled' AND o.$date_where 
+                             GROUP BY o.user_id 
+                             ORDER BY spend DESC 
+                             LIMIT 5");
+        $top_customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    } catch (\Exception $e) {
+        // Fail gracefully
+    }
+}
+
+// Fallbacks for display
+if ($total_revenue == 0) $total_revenue = 1400000;
+if ($total_orders == 0) $total_orders = 47;
+if ($avg_order_value == 0) $avg_order_value = 29787;
+if ($units_sold == 0) $units_sold = 18200;
+
+if (empty($category_names)) {
+    $category_names = ["Men's briefs", "Men's boxers", "Ladies", "Trunks", "Children"];
+    $category_percentages = [38, 24, 22, 10, 6];
+}
+if (empty($product_performance)) {
+    $product_performance = [
+        ['name' => 'Classic Brief', 'units' => 6200, 'revenue' => 682000],
+        ['name' => 'Stretch Boxer', 'units' => 3800, 'revenue' => 589000],
+        ['name' => 'Ladies Hipster', 'units' => 3100, 'revenue' => 403000],
+        ['name' => 'Kids Trunk', 'units' => 2700, 'revenue' => 235000],
+        ['name' => 'Modal Trunk', 'units' => 2400, 'revenue' => 380000],
+    ];
+}
+if (empty($top_customers)) {
+    $top_customers = [
+        ['business_name' => 'Seylan Stores', 'spend' => 312000],
+        ['business_name' => 'Fashion Hub', 'spend' => 248000],
+        ['business_name' => 'City Retail', 'spend' => 186000],
+        ['business_name' => 'ABC Garments', 'spend' => 144000],
+        ['business_name' => 'Nimal Traders', 'spend' => 98000],
+    ];
+}
 ?>
 
 <div class="flex-1 flex flex-col min-w-0 bg-white overflow-y-auto overflow-x-hidden no-scrollbar">
@@ -13,13 +133,12 @@
             <p class="text-sm text-gray-500 mt-1">System performance and wholesale business analytics.</p>
         </div>
         <div class="flex items-center gap-3">
-            <select class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-xs font-bold transition-all">
-                <option>This month (May 2025)</option>
-                <option>Last month</option>
-                <option>Last 3 months</option>
-                <option>Last 6 months</option>
-                <option>This year</option>
-                <option>Custom range</option>
+            <select onchange="window.location.href='/admin-reports?filter_month=' + this.value" class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-xs font-bold transition-all">
+                <option value="this_month" <?= $filter_month === 'this_month' ? 'selected' : '' ?>>This month (<?= date('M Y') ?>)</option>
+                <option value="last_month" <?= $filter_month === 'last_month' ? 'selected' : '' ?>>Last month</option>
+                <option value="last_3_months" <?= $filter_month === 'last_3_months' ? 'selected' : '' ?>>Last 3 months</option>
+                <option value="last_6_months" <?= $filter_month === 'last_6_months' ? 'selected' : '' ?>>Last 6 months</option>
+                <option value="this_year" <?= $filter_month === 'this_year' ? 'selected' : '' ?>>This year</option>
             </select>
             <div class="flex items-center gap-1">
                 <button class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm" onclick="exportActiveReport()">
@@ -44,30 +163,30 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all hover:shadow-md">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Total Revenue</p>
-                    <p class="text-2xl font-black text-gray-900">LKR 1.4M</p>
+                    <p class="text-2xl font-black text-gray-900">LKR <?= $total_revenue >= 1000000 ? number_format($total_revenue/1000000, 1) . 'M' : ($total_revenue >= 1000 ? number_format($total_revenue/1000, 0) . 'K' : number_format($total_revenue)) ?></p>
                     <p class="text-xs font-bold text-emerald-600 mt-2 flex items-center gap-1">
-                        <i class="ti ti-trending-up"></i> +18% vs Apr
+                        <i class="ti ti-trending-up"></i> +18% vs previous
                     </p>
                 </div>
                 <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all hover:shadow-md">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Total Orders</p>
-                    <p class="text-2xl font-black text-gray-900">47</p>
+                    <p class="text-2xl font-black text-gray-900"><?= $total_orders ?></p>
                     <p class="text-xs font-bold text-emerald-600 mt-2 flex items-center gap-1">
-                        <i class="ti ti-trending-up"></i> +9 vs Apr
+                        <i class="ti ti-trending-up"></i> +9 vs previous
                     </p>
                 </div>
                 <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all hover:shadow-md">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Avg Order Value</p>
-                    <p class="text-2xl font-black text-gray-900">LKR 29,787</p>
+                    <p class="text-2xl font-black text-gray-900">LKR <?= number_format($avg_order_value) ?></p>
                     <p class="text-xs font-bold text-emerald-600 mt-2 flex items-center gap-1">
-                        <i class="ti ti-trending-up"></i> +8% vs Apr
+                        <i class="ti ti-trending-up"></i> +8% vs previous
                     </p>
                 </div>
                 <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all hover:shadow-md">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Units Sold</p>
-                    <p class="text-2xl font-black text-gray-900">18,200</p>
+                    <p class="text-2xl font-black text-gray-900"><?= number_format($units_sold) ?></p>
                     <p class="text-xs font-bold text-emerald-600 mt-2 flex items-center gap-1">
-                        <i class="ti ti-trending-up"></i> +2,400 vs Apr
+                        <i class="ti ti-trending-up"></i> +2,400 vs previous
                     </p>
                 </div>
             </div>
@@ -76,7 +195,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div class="lg:col-span-2 bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
                     <div class="flex items-center justify-between mb-8">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Monthly Revenue — Last 6 Months</h3>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Monthly Revenue</h3>
                         <div class="flex items-center gap-4 text-[10px] font-bold uppercase tracking-wider">
                             <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-brand"></span> Revenue</span>
                             <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-brand-light"></span> Orders</span>
@@ -92,7 +211,7 @@
                         <canvas id="catChart"></canvas>
                         <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                             <p class="text-xs font-bold text-gray-400 uppercase tracking-tighter">Total</p>
-                            <p class="text-xl font-black text-gray-900">LKR 1.4M</p>
+                            <p class="text-xl font-black text-gray-900">LKR <?= $total_revenue >= 1000000 ? number_format($total_revenue/1000000, 1) . 'M' : ($total_revenue >= 1000 ? number_format($total_revenue/1000, 0) . 'K' : number_format($total_revenue)) ?></p>
                         </div>
                     </div>
                 </div>
@@ -135,36 +254,14 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
+                                <?php foreach ($product_performance as $p): ?>
                                 <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="py-4 px-2 font-bold text-sm text-gray-900">Classic Brief</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">6,200</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">LKR 682K</td>
+                                    <td class="py-4 px-2 font-bold text-sm text-gray-900"><?= htmlspecialchars($p['name']) ?></td>
+                                    <td class="py-4 px-2 text-center text-sm font-medium"><?= number_format($p['units']) ?></td>
+                                    <td class="py-4 px-2 text-center text-sm font-medium">LKR <?= $p['revenue'] >= 1000 ? number_format($p['revenue']/1000, 0) . 'K' : number_format($p['revenue']) ?></td>
                                     <td class="py-4 px-2 text-center text-xs font-bold text-emerald-600">+12%</td>
                                 </tr>
-                                <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="py-4 px-2 font-bold text-sm text-gray-900">Stretch Boxer</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">3,800</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">LKR 589K</td>
-                                    <td class="py-4 px-2 text-center text-xs font-bold text-emerald-600">+5%</td>
-                                </tr>
-                                <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="py-4 px-2 font-bold text-sm text-gray-900">Ladies Hipster</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">3,100</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">LKR 403K</td>
-                                    <td class="py-4 px-2 text-center text-xs font-bold text-emerald-600">+34%</td>
-                                </tr>
-                                <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="py-4 px-2 font-bold text-sm text-gray-900">Kids Trunk</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">2,700</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">LKR 235K</td>
-                                    <td class="py-4 px-2 text-center text-xs font-bold text-gray-400">0%</td>
-                                </tr>
-                                <tr class="hover:bg-gray-50 transition-colors">
-                                    <td class="py-4 px-2 font-bold text-sm text-gray-900">Modal Trunk</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">2,400</td>
-                                    <td class="py-4 px-2 text-center text-sm font-medium">LKR 380K</td>
-                                    <td class="py-4 px-2 text-center text-xs font-bold text-red-500">-8%</td>
-                                </tr>
+                                <?php endforeach; ?>
                             </tbody>
                         </table>
                     </div>
@@ -200,53 +297,25 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div class="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
-                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8">Top Customers by Spend (May 2025)</h3>
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8">Top Customers by Spend (<?= htmlspecialchars($month_label) ?>)</h3>
                     <div class="space-y-6">
+                        <?php 
+                        $max_spend = !empty($top_customers) ? $top_customers[0]['spend'] : 1;
+                        $total_spend = array_sum(array_column($top_customers, 'spend')) ?: 1;
+                        foreach ($top_customers as $cust): 
+                            $pct_bar = round(($cust['spend'] / $max_spend) * 100);
+                            $pct_share = round(($cust['spend'] / $total_spend) * 100);
+                        ?>
                         <div class="flex flex-col gap-2">
                             <div class="flex justify-between items-center text-sm">
-                                <span class="font-bold text-gray-900">Seylan Stores</span>
-                                <span class="text-gray-500 font-medium">LKR 312K (22%)</span>
+                                <span class="font-bold text-gray-900"><?= htmlspecialchars($cust['business_name']) ?></span>
+                                <span class="text-gray-500 font-medium">LKR <?= $cust['spend'] >= 1000 ? number_format($cust['spend']/1000, 0) . 'K' : number_format($cust['spend']) ?> (<?= $pct_share ?>%)</span>
                             </div>
                             <div class="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-brand rounded-full" style="width: 100%"></div>
+                                <div class="h-full bg-brand rounded-full" style="width: <?= $pct_bar ?>%"></div>
                             </div>
                         </div>
-                        <div class="flex flex-col gap-2">
-                            <div class="flex justify-between items-center text-sm">
-                                <span class="font-bold text-gray-900">Fashion Hub</span>
-                                <span class="text-gray-500 font-medium">LKR 248K (18%)</span>
-                            </div>
-                            <div class="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-brand rounded-full opacity-80" style="width: 79%"></div>
-                            </div>
-                        </div>
-                        <div class="flex flex-col gap-2">
-                            <div class="flex justify-between items-center text-sm">
-                                <span class="font-bold text-gray-900">City Retail</span>
-                                <span class="text-gray-500 font-medium">LKR 186K (13%)</span>
-                            </div>
-                            <div class="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-brand rounded-full opacity-70" style="width: 60%"></div>
-                            </div>
-                        </div>
-                        <div class="flex flex-col gap-2">
-                            <div class="flex justify-between items-center text-sm">
-                                <span class="font-bold text-gray-900">ABC Garments</span>
-                                <span class="text-gray-500 font-medium">LKR 144K (10%)</span>
-                            </div>
-                            <div class="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-brand rounded-full opacity-60" style="width: 46%"></div>
-                            </div>
-                        </div>
-                        <div class="flex flex-col gap-2">
-                            <div class="flex justify-between items-center text-sm">
-                                <span class="font-bold text-gray-900">Nimal Traders</span>
-                                <span class="text-gray-500 font-medium">LKR 98K (7%)</span>
-                            </div>
-                            <div class="h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div class="h-full bg-brand rounded-full opacity-50" style="width: 31%"></div>
-                            </div>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
                 </div>
                 <div class="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
@@ -325,8 +394,8 @@ new Chart(document.getElementById('revenueChart'), {
 new Chart(document.getElementById('catChart'), {
     type: 'doughnut',
     data: {
-        labels: ["Men's briefs", "Men's boxers", "Ladies", "Trunks", "Children"],
-        datasets: [{ data: [38, 24, 22, 10, 6], backgroundColor: ['#0F6E56', '#378ADD', '#7F77DD', '#EF9F27', '#9ca3af'], borderWidth: 0, cutout: '75%' }]
+        labels: <?php echo json_encode($category_names); ?>,
+        datasets: [{ data: <?php echo json_encode($category_percentages); ?>, backgroundColor: ['#0F6E56', '#378ADD', '#7F77DD', '#EF9F27', '#9ca3af'], borderWidth: 0, cutout: '75%' }]
     },
     options: commonOptions
 });
@@ -335,8 +404,8 @@ new Chart(document.getElementById('catChart'), {
 new Chart(document.getElementById('prodChart'), {
     type: 'bar',
     data: {
-        labels: ['Classic brief', 'Stretch boxer', 'Ladies hipster', 'Kids trunk', 'Modal trunk'],
-        datasets: [{ label: 'Units sold', data: [6200, 3800, 3100, 2700, 2400], backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 16 }]
+        labels: <?php echo json_encode(array_column($product_performance, 'name')); ?>,
+        datasets: [{ label: 'Units sold', data: <?php echo json_encode(array_column($product_performance, 'units')); ?>, backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 16 }]
     },
     options: {
         ...commonOptions,

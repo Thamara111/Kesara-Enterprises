@@ -246,7 +246,7 @@ document.getElementById('inquiry-form').addEventListener('submit', function(e) {
     btn.disabled = true;
     btn.textContent = 'Sending...';
 
-    fetch('/api/inquiries.php', {
+    fetch('api/inquiries.php', {
         method: 'POST',
         body: formData
     })

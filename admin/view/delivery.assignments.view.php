@@ -465,15 +465,17 @@ foreach ($admin_assignments as $a) {
                     <label class="text-xs font-bold text-gray-500 block">Select Orders to Include <span class="text-red-500">*</span></label>
                     <p class="text-[11px] text-gray-400 font-medium">Ready-to-dispatch orders not yet assigned</p>
                     <div class="flex flex-wrap gap-2 pt-2">
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand bg-brand-light text-brand text-xs font-bold cursor-pointer select-none transition-all order-chip sel" onclick="toggleOrderChip(this)">
-                            <i class="ti ti-package text-sm"></i> KE-2025-00846
-                        </span>
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand bg-brand-light text-brand text-xs font-bold cursor-pointer select-none transition-all order-chip sel" onclick="toggleOrderChip(this)">
-                            <i class="ti ti-package text-sm"></i> KE-2025-00844
-                        </span>
+                        <?php foreach ($unassigned_orders as $ord_id): 
+                            $formatted_ord_id = 'KE-2025-' . str_pad($ord_id, 5, '0', STR_PAD_LEFT);
+                        ?>
                         <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-500 hover:border-brand/30 text-xs font-bold cursor-pointer select-none transition-all order-chip" onclick="toggleOrderChip(this)">
-                            <i class="ti ti-package text-sm"></i> KE-2025-00841
+                            <i class="ti ti-package text-sm"></i> <?= $formatted_ord_id ?>
                         </span>
+                        <?php endforeach; ?>
+                        
+                        <?php if (empty($unassigned_orders)): ?>
+                            <span class="text-xs text-gray-400 italic">No unassigned processing orders available.</span>
+                        <?php endif; ?>
                     </div>
                 </div>
 

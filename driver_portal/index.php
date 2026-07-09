@@ -1,4 +1,187 @@
-<?php require_once __DIR__ . "/../database/connection.php"; ?>
+<?php 
+require_once __DIR__ . "/../database/connection.php"; 
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$error_message = "";
+$success_message = "";
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if ($_POST['action'] === 'login') {
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
+        
+        if (empty($email) || empty($password)) {
+            $error_message = "Email and password are required.";
+        } else {
+            if ($pdo) {
+                try {
+                    $stmt = $pdo->prepare("SELECT * FROM delivery_personnel WHERE email = ?");
+                    $stmt->execute([$email]);
+                    $driver = $stmt->fetch();
+                    
+                    if ($driver && password_verify($password, $driver['password'])) {
+                        $_SESSION['driver_id'] = $driver['id'];
+                        $_SESSION['driver_name'] = $driver['name'];
+                        $_SESSION['driver_vehicle'] = ucfirst($driver['vehicle_type']) . ' · ' . $driver['vehicle_number'];
+                        
+                        header("Location: /driver");
+                        exit;
+                    } else {
+                        $error_message = "Invalid email or password.";
+                    }
+                } catch (\Exception $e) {
+                    $error_message = "Database error: " . $e->getMessage();
+                }
+            } else {
+                $error_message = "No database connection.";
+            }
+        }
+    } elseif ($_POST['action'] === 'register') {
+        $name = trim($_POST['name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $phone = trim($_POST['phone'] ?? '');
+        $nic = trim($_POST['nic'] ?? '');
+        $licence_class = trim($_POST['licence_class'] ?? 'B');
+        $licence_expiry = trim($_POST['licence_expiry'] ?? '');
+        $vehicle_type = $_POST['vehicle_type'] ?? 'motorbike';
+        $vehicle_number = trim($_POST['vehicle_number'] ?? '');
+        $password = $_POST['password'] ?? '';
+        
+        if (empty($name) || empty($email) || empty($phone) || empty($nic) || empty($vehicle_number) || empty($password) || empty($licence_expiry)) {
+            $error_message = "All fields are required.";
+        } else {
+            if ($pdo) {
+                try {
+                    $check = $pdo->prepare("SELECT id FROM delivery_personnel WHERE email = ?");
+                    $check->execute([$email]);
+                    if ($check->fetch()) {
+                        $error_message = "A driver account with this email already exists.";
+                    } else {
+                        $hashed = password_hash($password, PASSWORD_BCRYPT);
+                        $ins = $pdo->prepare("INSERT INTO delivery_personnel (name, email, password, phone, nic, licence_class, licence_expiry, vehicle_type, vehicle_number, status, joined_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', CURDATE())");
+                        $ins->execute([$name, $email, $hashed, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number]);
+                        $success_message = "Registration successful! You can now log in.";
+                    }
+                } catch (\Exception $e) {
+                    $error_message = "Database error: " . $e->getMessage();
+                }
+            } else {
+                $error_message = "No database connection.";
+            }
+        }
+    }
+}
+
+if (isset($_GET['logout'])) {
+    unset($_SESSION['driver_id']);
+    unset($_SESSION['driver_name']);
+    unset($_SESSION['driver_vehicle']);
+    header("Location: /driver");
+    exit;
+}
+
+$is_logged_in = isset($_SESSION['driver_id']);
+
+$php_assignments = [];
+if ($is_logged_in && isset($pdo) && $pdo !== null) {
+    try {
+        $stmt = $pdo->prepare("SELECT da.id, da.assigned_at, da.status, da.notes,
+                                    dp.id AS driver_id, dp.name AS driver_name, dp.vehicle_type, dp.vehicle_number,
+                                    o.id AS order_id,
+                                    u.business_name AS company, u.address AS company_address
+                             FROM delivery_assignments da
+                             JOIN delivery_personnel dp ON da.personnel_id = dp.id
+                             JOIN orders o ON da.order_id = o.id
+                             JOIN users u ON o.user_id = u.id
+                             WHERE da.personnel_id = ?
+                             ORDER BY da.assigned_at DESC");
+        $stmt->execute([$_SESSION['driver_id']]);
+        $asgn_db = $stmt->fetchAll();
+        
+        $grouped = [];
+        foreach ($asgn_db as $row) {
+            $key = $row['id'];
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'id' => 'DA-2025-' . str_pad($row['id'], 4, '0', STR_PAD_LEFT),
+                    'date' => 'Assigned ' . date('d M, g:i A', strtotime($row['assigned_at'])),
+                    'driver' => $row['driver_name'],
+                    'vehicle' => ucfirst($row['vehicle_type']) . ' · ' . $row['vehicle_number'],
+                    'status' => $row['status'],
+                    'stops' => [],
+                    'driver_id' => $row['driver_id']
+                ];
+            }
+            $status_text = $row['status'] === 'completed' ? 'Delivered' : ($row['status'] === 'in_progress' ? 'In progress' : 'Pending');
+            
+            $lat = null;
+            $lng = null;
+            if (stripos($row['company'], 'ABC Garments') !== false || stripos($row['company_address'], 'Katunayake') !== false) {
+                $lat = 7.1650;
+                $lng = 79.8850;
+            } elseif (stripos($row['company'], 'Seylan') !== false || stripos($row['company_address'], 'Colombo 05') !== false || stripos($row['company_address'], 'Galle Road') !== false) {
+                $lat = 6.8850;
+                $lng = 79.8750;
+            } elseif (stripos($row['company'], 'Fashion') !== false || stripos($row['company_address'], 'Colombo 03') !== false || stripos($row['company_address'], 'Kurunegala') !== false) {
+                $lat = 6.9150;
+                $lng = 79.8510;
+            } else {
+                $hash = crc32($row['company'] ?: 'default');
+                $lat = 6.9000 + (($hash % 100) - 50) / 1000.0;
+                $lng = 79.8700 + ((intval($hash / 100) % 100) - 50) / 1000.0;
+            }
+            
+            $grouped[$key]['stops'][] = [
+                'num' => count($grouped[$key]['stops']) + 1,
+                'name' => 'KE-2025-' . str_pad($row['order_id'], 5, '0', STR_PAD_LEFT) . ' · ' . htmlspecialchars($row['company']),
+                'addr' => htmlspecialchars($row['company_address']),
+                'status' => $status_text,
+                'lat' => $lat,
+                'lng' => $lng
+            ];
+        }
+        
+        foreach ($grouped as $g) {
+            $badge = 'bg-amber-50 text-amber-700 border border-amber-100';
+            $badgeText = 'Pending';
+            if ($g['status'] === 'completed') {
+                $badge = 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                $badgeText = 'Completed';
+            } elseif ($g['status'] === 'in_progress') {
+                $badge = 'bg-blue-50 text-blue-700 border border-blue-100';
+                $badgeText = 'Active';
+            } elseif ($g['status'] === 'failed') {
+                $badge = 'bg-red-50 text-red-700 border border-red-100';
+                $badgeText = 'Failed';
+            }
+            
+            $words = explode(" ", $g['driver']);
+            $av = "";
+            foreach ($words as $w) {
+                $av .= strtoupper(substr($w, 0, 1));
+            }
+            $av = substr($av, 0, 2);
+            
+            $php_assignments[] = [
+                'id' => $g['id'],
+                'date' => $g['date'],
+                'badge' => $badge,
+                'badgeText' => $badgeText,
+                'av' => $av,
+                'avColor' => 'bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-emerald-100',
+                'driver' => $g['driver'],
+                'vehicle' => $g['vehicle'],
+                'canCancel' => $g['status'] === 'pending',
+                'zone' => 'Colombo',
+                'stops' => $g['stops']
+            ];
+        }
+    } catch (\Exception $e) {}
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,19 +217,98 @@
 
 <div class="mobile-shell w-full flex flex-col bg-white">
     
-    <!-- Profile Selection Screen -->
-    <div id="login-screen" class="flex-1 flex flex-col justify-center p-6 space-y-8">
+    <!-- Login / Registration Screen -->
+    <div id="login-screen" class="flex-1 flex flex-col justify-center p-6 space-y-6">
         <div class="text-center space-y-2">
             <div class="w-16 h-16 rounded-2xl bg-brand flex items-center justify-center mx-auto shadow-lg shadow-brand/20">
-                <i class="ti ti-motorbike text-3xl text-brand-light"></i>
+                <i class="ti ti-truck-delivery text-3xl text-brand-light"></i>
             </div>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Driver Dispatch Portal</h1>
-            <p class="text-xs text-gray-500">Select your profile to load today's assignments</p>
+            <p class="text-xs text-gray-500" id="auth-subtitle">Sign in to access your daily assignments</p>
         </div>
 
-        <div id="driver-cards" class="space-y-3">
-            <!-- Populated via JS -->
-        </div>
+        <?php if (!empty($error_message)): ?>
+            <div class="bg-red-50 border border-red-150 text-red-700 text-xs font-semibold px-4 py-3 rounded-xl">
+                <?= htmlspecialchars($error_message) ?>
+            </div>
+        <?php endif; ?>
+        <?php if (!empty($success_message)): ?>
+            <div class="bg-emerald-50 border border-emerald-150 text-emerald-700 text-xs font-semibold px-4 py-3 rounded-xl">
+                <?= htmlspecialchars($success_message) ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Login Form -->
+        <form method="POST" id="auth-login-form" class="space-y-4">
+            <input type="hidden" name="action" value="login">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Email Address</label>
+                <input type="email" name="email" required placeholder="e.g. sunil@kesara.lk" class="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Password</label>
+                <input type="password" name="password" required placeholder="••••••••" class="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+            </div>
+            <button type="submit" class="w-full bg-brand text-brand-light font-bold py-4 rounded-xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest mt-2">Log In</button>
+            <p class="text-xs text-center text-gray-500 font-semibold mt-3">
+                New driver? <a href="#" onclick="toggleAuthMode('register')" class="text-brand hover:underline">Register here</a>
+            </p>
+        </form>
+
+        <!-- Register Form -->
+        <form method="POST" id="auth-register-form" class="space-y-4" style="display: none;">
+            <input type="hidden" name="action" value="register">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Full Name</label>
+                <input type="text" name="name" required placeholder="e.g. Sunil Perera" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Email Address</label>
+                    <input type="email" name="email" required placeholder="e.g. sunil@kesara.lk" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Phone Number</label>
+                    <input type="text" name="phone" required placeholder="e.g. +94 77 123 4567" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">NIC / ID No</label>
+                    <input type="text" name="nic" required placeholder="e.g. 199012345678" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Licence Class</label>
+                    <input type="text" name="licence_class" value="B" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Licence Expiry</label>
+                    <input type="date" name="licence_expiry" required class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Vehicle Type</label>
+                    <select name="vehicle_type" class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-xs font-bold text-gray-705 outline-none cursor-pointer">
+                        <option value="motorbike">Motorbike</option>
+                        <option value="van">Van</option>
+                        <option value="lorry">Lorry</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Vehicle Number</label>
+                    <input type="text" name="vehicle_number" required placeholder="e.g. WP CBA-1234" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Password</label>
+                <input type="password" name="password" required placeholder="••••••••" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+            </div>
+            <button type="submit" class="w-full bg-brand text-brand-light font-bold py-4 rounded-xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest mt-2">Register</button>
+            <p class="text-xs text-center text-gray-500 font-semibold mt-3">
+                Already registered? <a href="#" onclick="toggleAuthMode('login')" class="text-brand hover:underline">Log in here</a>
+            </p>
+        </form>
 
         <p class="text-[10px] text-center text-gray-400">© 2026 Kesara Enterprises. Restricted logistics access.</p>
     </div>
@@ -247,12 +509,31 @@ const WAREHOUSES = {
 };
 
 // Global App State
-let activeDriver = null;
+let activeDriver = <?php echo json_encode($is_logged_in ? $_SESSION['driver_id'] : null); ?>;
+const activeDriverName = <?php echo json_encode($is_logged_in ? $_SESSION['driver_name'] : null); ?>;
+const activeDriverVehicle = <?php echo json_encode($is_logged_in ? $_SESSION['driver_vehicle'] : null); ?>;
+const defaultAssignments = <?php echo json_encode($php_assignments); ?>;
 let assignments = [];
 let activeRun = null;
 let gpsTimer = null;
 let currentActiveStopIdx = -1;
 let currentModalStopNum = -1;
+
+function toggleAuthMode(mode) {
+    const loginForm = document.getElementById('auth-login-form');
+    const registerForm = document.getElementById('auth-register-form');
+    const subtitle = document.getElementById('auth-subtitle');
+    
+    if (mode === 'register') {
+        loginForm.style.display = 'none';
+        registerForm.style.display = 'block';
+        subtitle.textContent = 'Register a new driver profile';
+    } else {
+        loginForm.style.display = 'block';
+        registerForm.style.display = 'none';
+        subtitle.textContent = 'Sign in to access your daily assignments';
+    }
+}
 
 function showToast(message, type = 'success') {
     const wrapper = document.getElementById('toast-wrapper');
@@ -271,32 +552,19 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
-// Load assignments from localStorage
+// Load assignments from default assignments
 function loadState() {
-    assignments = JSON.parse(localStorage.getItem('ke_assignments')) || [];
-    activeDriver = localStorage.getItem('ke_active_driver');
-}
-
-// Save active driver and load dashboard
-function loginDriver(driverId) {
-    localStorage.setItem('ke_active_driver', driverId);
-    activeDriver = driverId;
-    renderApp();
-    showToast(`Logged in successfully`, 'success');
+    assignments = [...defaultAssignments];
 }
 
 // Log out driver
 function logoutDriver() {
-    // Stop GPS simulator first
     if (gpsTimer) {
         clearInterval(gpsTimer);
         gpsTimer = null;
         document.getElementById('gps-toggle').checked = false;
     }
-    localStorage.removeItem('ke_active_driver');
-    activeDriver = null;
-    activeRun = null;
-    renderApp();
+    window.location.href = '?logout=1';
 }
 
 function renderApp() {
@@ -308,43 +576,33 @@ function renderApp() {
     if (!activeDriver) {
         loginScreen.style.display = 'flex';
         portalScreen.style.display = 'none';
-        renderLoginScreen();
     } else {
         loginScreen.style.display = 'none';
         portalScreen.style.display = 'flex';
         
         // Find driver details
-        const driverObj = DRIVERS.find(d => d.id === activeDriver);
-        document.getElementById('driver-avatar').textContent = driverObj ? driverObj.id : '--';
-        document.getElementById('driver-name-title').textContent = driverObj ? driverObj.name : '--';
-        document.getElementById('driver-vehicle-title').textContent = driverObj ? driverObj.vehicle : '--';
+        const getInitials = (name) => {
+            if (!name) return '--';
+            return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        };
+        document.getElementById('driver-avatar').textContent = getInitials(activeDriverName);
+        document.getElementById('driver-name-title').textContent = activeDriverName || 'Driver';
+        document.getElementById('driver-vehicle-title').textContent = activeDriverVehicle || 'Vehicle Info';
         
         // Find active run for this driver
         // Note: Active runs are status "Active" or "Pending"
-        activeRun = assignments.find(a => a.av === activeDriver && (a.badgeText === 'Active' || a.badgeText === 'Pending'));
+        activeRun = assignments.find(a => a.badgeText === 'Active' || a.badgeText === 'Pending');
         
         if (!activeRun) {
             // Check if there is a completed run
-            activeRun = assignments.find(a => a.av === activeDriver && a.badgeText === 'Completed');
+            activeRun = assignments.find(a => a.badgeText === 'Completed');
         }
         
         renderDashboard();
     }
 }
 
-function renderLoginScreen() {
-    const list = document.getElementById('driver-cards');
-    list.innerHTML = DRIVERS.map(d => `
-        <div onclick="loginDriver('${d.id}')" class="flex items-center gap-4 p-4 border border-gray-250 rounded-2xl bg-white hover:border-brand/40 hover:bg-brand-light/10 transition-all cursor-pointer shadow-sm">
-            <div class="w-10 h-10 rounded-xl ${d.avColor} flex items-center justify-center font-bold text-xs">${d.id}</div>
-            <div class="flex-1 min-w-0">
-                <p class="text-sm font-bold text-gray-900">${d.name}</p>
-                <p class="text-xs text-gray-500">${d.vehicle}</p>
-            </div>
-            <i class="ti ti-chevron-right text-gray-400"></i>
-        </div>
-    `).join('');
-}
+
 
 function renderDashboard() {
     const activeRunCard = document.getElementById('active-run-card');

@@ -127,6 +127,14 @@ foreach ($admin_orders as $o) {
     elseif ($status === 'processing') $processing_orders++;
     elseif ($status === 'shipped') $shipped_orders++;
 }
+
+$available_drivers = [];
+if (isset($pdo) && $pdo !== null) {
+    try {
+        $stmt_d = $pdo->query("SELECT id, name FROM delivery_personnel WHERE status = 'available'");
+        $available_drivers = $stmt_d->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\Exception $e) {}
+}
 ?>
 <!-- MAIN CONTENT AREA (SPLIT LAYOUT) -->
 <main class="flex-1 flex overflow-hidden">
@@ -377,8 +385,9 @@ foreach ($admin_orders as $o) {
 </style>
 
 <div id="toast-container"></div>
-
 <script>
+const availableDrivers = <?php echo json_encode($available_drivers); ?>;
+
 function getInitials(name) {
     const parts = name.split(' ');
     let initials = '';
@@ -473,9 +482,30 @@ function selectOrder(el, openDrawer = true) {
             </div>
         `;
     } else if (status_lower === 'processing') {
+        let driverSelectHTML = '';
+        if (availableDrivers && availableDrivers.length > 0) {
+            driverSelectHTML = `
+                <div class="mb-4">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Assign Driver</label>
+                    <select id="assign-driver-select" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                        <option value="">Select available driver...</option>
+                        ${availableDrivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
+                    </select>
+                </div>
+            `;
+        } else {
+            driverSelectHTML = `
+                <div class="mb-4">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Assign Driver</label>
+                    <p class="text-xs text-amber-600 font-semibold bg-amber-50 border border-amber-100 p-3 rounded-xl"><i class="ti ti-alert-triangle mr-1"></i> No available drivers.</p>
+                </div>
+            `;
+        }
+
         actionContainer.innerHTML = `
+            ${driverSelectHTML}
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="updateStatus(${oid}, 'shipped')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Dispatch Cargo</button>
+                <button onclick="dispatchOrder(${oid})" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Dispatch Cargo</button>
                 <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-650 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
             </div>
         `;
@@ -621,6 +651,34 @@ function updateStatus(id, status) {
     .catch(err => {
         console.error(err);
         showToast('Network error updating status.', 'error');
+    });
+}
+
+function dispatchOrder(oid) {
+    const driverSelect = document.getElementById('assign-driver-select');
+    const driverId = driverSelect ? driverSelect.value : '';
+    if (!driverId) {
+        showToast('Please select a driver to dispatch this cargo.', 'error');
+        return;
+    }
+    
+    fetch('/api/delivery.php?action=create_assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driver_id: parseInt(driverId), orders: ['KE-2025-' + String(oid).padStart(5, '0')] })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Order dispatched and delivery assignment created!', 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast(data.message || 'Error creating assignment', 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('Network error creating assignment.', 'error');
     });
 }
 

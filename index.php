@@ -65,15 +65,15 @@ require_once __DIR__ . "/layouts/header.php";
 
             <div class="flex gap-12 md:gap-24 flex-wrap">
                 <div>
-                    <p class="text-3xl font-bold text-brand">50+</p>
+                    <p class="text-3xl font-bold text-brand/80">50+</p>
                     <p class="text-sm text-gray-200 font-medium">Product SKUs</p>
                 </div>
                 <div>
-                    <p class="text-3xl font-bold text-brand">200+</p>
+                    <p class="text-3xl font-bold text-brand/80">200+</p>
                     <p class="text-sm text-gray-200 font-medium">Active buyers</p>
                 </div>
                 <div>
-                    <p class="text-3xl font-bold text-brand">10+ yrs</p>
+                    <p class="text-3xl font-bold text-brand/80">10+ yrs</p>
                     <p class="text-sm text-gray-200 font-medium">In business</p>
                 </div>
             </div>
@@ -137,7 +137,13 @@ require_once __DIR__ . "/layouts/header.php";
                     <div class="p-4">
                         <p class="text-[15px] font-semibold mb-1"><?= htmlspecialchars($p['name']) ?></p>
                         <p class="text-[12px] text-gray-400 mb-2">MOQ: <?= $p['moq'] ?> pcs</p>
-                        <p class="text-[15px] text-brand font-bold">LKR <?= number_format($p['base_price'], 2) ?>/pc</p>
+                        <p class="text-[15px] text-brand font-bold">
+                            <?php if ($can_see_prices): ?>
+                                LKR <?= number_format($p['base_price'], 2) ?>/pc
+                            <?php else: ?>
+                                <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none" title="Log in to view prices">LKR <?= number_format($p['base_price'], 2) ?></span>/pc
+                            <?php endif; ?>
+                        </p>
                     </div>
                 </a>
                 <?php endforeach; ?>

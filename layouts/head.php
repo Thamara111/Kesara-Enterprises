@@ -2,6 +2,31 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+$is_logged_in = isset($_SESSION['user_id']);
+$buyer_approved = false;
+
+if ($is_logged_in) {
+    if (!isset($pdo)) {
+        try {
+            require_once __DIR__ . "/../database/connection.php";
+        } catch (\Exception $e) {
+            // connection file issues
+        }
+    }
+    if (isset($pdo)) {
+        try {
+            $auth_stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? LIMIT 1");
+            $auth_stmt->execute([$_SESSION['user_id']]);
+            $auth_user = $auth_stmt->fetch();
+            if ($auth_user && $auth_user['status'] === 'approved') {
+                $buyer_approved = true;
+            }
+        } catch (\Exception $e) {
+            $buyer_approved = false;
+        }
+    }
+}
+$can_see_prices = $is_logged_in && $buyer_approved;
 ?>
 <!DOCTYPE html>
 <html lang="en">
