@@ -126,7 +126,15 @@ function getRoleMeta($role) {
 
                 <div class="space-y-1.5">
                     <label for="password" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block ml-1">Default Password</label>
-                    <input type="password" id="password" name="password" required placeholder="••••••••" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all">
+                    <div class="relative">
+                        <input type="password" id="password" name="password" required maxlength="8" placeholder="Min. 8 characters" class="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all" oninput="checkStaffPasswordStrength(this.value)">
+                        <i class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer toggle-password-btn" data-target="password"></i>
+                    </div>
+                    <!-- Strength bar -->
+                    <div class="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                        <div id="staff-strengthBar" class="h-full rounded-full transition-all duration-400 w-0 bg-gray-300"></div>
+                    </div>
+                    <p id="staff-strengthLabel" class="text-[10px] mt-1 text-gray-400 font-semibold"></p>
                 </div>
 
                 <div class="space-y-1.5">
@@ -183,3 +191,85 @@ function getRoleMeta($role) {
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Password Visibility Toggle
+    document.querySelectorAll('.toggle-password-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            if (input) {
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    this.classList.remove('ti-eye');
+                    this.classList.add('ti-eye-off');
+                } else {
+                    input.type = 'password';
+                    this.classList.remove('ti-eye-off');
+                    this.classList.add('ti-eye');
+                }
+            }
+        });
+    });
+
+    // Password Strength Checker
+    window.checkStaffPasswordStrength = function(password) {
+        const bar = document.getElementById('staff-strengthBar');
+        const label = document.getElementById('staff-strengthLabel');
+        if (!bar || !label) return;
+
+        if (!password) {
+            bar.className = "h-full rounded-full transition-all duration-400 w-0 bg-gray-300";
+            bar.style.width = "0%";
+            label.textContent = "";
+            return;
+        }
+
+        let score = 0;
+        if (password.length >= 8) score++;
+        if (/[a-z]/.test(password)) score++;
+        if (/[A-Z]/.test(password)) score++;
+        if (/\d/.test(password)) score++;
+        if (/[^A-Za-z0-9]/.test(password)) score++;
+
+        let width = "0%";
+        let colorClass = "bg-gray-300";
+        let text = "";
+
+        if (password.length < 8) {
+            width = "20%";
+            colorClass = "bg-red-500";
+            text = "Too Short (Min. 8 characters)";
+        } else {
+            if (score <= 2) {
+                width = "40%";
+                colorClass = "bg-orange-500";
+                text = "Weak";
+            } else if (score === 3 || score === 4) {
+                width = "70%";
+                colorClass = "bg-yellow-500";
+                text = "Medium";
+            } else if (score >= 5) {
+                width = "100%";
+                colorClass = "bg-green-500";
+                text = "Strong";
+            }
+        }
+
+        bar.style.width = width;
+        bar.className = "h-full rounded-full transition-all duration-400 " + colorClass;
+        label.textContent = text;
+        
+        if (colorClass === 'bg-red-500') {
+            label.className = "text-[10px] mt-1 text-red-500 font-semibold";
+        } else if (colorClass === 'bg-orange-500') {
+            label.className = "text-[10px] mt-1 text-orange-500 font-semibold";
+        } else if (colorClass === 'bg-yellow-500') {
+            label.className = "text-[10px] mt-1 text-yellow-650 font-semibold";
+        } else if (colorClass === 'bg-green-500') {
+            label.className = "text-[10px] mt-1 text-green-600 font-semibold";
+        }
+    };
+});
+</script>
