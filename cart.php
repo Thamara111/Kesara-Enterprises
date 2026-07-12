@@ -133,6 +133,25 @@ require_once __DIR__ . "/layouts/header.php";
     </div>
 </main>
 
+<!-- Custom Confirmation Modal -->
+<div id="clear-cart-modal" class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-all">
+    <div class="bg-white rounded-3xl p-8 max-w-sm w-full border border-gray-100 shadow-xl">
+        <div class="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-6">
+            <i class="ti ti-trash text-2xl"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 mb-2">Clear Entire Cart?</h3>
+        <p class="text-sm text-gray-500 mb-8 leading-relaxed">Are you sure you want to clear your entire cart? This action cannot be undone.</p>
+        <div class="flex gap-4">
+            <button onclick="closeClearCartModal()" class="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-100 font-bold py-3.5 rounded-2xl transition-all">
+                Cancel
+            </button>
+            <button onclick="confirmClearCart()" class="flex-1 bg-red-500 hover:bg-red-600 text-brand-light font-bold py-3.5 rounded-2xl transition-all shadow-lg shadow-red-500/20">
+                Clear Cart
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 let cartItems = [];
 let dbProducts = {};
@@ -342,11 +361,20 @@ function removeItem(index) {
 }
 
 function clearCart() {
-  if(confirm('Are you sure you want to clear your entire cart?')) {
-      cartItems.length = 0;
-      saveCartToStorage();
-      render();
-  }
+  const modal = document.getElementById('clear-cart-modal');
+  modal.classList.remove('hidden');
+}
+
+function closeClearCartModal() {
+  const modal = document.getElementById('clear-cart-modal');
+  modal.classList.add('hidden');
+}
+
+function confirmClearCart() {
+  cartItems.length = 0;
+  saveCartToStorage();
+  render();
+  closeClearCartModal();
 }
 
 function submitOrder() {
