@@ -302,7 +302,15 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
             </div>
             <div>
                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Password</label>
-                <input type="password" name="password" required placeholder="••••••••" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                <div class="relative">
+                    <input type="password" id="driver-register-password" name="password" required maxlength="8" placeholder="Min. 8 characters" class="w-full pl-4 pr-10 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all" oninput="checkDriverPasswordStrength(this.value)">
+                    <i class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-base cursor-pointer toggle-password-btn" data-target="driver-register-password"></i>
+                </div>
+                <!-- Strength bar -->
+                <div class="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div id="driver-strengthBar" class="h-full rounded-full transition-all duration-400 w-0 bg-gray-300"></div>
+                </div>
+                <p id="driver-strengthLabel" class="text-[10px] mt-1 text-gray-400 font-semibold"></p>
             </div>
             <button type="submit" class="w-full bg-brand text-brand-light font-bold py-4 rounded-xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest mt-2">Register</button>
             <p class="text-xs text-center text-gray-500 font-semibold mt-3">
@@ -970,6 +978,84 @@ window.addEventListener('storage', (e) => {
         renderDashboard();
     }
 });
+
+// Password Visibility Toggle for Registration
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('toggle-password-btn')) {
+        const targetId = e.target.getAttribute('data-target');
+        const input = document.getElementById(targetId);
+        if (input) {
+            if (input.type === 'password') {
+                input.type = 'text';
+                e.target.classList.remove('ti-eye');
+                e.target.classList.add('ti-eye-off');
+            } else {
+                input.type = 'password';
+                e.target.classList.remove('ti-eye-off');
+                e.target.classList.add('ti-eye');
+            }
+        }
+    }
+});
+
+// Password Strength Checker for Driver Registration
+window.checkDriverPasswordStrength = function(password) {
+    const bar = document.getElementById('driver-strengthBar');
+    const label = document.getElementById('driver-strengthLabel');
+    if (!bar || !label) return;
+
+    if (!password) {
+        bar.className = "h-full rounded-full transition-all duration-400 w-0 bg-gray-300";
+        bar.style.width = "0%";
+        label.textContent = "";
+        return;
+    }
+
+    let score = 0;
+    if (password.length >= 8) score++;
+    if (/[a-z]/.test(password)) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/\d/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+
+    let width = "0%";
+    let colorClass = "bg-gray-300";
+    let text = "";
+
+    if (password.length < 8) {
+        width = "20%";
+        colorClass = "bg-red-500";
+        text = "Too Short (Min. 8 characters)";
+    } else {
+        if (score <= 2) {
+            width = "40%";
+            colorClass = "bg-orange-500";
+            text = "Weak";
+        } else if (score === 3 || score === 4) {
+            width = "70%";
+            colorClass = "bg-yellow-500";
+            text = "Medium";
+        } else if (score >= 5) {
+            width = "100%";
+            colorClass = "bg-green-500";
+            text = "Strong";
+        }
+    }
+
+    bar.style.width = width;
+    bar.className = "h-full rounded-full transition-all duration-400 " + colorClass;
+    label.textContent = text;
+    
+    if (colorClass === 'bg-red-500') {
+        label.className = "text-[10px] mt-1 text-red-500 font-semibold";
+    } else if (colorClass === 'bg-orange-500') {
+        label.className = "text-[10px] mt-1 text-orange-500 font-semibold";
+    } else if (colorClass === 'bg-yellow-500') {
+        label.className = "text-[10px] mt-1 text-yellow-650 font-semibold";
+    } else if (colorClass === 'bg-green-500') {
+        label.className = "text-[10px] mt-1 text-green-600 font-semibold";
+    }
+};
 
 // Init on Load
 document.addEventListener('DOMContentLoaded', () => {
