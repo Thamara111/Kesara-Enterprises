@@ -254,8 +254,8 @@ require_once __DIR__ . "/layouts/header.php";
                                     $circle_bg = 'bg-brand text-brand-light';
                                     $circle_icon = '<i class="ti ti-check text-xs"></i>';
                                     $title_class = 'text-gray-900';
-                                    $log_time = date('d M Y, g:i A', strtotime($log_map[$st]['changed_at']));
-                                    $desc = ($log_map[$st]['note'] && trim($log_map[$st]['note']) !== '') ? $log_map[$st]['note'] : $default_desc;
+                                    $log_time = $has_log ? date('d M Y, g:i A', strtotime($log_map[$st]['changed_at'])) : '';
+                                    $desc = ($has_log && $log_map[$st]['note'] && trim($log_map[$st]['note']) !== '') ? $log_map[$st]['note'] : $default_desc;
                                 } elseif ($idx === $currentStateIdx) {
                                     // Current active step
                                     $circle_bg = 'bg-brand text-brand-light ring-4 ring-brand-light';
