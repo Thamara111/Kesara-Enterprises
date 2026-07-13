@@ -77,17 +77,33 @@ if ($method === 'POST') {
 
     // Determine User ID (fallback to 1 if not logged in)
     $user_id = $_SESSION['user_id'] ?? $input['user_id'] ?? 1;
-    $total_amount = (float)($input['total_amount'] ?? 0);
     $items = $input['items'] ?? [];
 
-    if ($total_amount <= 0 || empty($items)) {
+    if (empty($items)) {
         http_response_code(400);
-        echo json_encode(["status" => "error", "message" => "Invalid order total or items list."]);
+        echo json_encode(["status" => "error", "message" => "Invalid order items list."]);
         exit;
     }
 
     if (isset($pdo) && $pdo !== null) {
         try {
+            // Require the model layer validation functions
+            require_once __DIR__ . '/model_validation.php';
+
+            // Validate order items (MOQ and Pricing Tiers resolved server-side)
+            $validation = validateOrderItems($pdo, $items);
+            if (!empty($validation['errors'])) {
+                http_response_code(400);
+                echo json_encode([
+                    "status" => "error", 
+                    "message" => "Validation failed: " . implode(" ", $validation['errors'])
+                ]);
+                exit;
+            }
+
+            $total_amount = $validation['calculated_total'];
+            $validated_items = $validation['validated_items'];
+
             $checkOrderColor = $pdo->query("SHOW COLUMNS FROM order_items LIKE 'color'");
             if (!$checkOrderColor->fetch()) {
                 $pdo->exec("ALTER TABLE order_items ADD COLUMN color VARCHAR(50) DEFAULT NULL");
@@ -103,16 +119,14 @@ if ($method === 'POST') {
 
             // 2. Insert order items
             $stmt_item = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, color, size) VALUES (?, ?, ?, ?, ?, ?)");
-            foreach ($items as $item) {
-                $pid = (int)($item['product_id'] ?? 0);
-                $qty = (int)($item['quantity'] ?? 0);
-                $price = (float)($item['unit_price'] ?? 0);
-                $color = trim($item['color'] ?? '');
-                $size = trim($item['size'] ?? '');
+            foreach ($validated_items as $item) {
+                $pid = $item['product_id'];
+                $qty = $item['quantity'];
+                $price = $item['unit_price'];
+                $color = trim($item['color']);
+                $size = trim($item['size']);
 
-                if ($pid > 0 && $qty > 0 && $price > 0) {
-                    $stmt_item->execute([$order_id, $pid, $qty, $price, $color, $size]);
-                }
+                $stmt_item->execute([$order_id, $pid, $qty, $price, $color, $size]);
             }
 
             // 3. Create log
