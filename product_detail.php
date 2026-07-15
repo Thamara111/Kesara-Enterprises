@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$is_logged_in   = isset($_SESSION['user_id']);
+$is_logged_in = isset($_SESSION['user_id']);
 $buyer_approved = false;
 
 if ($is_logged_in && isset($pdo)) {
@@ -38,15 +38,15 @@ if (isset($pdo) && $pdo !== null) {
         $stmt = $pdo->prepare("SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.sku = ?");
         $stmt->execute([$sku]);
         $product = $stmt->fetch();
-        
+
         if ($product) {
             $category_name = $product['category_name'];
-            
+
             // Query pricing tiers
             $stmt_tiers = $pdo->prepare("SELECT * FROM pricing_tiers WHERE product_id = ? ORDER BY min_qty ASC");
             $stmt_tiers->execute([$product['id']]);
             $pricing_tiers = $stmt_tiers->fetchAll();
-            
+
             // Query variations (sizes and colours)
             $stmt_vars = $pdo->prepare("SELECT DISTINCT size, colour, quantity FROM inventory WHERE product_id = ?");
             $stmt_vars->execute([$product['id']]);
@@ -69,13 +69,13 @@ if (!$product) {
         'status' => 'In Stock'
     ];
     $category_name = "Briefs";
-    
+
     $pricing_tiers = [
         ['min_qty' => 50, 'max_qty' => 99, 'price' => 120.00],
         ['min_qty' => 100, 'max_qty' => 499, 'price' => 108.00],
         ['min_qty' => 500, 'max_qty' => null, 'price' => 95.00]
     ];
-    
+
     $variations = [
         ['size' => 'S', 'colour' => 'White', 'quantity' => 10],
         ['size' => 'M', 'colour' => 'White', 'quantity' => 10],
@@ -88,14 +88,14 @@ if (!$product) {
 
 // Parse JSON specs if we added them in future, for now use empty or generic
 $prod_specs = [
-    'material' => 'Cotton Blend', 
-    'gsm' => !empty($product['gsm']) ? $product['gsm'] : '180 GSM', 
-    'waistband' => !empty($product['waistband']) ? $product['waistband'] : 'Elastic', 
-    'packaging' => 'Bulk pack', 
+    'material' => 'Cotton Blend',
+    'gsm' => !empty($product['gsm']) ? $product['gsm'] : '180 GSM',
+    'waistband' => !empty($product['waistband']) ? $product['waistband'] : 'Elastic',
+    'packaging' => 'Bulk pack',
     'lead' => '3–5 Business Days'
 ];
 // Extract discount
-$discount = isset($product['discount']) ? (float)$product['discount'] : 0;
+$discount = isset($product['discount']) ? (float) $product['discount'] : 0;
 
 // Extract sizes
 if (!empty(trim($product['sizes'] ?? ''))) {
@@ -115,7 +115,8 @@ $default_colour = !empty($colours) ? reset($colours) : 'White';
 $default_size = !empty($sizes) ? reset($sizes) : 'M';
 
 // Color classes mapping helper
-function getColorClass($colorName) {
+function getColorClass($colorName)
+{
     $colors = [
         'white' => 'bg-white border border-gray-200',
         'black' => 'bg-gray-900',
@@ -155,40 +156,40 @@ require_once __DIR__ . "/layouts/header.php";
             <!-- LEFT: IMAGES & SPECS -->
             <div class="space-y-10">
                 <!-- Image Gallery -->
-                <?php 
+                <?php
                 $prod_images = json_decode($product['images'] ?? '[]', true) ?: [];
                 $primary_image = !empty($prod_images) ? $prod_images[0] : '';
                 ?>
                 <div class="space-y-4">
                     <div class="bg-white border border-gray-100 rounded-3xl flex items-center justify-center shadow-sm relative overflow-hidden group aspect-square lg:aspect-video">
                         <?php if (!empty($primary_image)): ?>
-                            <img id="main-product-image" src="<?= htmlspecialchars($primary_image) ?>" alt="<?= htmlspecialchars($product['name']) ?>" class="w-full h-full object-cover">
+                                <img id="main-product-image" src="<?= htmlspecialchars($primary_image) ?>" alt="<?= htmlspecialchars($product['name']) ?>" class="w-full h-full object-cover">
                         <?php else: ?>
-                            <i class="ti ti-shirt text-[120px] text-gray-100 group-hover:scale-110 transition-transform duration-700"></i>
+                                <i class="ti ti-shirt text-[120px] text-gray-100 group-hover:scale-110 transition-transform duration-700"></i>
                         <?php endif; ?>
                         <div class="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-500"></div>
                     </div>
                     
                     <?php if (!empty($prod_images) && count($prod_images) > 1): ?>
-                    <div class="flex gap-4 overflow-x-auto py-2">
-                        <?php foreach ($prod_images as $idx => $img): ?>
-                            <div onclick="changeMainImage('<?= htmlspecialchars($img) ?>', this)" 
-                                 class="thumb-btn w-20 h-20 bg-white rounded-2xl overflow-hidden cursor-pointer shadow-sm transition-all hover:border-brand <?= $idx === 0 ? 'border-2 border-brand' : 'border border-gray-100' ?>">
-                                <img src="<?= htmlspecialchars($img) ?>" alt="Thumbnail" class="w-full h-full object-cover">
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                    <script>
-                    function changeMainImage(url, el) {
-                        document.getElementById('main-product-image').src = url;
-                        document.querySelectorAll('.thumb-btn').forEach(btn => {
-                            btn.classList.remove('border-brand', 'border-2');
-                            btn.classList.add('border-gray-100', 'border');
-                        });
-                        el.classList.remove('border-gray-100', 'border');
-                        el.classList.add('border-brand', 'border-2');
-                    }
-                    </script>
+                        <div class="flex gap-4 overflow-x-auto py-2">
+                            <?php foreach ($prod_images as $idx => $img): ?>
+                                    <div onclick="changeMainImage('<?= htmlspecialchars($img) ?>', this)" 
+                                         class="thumb-btn w-20 h-20 bg-white rounded-2xl overflow-hidden cursor-pointer shadow-sm transition-all hover:border-brand <?= $idx === 0 ? 'border-2 border-brand' : 'border border-gray-100' ?>">
+                                        <img src="<?= htmlspecialchars($img) ?>" alt="Thumbnail" class="w-full h-full object-cover">
+                                    </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <script>
+                        function changeMainImage(url, el) {
+                            document.getElementById('main-product-image').src = url;
+                            document.querySelectorAll('.thumb-btn').forEach(btn => {
+                                btn.classList.remove('border-brand', 'border-2');
+                                btn.classList.add('border-gray-100', 'border');
+                            });
+                            el.classList.remove('border-gray-100', 'border');
+                            el.classList.add('border-brand', 'border-2');
+                        }
+                        </script>
                     <?php endif; ?>
                 </div>
 
@@ -240,76 +241,80 @@ require_once __DIR__ . "/layouts/header.php";
                 <p class="text-xs font-medium text-gray-400 tracking-wider mb-4">SKU: <?= htmlspecialchars($product['sku']) ?> &nbsp;·&nbsp; <?= htmlspecialchars($category_name) ?></p>
 
                 <?php if ($discount > 0): ?>
-                    <div class="mb-6 inline-block px-3 py-1 bg-red-50 border border-red-100 rounded-lg text-red-600 font-bold text-xs uppercase tracking-widest">
-                        <?= $discount ?>% OFF
-                    </div>
+                        <div class="mb-6 inline-block px-3 py-1 bg-red-50 border border-red-100 rounded-lg text-red-600 font-bold text-xs uppercase tracking-widest">
+                            <?= $discount ?>% OFF
+                        </div>
                 <?php endif; ?>
 
                 <hr class="border-gray-50 mb-8">
 
                 <!-- Wholesale Pricing Tiers -->
-                <div class="space-y-4 mb-8">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Wholesale Pricing Tiers</label>
-                    <div class="border border-gray-100 rounded-2xl overflow-hidden divide-y divide-gray-50">
-                        <?php $tier_idx = 1; foreach ($pricing_tiers as $index => $t): ?>
-                        <?php 
+                <div class="p-6 bg-gradient-to-br from-brand/5 to-transparent border-2 border-brand/20 rounded-3xl mb-8 shadow-sm">
+                    <div class="flex items-center gap-2 mb-4">
+                        <i class="ti ti-tags text-brand text-lg"></i>
+                        <label class="block text-[11px] font-bold text-brand uppercase tracking-widest">Wholesale Volume-Based Pricing</label>
+                    </div>
+                    <div class="border border-brand/10 rounded-2xl overflow-hidden divide-y divide-brand/10 shadow-sm bg-white">
+                        <?php $tier_idx = 1;
+                        foreach ($pricing_tiers as $index => $t): ?>
+                            <?php
                             // Determine if this is the default middle tier for active class (e.g. 2nd tier or 1st tier if count is small)
                             $is_active = (count($pricing_tiers) > 1 && $index === 1) || (count($pricing_tiers) === 1 && $index === 0);
-                        ?>
-                        <div class="flex justify-between items-center p-4 text-sm <?= $is_active ? 'bg-brand-light/30 border-y border-brand/10 text-brand' : 'bg-white text-gray-500' ?>" id="tier-<?= $tier_idx++ ?>">
-                            <div class="flex items-center gap-3">
-                                <span class="<?= $is_active ? 'font-bold' : '' ?>">
-                                    <?= htmlspecialchars($t['min_qty']) ?><?= $t['max_qty'] ? ' – ' . htmlspecialchars($t['max_qty']) : '+' ?> units
-                                </span>
-                                <?php if ($is_active): ?>
-                                <span class="px-2 py-0.5 bg-brand text-brand-light text-[9px] font-bold rounded-full">YOUR QTY</span>
-                                <?php endif; ?>
-                            </div>
-                            <span class="<?= $is_active ? 'text-brand font-extrabold' : 'text-gray-900 font-bold' ?>">
-                                <?php if ($can_see_prices): ?>
-                                    <?php if ($discount > 0): ?>
-                                        <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($t['price']) ?></span>
-                                        LKR <?= number_format($t['price'] * (1 - $discount / 100)) ?> / pc
-                                    <?php else: ?>
-                                        LKR <?= number_format($t['price']) ?> / pc
-                                    <?php endif; ?>
-                                <?php else: ?>
-                                    <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none" title="Log in to view prices">
-                                        <?php if ($discount > 0): ?>
-                                            LKR <?= number_format($t['price'] * (1 - $discount / 100)) ?> / pc
-                                        <?php else: ?>
-                                            LKR <?= number_format($t['price']) ?> / pc
-                                        <?php endif; ?>
+                            ?>
+                            <div class="flex justify-between items-center p-4 text-sm <?= $is_active ? 'bg-brand-light/30 border-y border-brand/10 text-brand' : 'bg-white text-gray-500' ?>" id="tier-<?= $tier_idx++ ?>">
+                                <div class="flex items-center gap-3">
+                                    <span class="<?= $is_active ? 'font-bold' : '' ?>">
+                                        <?= htmlspecialchars($t['min_qty']) ?>    <?= $t['max_qty'] ? ' – ' . htmlspecialchars($t['max_qty']) : '+' ?> units
                                     </span>
-                                <?php endif; ?>
-                            </span>
-                        </div>
+                                    <?php if ($is_active): ?>
+                                        <span class="px-2 py-0.5 bg-brand text-brand-light text-[9px] font-bold rounded-full">YOUR QTY</span>
+                                    <?php endif; ?>
+                                </div>
+                                <span class="<?= $is_active ? 'text-brand font-extrabold' : 'text-gray-900 font-bold' ?>">
+                                    <?php if ($can_see_prices): ?>
+                                            <?php if ($discount > 0): ?>
+                                                    <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($t['price']) ?></span>
+                                                    LKR <?= number_format($t['price'] * (1 - $discount / 100)) ?> / pc
+                                            <?php else: ?>
+                                                    LKR <?= number_format($t['price']) ?> / pc
+                                            <?php endif; ?>
+                                    <?php else: ?>
+                                            <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none" title="Log in to view prices">
+                                                <?php if ($discount > 0): ?>
+                                                        LKR <?= number_format($t['price'] * (1 - $discount / 100)) ?> / pc
+                                                <?php else: ?>
+                                                        LKR <?= number_format($t['price']) ?> / pc
+                                                <?php endif; ?>
+                                            </span>
+                                    <?php endif; ?>
+                                </span>
+                            </div>
                         <?php endforeach; ?>
                         
                         <?php if (empty($pricing_tiers)): ?>
-                        <div class="flex justify-between items-center p-4 text-sm bg-brand-light/30 border-y border-brand/10 text-brand" id="tier-1">
-                            <div class="flex items-center gap-3">
-                                <span class="font-bold">Base Wholesale Price</span>
-                            </div>
-                            <span class="text-brand font-extrabold">
-                                <?php if ($can_see_prices): ?>
-                                    <?php if ($discount > 0): ?>
-                                        <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($product['base_price']) ?></span>
-                                        LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
+                            <div class="flex justify-between items-center p-4 text-sm bg-brand-light/30 border-y border-brand/10 text-brand" id="tier-1">
+                                <div class="flex items-center gap-3">
+                                    <span class="font-bold">Base Wholesale Price</span>
+                                </div>
+                                <span class="text-brand font-extrabold">
+                                    <?php if ($can_see_prices): ?>
+                                            <?php if ($discount > 0): ?>
+                                                    <span class="text-gray-400 line-through text-xs mr-2">LKR <?= number_format($product['base_price']) ?></span>
+                                                    LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
+                                            <?php else: ?>
+                                                    LKR <?= number_format($product['base_price']) ?> / pc
+                                            <?php endif; ?>
                                     <?php else: ?>
-                                        LKR <?= number_format($product['base_price']) ?> / pc
+                                            <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none" title="Log in to view prices">
+                                                <?php if ($discount > 0): ?>
+                                                        LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
+                                                <?php else: ?>
+                                                        LKR <?= number_format($product['base_price']) ?> / pc
+                                                <?php endif; ?>
+                                            </span>
                                     <?php endif; ?>
-                                <?php else: ?>
-                                    <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none" title="Log in to view prices">
-                                        <?php if ($discount > 0): ?>
-                                            LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
-                                        <?php else: ?>
-                                            LKR <?= number_format($product['base_price']) ?> / pc
-                                        <?php endif; ?>
-                                    </span>
-                                <?php endif; ?>
-                            </span>
-                        </div>
+                                </span>
+                            </div>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -320,31 +325,31 @@ require_once __DIR__ . "/layouts/header.php";
                         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Colour</label>
                         <div class="flex flex-wrap gap-3">
                             <?php foreach ($colours as $c): ?>
-                            <button id="color-btn-<?= $idx ?>" type="button" onclick="selectColor(<?= $idx ?>, '<?= htmlspecialchars($c) ?>')" class="color-select-btn w-8 h-8 rounded-full <?= getColorClass($c) ?> <?= $is_selected ? 'ring-2 ring-brand ring-offset-2' : 'hover:ring-2 hover:ring-gray-300' ?> ring-offset-2 transition-all" title="<?= htmlspecialchars($c) ?>"></button>
+                                <button id="color-btn-<?= $idx ?>" type="button" onclick="selectColor(<?= $idx ?>, '<?= htmlspecialchars($c) ?>')" class="color-select-btn w-8 h-8 rounded-full <?= getColorClass($c) ?> <?= $is_selected ? 'ring-2 ring-brand ring-offset-2' : 'hover:ring-2 hover:ring-gray-300' ?> ring-offset-2 transition-all" title="<?= htmlspecialchars($c) ?>"></button>
                             <?php endforeach; ?>
                             
                             <?php if (empty($colours)): ?>
-                            <button class="w-8 h-8 rounded-full bg-white border border-gray-200 ring-2 ring-brand ring-offset-2 ring-offset-2 transition-all" title="Standard"></button>
+                                <button class="w-8 h-8 rounded-full bg-white border border-gray-200 ring-2 ring-brand ring-offset-2 ring-offset-2 transition-all" title="Standard"></button>
                             <?php endif; ?>
                         </div>
                     </div>
                     <div class="space-y-4">
                         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Size</label>
                         <div class="flex flex-wrap gap-2">
-                            <?php 
-                                $size_options = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-                                foreach ($size_options as $idx => $so):
-                                    $is_available = in_array($so, $sizes) || empty($sizes);
-                                    $is_selected = ($so === $default_size);
-                                    
-                                    if (!$is_available):
-                            ?>
-                            <button type="button" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-gray-50 text-gray-300 cursor-not-allowed line-through"><?= htmlspecialchars($so) ?></button>
-                            <?php elseif ($is_selected): ?>
-                            <button id="size-btn-<?= $idx ?>" type="button" onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-brand text-brand-light shadow-sm shadow-brand/20"><?= htmlspecialchars($so) ?></button>
-                            <?php else: ?>
-                            <button id="size-btn-<?= $idx ?>" type="button" onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold border border-gray-100 hover:border-brand hover:text-brand transition-colors"><?= htmlspecialchars($so) ?></button>
-                            <?php endif; ?>
+                            <?php
+                            $size_options = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+                            foreach ($size_options as $idx => $so):
+                                $is_available = in_array($so, $sizes) || empty($sizes);
+                                $is_selected = ($so === $default_size);
+
+                                if (!$is_available):
+                                    ?>
+                                    <button type="button" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-gray-50 text-gray-300 cursor-not-allowed line-through"><?= htmlspecialchars($so) ?></button>
+                                <?php elseif ($is_selected): ?>
+                                    <button id="size-btn-<?= $idx ?>" type="button" onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-brand text-brand-light shadow-sm shadow-brand/20"><?= htmlspecialchars($so) ?></button>
+                                <?php else: ?>
+                                    <button id="size-btn-<?= $idx ?>" type="button" onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold border border-gray-100 hover:border-brand hover:text-brand transition-colors"><?= htmlspecialchars($so) ?></button>
+                                <?php endif; ?>
                             <?php endforeach; ?>
                         </div>
                     </div>
@@ -356,7 +361,7 @@ require_once __DIR__ . "/layouts/header.php";
                     <div class="flex items-center gap-6">
                         <div class="flex items-center bg-gray-50 border border-gray-100 rounded-xl overflow-hidden group focus-within:ring-2 focus-within:ring-brand/20 transition-all">
                             <button onclick="changeQty(-10)" class="w-12 h-12 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all"><i class="ti ti-minus text-sm"></i></button>
-                            <span id="qty-display" class="w-16 text-center text-sm font-bold text-gray-900"><?= (int)$product['moq'] ?></span>
+                            <span id="qty-display" class="w-16 text-center text-sm font-bold text-gray-900"><?= (int) $product['moq'] ?></span>
                             <button onclick="changeQty(10)" class="w-12 h-12 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all"><i class="ti ti-plus text-sm"></i></button>
                         </div>
                         <span class="text-sm font-bold text-gray-400 uppercase tracking-widest">Units</span>
@@ -374,24 +379,24 @@ require_once __DIR__ . "/layouts/header.php";
                         <span>Unit Price</span>
                         <span id="unit-price" class="text-gray-900">
                             <?php if ($can_see_prices): ?>
-                                LKR <?= !empty($pricing_tiers) ? number_format($pricing_tiers[0]['price']) : number_format($product['base_price']) ?>
+                                    LKR <?= !empty($pricing_tiers) ? number_format($pricing_tiers[0]['price']) : number_format($product['base_price']) ?>
                             <?php else: ?>
-                                <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR <?= !empty($pricing_tiers) ? number_format($pricing_tiers[0]['price']) : number_format($product['base_price']) ?></span>
+                                    <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR <?= !empty($pricing_tiers) ? number_format($pricing_tiers[0]['price']) : number_format($product['base_price']) ?></span>
                             <?php endif; ?>
                         </span>
                     </div>
                     <div class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest">
                         <span>Total Quantity</span>
-                        <span id="order-qty" class="text-gray-900"><?= (int)$product['moq'] ?> units</span>
+                        <span id="order-qty" class="text-gray-900"><?= (int) $product['moq'] ?> units</span>
                     </div>
                     <div class="h-px bg-gray-200"></div>
                     <div class="flex justify-between items-center">
                         <span class="text-sm font-bold text-gray-900 uppercase tracking-widest">Subtotal</span>
                         <span id="subtotal" class="text-2xl font-extrabold text-brand font-sans">
                             <?php if ($can_see_prices): ?>
-                                LKR <?= number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?>
+                                    LKR <?= number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?>
                             <?php else: ?>
-                                <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR <?= number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?></span>
+                                    <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR <?= number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?></span>
                             <?php endif; ?>
                         </span>
                     </div>
@@ -400,51 +405,50 @@ require_once __DIR__ . "/layouts/header.php";
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <?php if ($buyer_approved): ?>
-                        <!-- ✅ Approved buyer: show full action buttons -->
-                        <button onclick="addToCart()"
-                            class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark
+                            <!-- ✅ Approved buyer: show full action buttons -->
+                            <button onclick="addToCart()"
+                                class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark
                                    transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20
                                    active:scale-95 flex items-center justify-center gap-2">
-                            <i class="ti ti-shopping-cart-plus text-xl"></i>
-                            Add to Order
-                        </button>
-                        <button onclick="requestQuote()"
-                            class="bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl
+                                <i class="ti ti-shopping-cart-plus text-xl"></i>
+                                Add to Order
+                            </button>
+                            <button onclick="requestQuote()"
+                                class="bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl
                                    hover:bg-gray-50 hover:border-brand hover:text-brand transition-all
                                    transform hover:-translate-y-px active:scale-95">
-                            Request Quote
-                        </button>
+                                Request Quote
+                            </button>
 
                     <?php elseif ($is_logged_in && !$buyer_approved): ?>
-                        <!-- ⏳ Logged in but account still pending/suspended -->
-                        <div class="col-span-2 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200
+                            <!-- ⏳ Logged in but account still pending/suspended -->
+                            <div class="col-span-2 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200
                                     rounded-2xl text-amber-800">
-                            <i class="ti ti-clock-hour-4 text-xl mt-0.5 shrink-0"></i>
-                            <div>
-                                <p class="text-sm font-bold">Account Pending Approval</p>
-                                <p class="text-xs font-medium mt-1 text-amber-700">
-                                    Your wholesale account is under review. We typically approve within 24 hours.
-                                    <a href="/contact" class="underline hover:text-amber-900">Contact us</a> if you need urgent access.
-                                </p>
+                                <i class="ti ti-clock-hour-4 text-xl mt-0.5 shrink-0"></i>
+                                <div>
+                                    <p class="text-sm font-bold">Account Pending Approval</p>
+                                    <p class="text-xs font-medium mt-1 text-amber-700">
+                                        Your wholesale account is currently under review by our administrative team. No further action is required on your part. We typically verify and approve accounts within 24 business hours. If you require urgent access, please <a href="/contact" class="underline hover:text-amber-900">contact us</a>.
+                                    </p>
+                                </div>
                             </div>
-                        </div>
 
                     <?php else: ?>
-                        <!-- 🔒 Guest: prompt to sign in or register -->
-                        <a href="/login"
-                            class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark
+                            <!-- 🔒 Guest: prompt to sign in or register -->
+                            <a href="/login"
+                                class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark
                                    transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20
                                    active:scale-95 flex items-center justify-center gap-2">
-                            <i class="ti ti-lock text-xl"></i>
-                            Sign In to Order
-                        </a>
-                        <a href="/login?mode=register"
-                            class="bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl
+                                <i class="ti ti-lock text-xl"></i>
+                                Sign In to Order
+                            </a>
+                            <a href="/login?mode=register"
+                                class="bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl
                                    hover:bg-gray-50 hover:border-brand hover:text-brand transition-all
                                    transform hover:-translate-y-px active:scale-95 flex items-center justify-center gap-2">
-                            <i class="ti ti-user-plus text-xl"></i>
-                            Apply for Wholesale
-                        </a>
+                                <i class="ti ti-user-plus text-xl"></i>
+                                Apply for Wholesale
+                            </a>
                     <?php endif; ?>
                 </div>
 
@@ -474,24 +478,24 @@ const tiers = <?php
 $js_tiers = [];
 foreach ($pricing_tiers as $t) {
     $js_tiers[] = [
-        'min' => (int)$t['min_qty'],
-        'max' => $t['max_qty'] !== null ? (int)$t['max_qty'] : 999999,
-        'price' => (float)$t['price']
+        'min' => (int) $t['min_qty'],
+        'max' => $t['max_qty'] !== null ? (int) $t['max_qty'] : 999999,
+        'price' => (float) $t['price']
     ];
 }
 if (empty($js_tiers)) {
     $js_tiers[] = [
-        'min' => (int)$product['moq'],
+        'min' => (int) $product['moq'],
         'max' => 999999,
-        'price' => (float)$product['base_price']
+        'price' => (float) $product['base_price']
     ];
 }
 echo json_encode($js_tiers);
 ?>;
-const discount = <?= (float)$discount ?>;
-const moq = <?= (int)$product['moq'] ?>;
+const discount = <?= (float) $discount ?>;
+const moq = <?= (int) $product['moq'] ?>;
 const canSeePrices = <?= $can_see_prices ? 'true' : 'false' ?>;
-let qty = <?= (int)$product['moq'] ?>;
+let qty = <?= (int) $product['moq'] ?>;
 
 function getTier(q) {
   return tiers.find(t => q >= t.min && q <= t.max) || tiers[0];
@@ -590,7 +594,7 @@ function addToCart() {
         alert("Minimum Order Quantity is " + moq);
         return;
     }
-    const productId = <?= (int)$product['id'] ?>;
+    const productId = <?= (int) $product['id'] ?>;
     let saved = localStorage.getItem('kesara_cart');
     let cart = [];
     if (saved) {

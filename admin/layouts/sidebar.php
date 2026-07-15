@@ -7,6 +7,16 @@ $is_admin = ($role === 'admin');
 $has_finance = in_array($role, ['admin', 'finance_manager']);
 $has_supplier = in_array($role, ['admin', 'supplier_manager']);
 $has_delivery = in_array($role, ['admin', 'delivery_manager']);
+
+$pending_approvals_count = 0;
+if (isset($pdo)) {
+    try {
+        $stmt_pending = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'pending'");
+        $pending_approvals_count = (int)$stmt_pending->fetchColumn();
+    } catch (\Exception $e) {
+        $pending_approvals_count = 0;
+    }
+}
 ?>
 <!-- Sidebar Backdrop (Mobile Only) -->
 <div id="admin-sidebar-backdrop" class="hidden fixed inset-0 bg-black/60 z-30 lg:hidden"></div>
@@ -58,9 +68,16 @@ $has_delivery = in_array($role, ['admin', 'delivery_manager']);
             <?php endif; ?>
             
             <?php if ($is_admin): ?>
-            <a href="/admin-customers" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'customers' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
-                <i class="ti ti-users text-xl"></i>
-                Customers
+            <a href="/admin-customers" class="flex items-center justify-between w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'customers' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <div class="flex items-center gap-4">
+                    <i class="ti ti-users text-xl"></i>
+                    Customers
+                </div>
+                <?php if ($pending_approvals_count > 0): ?>
+                    <span class="px-2 py-0.5 bg-amber-500 text-white text-[9px] font-extrabold rounded-full animate-pulse tracking-wider">
+                        <?= $pending_approvals_count ?> PENDING
+                    </span>
+                <?php endif; ?>
             </a>
             <a href="/admin-users" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'users' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                 <i class="ti ti-user-cog text-xl"></i>

@@ -2,6 +2,11 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+// Cache-control headers to prevent stale display of approval-gated content
+header("Cache-Control: no-cache, no-store, must-revalidate"); // HTTP 1.1.
+header("Pragma: no-cache"); // HTTP 1.0.
+header("Expires: 0"); // Proxies.
+
 $is_logged_in = isset($_SESSION['user_id']);
 $buyer_approved = false;
 
