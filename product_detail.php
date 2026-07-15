@@ -319,37 +319,69 @@ require_once __DIR__ . "/layouts/header.php";
                     </div>
                 </div>
 
-                <!-- Attributes: Color & Size -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <!-- Attributes: Color & Size (Alibaba-Style Selector) -->
+                <div class="space-y-6 mb-8">
                     <div class="space-y-4">
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Colour</label>
-                        <div class="flex flex-wrap gap-3">
-                            <?php foreach ($colours as $c): ?>
-                                <button id="color-btn-<?= $idx ?>" type="button" onclick="selectColor(<?= $idx ?>, '<?= htmlspecialchars($c) ?>')" class="color-select-btn w-8 h-8 rounded-full <?= getColorClass($c) ?> <?= $is_selected ? 'ring-2 ring-brand ring-offset-2' : 'hover:ring-2 hover:ring-gray-300' ?> ring-offset-2 transition-all" title="<?= htmlspecialchars($c) ?>"></button>
+                        <div class="flex justify-between items-center">
+                            <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Colour</label>
+                            <span class="text-xs font-bold text-gray-500">Selected: <span id="selected-color-name" class="text-brand font-extrabold"><?= htmlspecialchars($default_colour) ?></span></span>
+                        </div>
+                        <div class="flex flex-wrap gap-4">
+                            <?php foreach ($colours as $idx => $c): 
+                                $is_selected = ($c === $default_colour);
+                            ?>
+                            <div class="relative inline-block">
+                                <button id="color-btn-<?= $idx ?>" type="button" onclick="selectColor(<?= $idx ?>, '<?= htmlspecialchars($c) ?>')" 
+                                        class="color-select-btn w-10 h-10 rounded-full <?= getColorClass($c) ?> <?= $is_selected ? 'ring-2 ring-brand ring-offset-2' : 'hover:ring-2 hover:ring-gray-300' ?> ring-offset-2 transition-all shadow-sm" 
+                                        title="<?= htmlspecialchars($c) ?>"></button>
+                                <span id="color-qty-badge-<?= htmlspecialchars($c) ?>" 
+                                      class="shadow-md hidden"
+                                      style="background-color: #ff6600; color: #ffffff; position: absolute; top: -8px; right: -8px; padding: 2px 6px; font-size: 8px; font-weight: 900; line-height: 1; border-radius: 9999px; border: 1.5px solid #ffffff; z-index: 10;"></span>
+                            </div>
                             <?php endforeach; ?>
                             
                             <?php if (empty($colours)): ?>
-                                <button class="w-8 h-8 rounded-full bg-white border border-gray-200 ring-2 ring-brand ring-offset-2 ring-offset-2 transition-all" title="Standard"></button>
+                            <div class="relative inline-block">
+                                <button class="w-10 h-10 rounded-full bg-white border border-gray-200 ring-2 ring-brand ring-offset-2 ring-offset-2 transition-all shadow-sm" title="Standard"></button>
+                                <span id="color-qty-badge-Standard" 
+                                      class="shadow-md hidden"
+                                      style="background-color: #ff6600; color: #ffffff; position: absolute; top: -8px; right: -8px; padding: 2px 6px; font-size: 8px; font-weight: 900; line-height: 1; border-radius: 9999px; border: 1.5px solid #ffffff; z-index: 10;"></span>
+                            </div>
                             <?php endif; ?>
                         </div>
                     </div>
-                    <div class="space-y-4">
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Size</label>
-                        <div class="flex flex-wrap gap-2">
-                            <?php
-                            $size_options = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-                            foreach ($size_options as $idx => $so):
-                                $is_available = in_array($so, $sizes) || empty($sizes);
-                                $is_selected = ($so === $default_size);
 
-                                if (!$is_available):
-                                    ?>
-                                    <button type="button" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-gray-50 text-gray-300 cursor-not-allowed line-through"><?= htmlspecialchars($so) ?></button>
-                                <?php elseif ($is_selected): ?>
-                                    <button id="size-btn-<?= $idx ?>" type="button" onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold bg-brand text-brand-light shadow-sm shadow-brand/20"><?= htmlspecialchars($so) ?></button>
-                                <?php else: ?>
-                                    <button id="size-btn-<?= $idx ?>" type="button" onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')" class="size-select-btn w-9 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold border border-gray-100 hover:border-brand hover:text-brand transition-colors"><?= htmlspecialchars($so) ?></button>
-                                <?php endif; ?>
+                    <div class="space-y-4">
+                        <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select Quantity by Size</label>
+                        <div class="divide-y divide-gray-100 border border-gray-100 rounded-3xl overflow-hidden bg-white shadow-sm">
+                            <?php 
+                                $size_options = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+                                foreach ($size_options as $idx => $so):
+                                    $is_available = in_array($so, $sizes) || empty($sizes);
+                                    if (!$is_available) continue;
+                                    $is_selected = ($so === $default_size);
+                            ?>
+                            <div id="size-row-card-<?= htmlspecialchars($so) ?>" onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')"
+                                 class="size-row-el flex items-center justify-between p-4 hover:bg-gray-50/50 cursor-pointer transition-colors <?= $is_selected ? 'bg-brand-light/10' : '' ?>">
+                                <div class="flex items-center gap-4">
+                                    <span class="w-10 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-xs font-extrabold text-gray-900 bg-gray-50"><?= htmlspecialchars($so) ?></span>
+                                    <span class="text-xs font-bold text-gray-400">
+                                        <?php if ($can_see_prices): ?>
+                                            LKR <span class="size-price-display">...</span>
+                                        <?php else: ?>
+                                            <span style="filter: blur(4px);">LKR 000</span>
+                                        <?php endif; ?>
+                                    </span>
+                                </div>
+                                <div class="flex items-center bg-gray-100 border border-gray-200 rounded-xl overflow-hidden shadow-sm" onclick="event.stopPropagation()">
+                                    <button type="button" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', -10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all"><i class="ti ti-minus text-xs"></i></button>
+                                    <input type="number" id="size-qty-<?= htmlspecialchars($so) ?>" value="<?= $is_selected ? (int)$product['moq'] : 0 ?>" min="0" step="10" 
+                                           onfocus="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')"
+                                           onchange="onSizeQtyChange('<?= htmlspecialchars($so) ?>')" 
+                                           class="w-12 text-center text-xs font-black text-gray-900 bg-transparent border-none outline-none focus:ring-0 transition-all duration-300 py-1">
+                                    <button type="button" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', 10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all"><i class="ti ti-plus text-xs"></i></button>
+                                </div>
+                            </div>
                             <?php endforeach; ?>
                         </div>
                     </div>
@@ -496,6 +528,23 @@ const discount = <?= (float) $discount ?>;
 const moq = <?= (int) $product['moq'] ?>;
 const canSeePrices = <?= $can_see_prices ? 'true' : 'false' ?>;
 let qty = <?= (int) $product['moq'] ?>;
+const sizeOptions = <?php echo json_encode($size_options); ?>;
+const availableSizes = <?php echo json_encode($sizes); ?>;
+const defaultSize = '<?= htmlspecialchars($default_size) ?>';
+const colorsArray = <?php echo json_encode($colours); ?>;
+const defaultColor = '<?= htmlspecialchars($default_colour) ?>';
+
+// Initialize nested quantities: selectedQuantities[color][size]
+let selectedQuantities = {};
+colorsArray.forEach(c => {
+    selectedQuantities[c] = {};
+    sizeOptions.forEach(s => {
+        selectedQuantities[c][s] = 0;
+    });
+});
+if (selectedQuantities[defaultColor]) {
+    selectedQuantities[defaultColor][defaultSize] = qty;
+}
 
 function getTier(q) {
   return tiers.find(t => q >= t.min && q <= t.max) || tiers[0];
@@ -515,6 +564,11 @@ function updateUI() {
   if (canSeePrices) {
       document.getElementById('unit-price').textContent = 'LKR ' + activePrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
       document.getElementById('subtotal').textContent = 'LKR ' + (qty * activePrice).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+      
+      // Update size price display inside list
+      document.querySelectorAll('.size-price-display').forEach(el => {
+          el.textContent = activePrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2});
+      });
   } else {
       document.getElementById('unit-price').innerHTML = '<span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR ' + activePrice.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) + '</span>';
       document.getElementById('subtotal').innerHTML = '<span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR ' + (qty * activePrice).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) + '</span>';
@@ -556,8 +610,92 @@ function updateUI() {
 }
 
 function changeQty(delta) {
-  qty = Math.max(0, qty + delta);
-  updateUI();
+  if (selectedSize && selectedColor) {
+      const currentVal = (selectedQuantities[selectedColor] && selectedQuantities[selectedColor][selectedSize]) || 0;
+      const newVal = Math.max(0, currentVal + delta);
+      selectedQuantities[selectedColor][selectedSize] = newVal;
+      
+      const input = document.getElementById('size-qty-' + selectedSize);
+      if (input) {
+          input.value = newVal;
+          updateSizeInputStyles(selectedSize, newVal);
+      }
+      
+      recalculateTotalQty();
+  }
+}
+
+function changeSizeQty(size, delta) {
+    if (selectedColor) {
+        const input = document.getElementById('size-qty-' + size);
+        if (input) {
+            let val = (selectedQuantities[selectedColor] && selectedQuantities[selectedColor][size]) || 0;
+            val = Math.max(0, val + delta);
+            input.value = val;
+            selectedQuantities[selectedColor][size] = val;
+            updateSizeInputStyles(size, val);
+            recalculateTotalQty();
+        }
+    }
+}
+
+function onSizeQtyChange(size) {
+    if (selectedColor) {
+        const input = document.getElementById('size-qty-' + size);
+        if (input) {
+            let val = parseInt(input.value) || 0;
+            val = Math.max(0, val);
+            input.value = val;
+            selectedQuantities[selectedColor][size] = val;
+            updateSizeInputStyles(size, val);
+            recalculateTotalQty();
+        }
+    }
+}
+
+function updateSizeInputStyles(size, val) {
+    const input = document.getElementById('size-qty-' + size);
+    if (input) {
+        if (val > 0) {
+            input.style.backgroundColor = "#ff6600";
+            input.style.color = "#ffffff";
+            input.className = "w-12 text-center text-xs font-black rounded-lg outline-none focus:ring-0 transition-all duration-300 py-1";
+        } else {
+            input.style.backgroundColor = "transparent";
+            input.style.color = "#111827";
+            input.className = "w-12 text-center text-xs font-black border-none outline-none focus:ring-0 transition-all duration-300 py-1";
+        }
+    }
+}
+
+function recalculateTotalQty() {
+    let total = 0;
+    for (let c in selectedQuantities) {
+        for (let s in selectedQuantities[c]) {
+            total += selectedQuantities[c][s] || 0;
+        }
+    }
+    qty = total;
+    updateUI();
+    updateColorBadges();
+}
+
+function updateColorBadges() {
+    for (let c in selectedQuantities) {
+        let colorTotal = 0;
+        for (let s in selectedQuantities[c]) {
+            colorTotal += selectedQuantities[c][s] || 0;
+        }
+        const badge = document.getElementById('color-qty-badge-' + c);
+        if (badge) {
+            if (colorTotal > 0) {
+                badge.textContent = 'x' + colorTotal;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    }
 }
 
 let selectedColor = '<?= htmlspecialchars($default_colour) ?>';
@@ -565,6 +703,8 @@ let selectedSize = '<?= htmlspecialchars($default_size) ?>';
 
 function selectColor(idx, color) {
     selectedColor = color;
+    document.getElementById('selected-color-name').textContent = color;
+    
     document.querySelectorAll('.color-select-btn').forEach(btn => {
         btn.classList.remove('ring-2', 'ring-brand', 'ring-offset-2');
         btn.classList.add('hover:ring-2', 'hover:ring-gray-300');
@@ -574,24 +714,33 @@ function selectColor(idx, color) {
         btn.classList.add('ring-2', 'ring-brand', 'ring-offset-2');
         btn.classList.remove('hover:ring-2', 'hover:ring-gray-300');
     }
+    
+    // Load saved quantities for the newly selected color into the size fields
+    sizeOptions.forEach(size => {
+        const sizeVal = (selectedQuantities[color] && selectedQuantities[color][size]) || 0;
+        const input = document.getElementById('size-qty-' + size);
+        if (input) {
+            input.value = sizeVal;
+            updateSizeInputStyles(size, sizeVal);
+        }
+    });
 }
 
 function selectSize(idx, size) {
     selectedSize = size;
-    document.querySelectorAll('.size-select-btn:not(.cursor-not-allowed)').forEach(btn => {
-        btn.classList.remove('bg-brand', 'text-brand-light', 'shadow-sm', 'shadow-brand/20');
-        btn.classList.add('border', 'border-gray-100', 'hover:border-brand', 'hover:text-brand');
+    document.querySelectorAll('.size-row-el').forEach(row => {
+        row.classList.remove('bg-brand-light/10');
     });
-    const btn = document.getElementById('size-btn-' + idx);
-    if (btn) {
-        btn.classList.add('bg-brand', 'text-brand-light', 'shadow-sm', 'shadow-brand/20');
-        btn.classList.remove('border', 'border-gray-100', 'hover:border-brand', 'hover:text-brand');
+    
+    const activeRow = document.getElementById('size-row-card-' + size);
+    if (activeRow) {
+        activeRow.classList.add('bg-brand-light/10');
     }
 }
 
 function addToCart() {
     if (qty < moq) {
-        alert("Minimum Order Quantity is " + moq);
+        alert("Minimum Order Quantity is " + moq + " units in total across all selections.");
         return;
     }
     const productId = <?= (int) $product['id'] ?>;
@@ -601,12 +750,25 @@ function addToCart() {
         try { cart = JSON.parse(saved); } catch(e){}
     }
     
-    // Check if already in cart
-    let existing = cart.find(i => i.id === productId && i.color === selectedColor && i.size === selectedSize);
-    if (existing) {
-        existing.qty += qty;
-    } else {
-        cart.push({ id: productId, qty: qty, color: selectedColor, size: selectedSize });
+    let addedCount = 0;
+    for (let c in selectedQuantities) {
+        for (let s in selectedQuantities[c]) {
+            const sizeQty = selectedQuantities[c][s] || 0;
+            if (sizeQty > 0) {
+                let existing = cart.find(i => i.id === productId && i.color === c && i.size === s);
+                if (existing) {
+                    existing.qty += sizeQty;
+                } else {
+                    cart.push({ id: productId, qty: sizeQty, color: c, size: s });
+                }
+                addedCount++;
+            }
+        }
+    }
+
+    if (addedCount === 0) {
+        alert("Please select a quantity for at least one color and size combination.");
+        return;
     }
     
     localStorage.setItem('kesara_cart', JSON.stringify(cart));
@@ -618,16 +780,33 @@ function addToCart() {
 function requestQuote() {
     const productName = "<?= htmlspecialchars($product['name']) ?>";
     const quantity = qty;
-    const color = selectedColor;
-    const size = selectedSize;
+    
+    let details = [];
+    for (let c in selectedQuantities) {
+        for (let s in selectedQuantities[c]) {
+            const sizeQty = selectedQuantities[c][s] || 0;
+            if (sizeQty > 0) {
+                details.push(`${sizeQty} units of ${c} (Size ${s})`);
+            }
+        }
+    }
+    
+    const summary = details.join(', ');
     
     // Set pre-filled message
-    document.getElementById('quoteMessage').value = `Hello, I would like to request a wholesale price quote for ${quantity} units of ${productName} (Size: ${size}, Color: ${color}). Please let me know the availability and best tiered pricing.`;
+    document.getElementById('quoteMessage').value = `Hello, I would like to request a wholesale price quote for a total of ${quantity} units of ${productName} (${summary}). Please let us know the availability and best tiered pricing.`;
     
     // Open modal
     document.getElementById('quoteModal').classList.remove('hidden');
     document.getElementById('quoteModal').classList.add('flex');
 }
+
+// Initial badge render on load
+updateColorBadges();
+sizeOptions.forEach(s => {
+    const sizeVal = (selectedQuantities[defaultColor] && selectedQuantities[defaultColor][s]) || 0;
+    updateSizeInputStyles(s, sizeVal);
+});
 
 function closeQuoteModal() {
     document.getElementById('quoteModal').classList.add('hidden');
