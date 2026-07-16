@@ -84,29 +84,19 @@
             </div>
         </div>
 
-        <!-- Sticky Controls Pane -->
+        <!-- Read-Only Driver Status Pane -->
         <div class="p-6 border-t border-gray-100 bg-gray-50/50 space-y-3">
             <div class="flex justify-between items-center text-xs text-gray-500 font-semibold mb-1">
-                <span>Simulation Controls</span>
-                <span id="sim-status" class="text-amber-600 font-bold uppercase tracking-wider text-[10px]">Stopped</span>
+                <span class="flex items-center gap-1.5"><i class="ti ti-eye text-base text-gray-400"></i> Live Observation Mode</span>
+                <span id="sim-status" class="text-amber-600 font-bold uppercase tracking-wider text-[10px]">Waiting for Driver</span>
             </div>
-            
-            <div class="grid grid-cols-3 gap-2">
-                <button id="btn-play" onclick="toggleSimulation()" class="flex flex-col items-center justify-center gap-1.5 p-2.5 bg-brand text-brand-light rounded-xl hover:bg-brand-dark hover:text-white transition-all font-bold text-[10px] shadow-lg shadow-brand/10">
-                    <i class="ti ti-player-play text-base"></i>
-                    <span id="btn-play-text">Start Sim</span>
-                </button>
-                <button id="btn-speed" onclick="toggleSpeed()" class="flex flex-col items-center justify-center gap-1.5 p-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-all font-bold text-[10px]">
-                    <i class="ti ti-bolt text-base text-amber-500"></i>
-                    <span id="speed-label">1x Speed</span>
-                </button>
-                <button id="btn-step" onclick="stepNextStop()" class="flex flex-col items-center justify-center gap-1.5 p-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-all font-bold text-[10px]">
-                    <i class="ti ti-arrow-forward-up text-base text-blue-500"></i>
-                    <span>Next Stop</span>
-                </button>
+            <!-- Read-only status row -->
+            <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 flex items-center gap-3">
+                <i class="ti ti-info-circle text-amber-500 text-lg flex-shrink-0"></i>
+                <p class="text-[10px] font-semibold text-amber-700 leading-snug">Simulation is controlled by the <strong>Driver Portal</strong>.<br>Start / Stop updates appear here automatically.</p>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 pt-2">
+            <div class="grid grid-cols-2 gap-3 pt-1">
                 <a href="/admin-assignments" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all">
                     <i class="ti ti-arrow-left text-base"></i>
                     Assignments
@@ -757,189 +747,9 @@ function triggerQuickCall() {
     logTelemetry(`Voice link established with driver: ${activeRun.driver}`, 'SYSTEM');
 }
 
-// Speed toggle (1x, 2x, 5x)
-function toggleSpeed() {
-    if (simSpeed === 1) {
-        simSpeed = 2;
-        document.getElementById('speed-label').textContent = '2x Speed';
-        showToast('Simulation speed set to 2x', 'info');
-    } else if (simSpeed === 2) {
-        simSpeed = 5;
-        document.getElementById('speed-label').textContent = '5x Speed';
-        showToast('Simulation speed set to 5x (Fast)', 'info');
-    } else {
-        simSpeed = 1;
-        document.getElementById('speed-label').textContent = '1x Speed';
-        showToast('Simulation speed set to 1x', 'info');
-    }
-    
-    // Restart interval with new speed if actively running
-    if (isSimulating) {
-        clearInterval(simInterval);
-        startSimulationInterval();
-    }
-}
+// Instantly skip current leg to next stop — DRIVER PORTAL ONLY
+// (Admin tracking view is read-only; simulation is driven by the driver portal)
 
-// Stop Simulation
-function stopSimulation() {
-    isSimulating = false;
-    if (simInterval) clearInterval(simInterval);
-    document.getElementById('sim-status').textContent = 'Stopped';
-    document.getElementById('sim-status').className = 'text-amber-600 font-bold uppercase tracking-wider text-[10px]';
-    document.getElementById('btn-play-text').textContent = 'Start Sim';
-    
-    const playIcon = document.querySelector('#btn-play i');
-    if (playIcon) {
-        playIcon.className = 'ti ti-player-play text-base';
-    }
-}
-
-// Start simulation ticker
-function startSimulationInterval() {
-    const intervalMs = Math.max(250 / simSpeed, 50); // Speed up tick interval
-    
-    simInterval = setInterval(() => {
-        simulateTick();
-    }, intervalMs);
-}
-
-// Start / Pause simulation
-function toggleSimulation() {
-    if (activeRun.badgeText === 'Completed') {
-        showToast('This delivery run is already completed.', 'error');
-        return;
-    }
-    
-    if (activeRun.badgeText === 'Pending') {
-        // Automatically mark as Active
-        activeRun.badgeText = 'Active';
-        activeRun.badge = 'bg-blue-50 text-blue-750 border border-blue-100';
-        activeRun.stops[0].status = 'In progress';
-        
-        // Save changes to localStorage
-        localStorage.setItem('ke_assignments', JSON.stringify(assignments));
-        
-        // Refresh dropdown text
-        populateRunsDropdown();
-        document.getElementById('run-selector').value = activeRun.id;
-        
-        updateUI(activeRun);
-        drawRouteOnMap(activeRun);
-        logTelemetry(`Warehouse dispatched run ${activeRun.id}. GPS online.`, 'SYSTEM');
-        logTelemetry(`En route to Stop 1: ${activeRun.stops[0].name.split(' · ')[1]}`, 'GPS');
-        showToast('Run dispatched from warehouse. Simulation starting.', 'success');
-    }
-    
-    if (isSimulating) {
-        stopSimulation();
-        logTelemetry('Simulation paused by administrator.', 'WARN');
-        showToast('Simulation paused', 'info');
-    } else {
-        isSimulating = true;
-        document.getElementById('sim-status').textContent = 'Live Running';
-        document.getElementById('sim-status').className = 'text-emerald-600 font-bold uppercase tracking-wider text-[10px]';
-        document.getElementById('btn-play-text').textContent = 'Pause Sim';
-        
-        const playIcon = document.querySelector('#btn-play i');
-        if (playIcon) {
-            playIcon.className = 'ti ti-player-pause text-base';
-        }
-        
-        startSimulationInterval();
-        showToast('Simulation started', 'success');
-    }
-}
-
-// Core tick function of route navigation simulation
-function simulateTick() {
-    if (currentLegIndex >= legInterpolatedPaths.length) {
-        // Complete run
-        stopSimulation();
-        activeRun.badgeText = 'Completed';
-        activeRun.badge = 'bg-emerald-50 text-emerald-700 border border-emerald-100';
-        
-        // Save to localStorage
-        localStorage.setItem('ke_assignments', JSON.stringify(assignments));
-        
-        populateRunsDropdown();
-        document.getElementById('run-selector').value = activeRun.id;
-        
-        updateUI(activeRun);
-        showToast('Run completed! All orders delivered.', 'success');
-        logTelemetry(`All drops complete. Driver returning to depot.`, 'SYSTEM');
-        return;
-    }
-    
-    const legPath = legInterpolatedPaths[currentLegIndex];
-    if (currentStepIndex < legPath.length) {
-        // Move vehicle marker
-        const nextPos = legPath[currentStepIndex];
-        vehicleMarker.setLatLng(nextPos);
-        
-        // Log telemetry coordinates occasionally
-        if (currentStepIndex % 8 === 0) {
-            const speedKmh = Math.floor(40 + Math.random() * 20);
-            logTelemetry(`Vehicle speed: ${speedKmh} km/h | GPS: (${nextPos[0].toFixed(5)}, ${nextPos[1].toFixed(5)})`, 'GPS');
-        }
-        
-        currentStepIndex++;
-    } else {
-        // Leg completed, reached stop
-        const completedStop = activeRun.stops[currentLegIndex];
-        const nowStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        completedStop.status = `Delivered ${nowStr}`;
-        
-        logTelemetry(`STOP ${completedStop.num} REACHED: ${completedStop.name.split(' · ')[1]}`, 'SYSTEM');
-        logTelemetry(`Digital dispatch verification: Delivery recorded at ${nowStr}`, 'DELIVERED');
-        showToast(`Stop ${completedStop.num} delivered successfully`, 'success');
-        
-        // Update marker style on map
-        const finishedMarker = stopMarkers[currentLegIndex];
-        const stopHtml = `<div class="w-7 h-7 rounded-full border border-white flex items-center justify-center shadow-md text-white text-xs font-bold bg-emerald-500">${completedStop.num}</div>`;
-        finishedMarker.setIcon(L.divIcon({
-            html: stopHtml,
-            className: 'custom-marker-stop',
-            iconSize: [28, 28],
-            iconAnchor: [14, 14]
-        }));
-        
-        // Prepare next leg
-        currentLegIndex++;
-        currentStepIndex = 0;
-        
-        if (currentLegIndex < activeRun.stops.length) {
-            const nextStop = activeRun.stops[currentLegIndex];
-            nextStop.status = 'In progress';
-            logTelemetry(`Dispatched from Stop ${completedStop.num}. En route to Stop ${nextStop.num}: ${nextStop.name.split(' · ')[1]}`, 'GPS');
-        }
-        
-        // Save state to localStorage so updates are persisted!
-        localStorage.setItem('ke_assignments', JSON.stringify(assignments));
-        
-        updateUI(activeRun);
-    }
-}
-
-// Instantly skip current leg to next stop (simulates arrival)
-function stepNextStop() {
-    if (activeRun.badgeText === 'Completed') {
-        showToast('Already completed', 'error');
-        return;
-    }
-    
-    if (activeRun.badgeText === 'Pending') {
-        // Start run first
-        toggleSimulation();
-        return;
-    }
-    
-    // Jump straight to the end of the current leg
-    if (currentLegIndex < legInterpolatedPaths.length) {
-        const legPath = legInterpolatedPaths[currentLegIndex];
-        currentStepIndex = legPath.length;
-        simulateTick();
-    }
-}
 
 // Listen for storage events from the Driver Portal
 window.addEventListener('storage', (e) => {

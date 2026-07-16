@@ -89,10 +89,10 @@ if (!$product) {
 // Parse JSON specs if we added them in future, for now use empty or generic
 $prod_specs = [
     'material' => 'Cotton Blend',
-    'gsm' => !empty($product['gsm']) ? $product['gsm'] : '180 GSM',
-    'waistband' => !empty($product['waistband']) ? $product['waistband'] : 'Elastic',
+    'gsm'      => !empty($product['gsm'] ?? '') ? $product['gsm'] : '180 GSM',
+    'waistband'=> !empty($product['waistband'] ?? '') ? $product['waistband'] : 'Elastic',
     'packaging' => 'Bulk pack',
-    'lead' => '3–5 Business Days'
+    'lead'     => '3–5 Business Days'
 ];
 // Extract discount
 $discount = isset($product['discount']) ? (float) $product['discount'] : 0;

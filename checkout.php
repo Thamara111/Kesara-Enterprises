@@ -61,46 +61,69 @@ if (!$can_see_prices) {
         
         <!-- Left: Payment Form -->
         <div>
-            <h1 class="text-3xl font-bold text-gray-900 tracking-tight mb-2">Payment Details</h1>
-            <p class="text-sm text-gray-500 mb-8">Please enter your payment information to finalize the order.</p>
+            <h1 class="text-3xl font-bold text-gray-900 tracking-tight mb-2">Payment Verification</h1>
+            <p class="text-sm text-gray-500 mb-8">Please transfer the total amount to our bank account and upload your payment receipt below.</p>
             
             <form id="payment-form" onsubmit="processPayment(event)">
+                <input type="hidden" id="payment_method" name="payment_method" value="bank">
+
                 <div class="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm space-y-6">
                     
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">Name on Card</label>
-                        <input type="text" id="card_name" required placeholder="John Doe" 
-                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all">
-                    </div>
-
-                    <div class="space-y-2">
-                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">Card Number</label>
-                        <div class="relative">
-                            <i class="ti ti-credit-card absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                            <input type="text" id="card_number" required placeholder="0000 0000 0000 0000" maxlength="19"
-                                class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all font-mono"
-                                oninput="formatCardNumber(this)">
+                    <!-- Bank Details Panel -->
+                    <div class="bg-gray-50 rounded-2xl p-6 border border-gray-100 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Our Bank Details</h3>
+                            <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-brand-light text-brand border border-brand/10 uppercase tracking-wider">Bank Transfer</span>
                         </div>
-                        <p id="card-error" class="text-xs text-red-500 font-bold hidden">Invalid card number. Must be 16 digits.</p>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-6">
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">Expiry (MM/YY)</label>
-                            <input type="text" id="card_expiry" required placeholder="MM/YY" maxlength="5"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all font-mono"
-                                oninput="formatExpiry(this)">
-                            <p id="expiry-error" class="text-xs text-red-500 font-bold hidden">Invalid expiry.</p>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">CVV</label>
-                            <div class="relative">
-                                <input type="password" id="card_cvv" required placeholder="123" maxlength="4"
-                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all font-mono"
-                                    oninput="this.value = this.value.replace(/\D/g, '')">
-                                <i class="ti ti-help absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 cursor-help" title="3 or 4 digits on the back of your card"></i>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                            <div>
+                                <span class="text-gray-400 block text-[10px] font-bold uppercase tracking-wider mb-0.5">Bank</span>
+                                <span class="font-extrabold text-gray-800">Sampath Bank PLC</span>
                             </div>
-                            <p id="cvv-error" class="text-xs text-red-500 font-bold hidden">Invalid CVV.</p>
+                            <div>
+                                <span class="text-gray-400 block text-[10px] font-bold uppercase tracking-wider mb-0.5">Branch</span>
+                                <span class="font-extrabold text-gray-800">Colombo Main Branch</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400 block text-[10px] font-bold uppercase tracking-wider mb-0.5">Account Name</span>
+                                <span class="font-extrabold text-gray-800">Kesara Enterprises (Pvt) Ltd</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-400 block text-[10px] font-bold uppercase tracking-wider mb-0.5">Account Number</span>
+                                <span class="font-black text-brand text-base tracking-wider font-mono">1009 5432 1987</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload Panel -->
+                    <div class="space-y-3">
+                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest block">Upload Payment Receipt</label>
+                        <div id="drop-zone" class="border-2 border-dashed border-gray-200 hover:border-brand/40 rounded-3xl p-10 text-center cursor-pointer transition-all bg-gray-50/50 flex flex-col items-center justify-center gap-3 group">
+                            <input type="file" id="receipt_file" name="receipt_file" accept=".jpg,.jpeg,.png,.pdf" class="hidden" onchange="handleFileSelect(this)">
+                            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-400 group-hover:text-brand shadow-sm transition-all border border-gray-100">
+                                <i class="ti ti-upload text-2xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-gray-700">Click to upload or drag and drop</p>
+                                <p class="text-[10px] text-gray-400 mt-1">JPEG, PNG or PDF (Max 5MB)</p>
+                            </div>
+                        </div>
+                        <p id="file-error" class="text-xs text-red-500 font-bold hidden">Payment receipt is required.</p>
+                        
+                        <!-- Selected File Preview Container -->
+                        <div id="file-preview-container" class="hidden bg-brand-light/20 border border-brand/10 rounded-2xl p-4 flex items-center justify-between">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-10 h-10 bg-white rounded-xl border border-brand/10 flex items-center justify-center text-brand">
+                                    <i class="ti ti-file-description text-xl" id="file-icon"></i>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="text-xs font-bold text-gray-800 truncate" id="preview-filename">receipt.pdf</p>
+                                    <p class="text-[10px] text-gray-400 mt-0.5" id="preview-filesize">2.4 MB</p>
+                                </div>
+                            </div>
+                            <button type="button" onclick="clearSelectedFile()" class="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                                <i class="ti ti-trash text-lg"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -108,11 +131,11 @@ if (!$can_see_prices) {
 
                 <div class="mt-8">
                     <button type="submit" id="pay-btn" class="w-full bg-brand text-brand-light font-bold py-5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 text-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <i class="ti ti-lock text-xl"></i>
-                        Pay LKR <span id="btn-total">0.00</span>
+                        <i class="ti ti-check text-xl"></i>
+                        Place Order (LKR <span id="btn-total">0.00</span>)
                     </button>
                     <div id="processing-loader" class="hidden justify-center items-center gap-3 mt-4 text-sm font-bold text-gray-500 uppercase tracking-widest">
-                        <i class="ti ti-loader animate-spin text-brand text-lg"></i> Processing Secure Payment...
+                        <i class="ti ti-loader animate-spin text-brand text-lg"></i> Submitting order & uploading receipt...
                     </div>
                 </div>
             </form>
@@ -250,84 +273,112 @@ function renderSummary() {
     document.getElementById('btn-total').textContent = finalFormatted;
 }
 
-// Input Formatting
-function formatCardNumber(input) {
-    let val = input.value.replace(/\D/g, '');
-    let formatted = val.match(/.{1,4}/g);
-    input.value = formatted ? formatted.join(' ') : val;
-    document.getElementById('card-error').classList.add('hidden');
+// File Drag & Drop + Selection Logic
+document.addEventListener('DOMContentLoaded', () => {
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('receipt_file');
+
+    if (dropZone && fileInput) {
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-gray-200');
+            dropZone.classList.add('border-brand', 'bg-brand-light/10');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-brand', 'bg-brand-light/10');
+            dropZone.classList.add('border-gray-200');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-brand', 'bg-brand-light/10');
+            dropZone.classList.add('border-gray-200');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect(fileInput);
+            }
+        });
+    }
+});
+
+function handleFileSelect(input) {
+    const errorEl = document.getElementById('file-error');
+    if (errorEl) errorEl.classList.add('hidden');
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        
+        // Size validation
+        if (file.size > 5 * 1024 * 1024) {
+            alert("File is too large. Max size is 5MB.");
+            input.value = '';
+            return;
+        }
+        
+        // Extension validation
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!['jpg', 'jpeg', 'png', 'pdf'].includes(ext)) {
+            alert("Invalid file format. Allowed types: JPG, PNG, PDF.");
+            input.value = '';
+            return;
+        }
+
+        // Show preview
+        document.getElementById('preview-filename').textContent = file.name;
+        document.getElementById('preview-filesize').textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+        
+        // Update icon based on file type
+        const fileIcon = document.getElementById('file-icon');
+        if (ext === 'pdf') {
+            fileIcon.className = 'ti ti-file-type-pdf text-xl text-red-500';
+        } else {
+            fileIcon.className = 'ti ti-photo text-xl text-brand';
+        }
+        
+        document.getElementById('file-preview-container').classList.remove('hidden');
+        document.getElementById('file-preview-container').classList.add('flex');
+        document.getElementById('drop-zone').classList.add('hidden');
+    }
 }
 
-function formatExpiry(input) {
-    let val = input.value.replace(/\D/g, '');
-    if (val.length >= 2) {
-        val = val.substring(0,2) + '/' + val.substring(2,4);
-    }
-    input.value = val;
-    document.getElementById('expiry-error').classList.add('hidden');
+function clearSelectedFile() {
+    const fileInput = document.getElementById('receipt_file');
+    if (fileInput) fileInput.value = '';
+    document.getElementById('file-preview-container').classList.remove('flex');
+    document.getElementById('file-preview-container').classList.add('hidden');
+    document.getElementById('drop-zone').classList.remove('hidden');
 }
 
 // Validation & Submission
 async function processPayment(e) {
     e.preventDefault();
     
-    let valid = true;
-    
-    // Validate Card Number (16 digits)
-    const cardNo = document.getElementById('card_number').value.replace(/\s/g, '');
-    if (cardNo.length < 15 || cardNo.length > 19) {
-        document.getElementById('card-error').classList.remove('hidden');
-        valid = false;
+    const fileInput = document.getElementById('receipt_file');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        document.getElementById('file-error').classList.remove('hidden');
+        return;
     }
     
-    // Validate Expiry (MM/YY)
-    const exp = document.getElementById('card_expiry').value;
-    const expParts = exp.split('/');
-    if (expParts.length !== 2 || parseInt(expParts[0]) > 12 || parseInt(expParts[0]) === 0 || expParts[1].length !== 2) {
-        document.getElementById('expiry-error').classList.remove('hidden');
-        valid = false;
-    } else {
-        // Optional: Check if expired
-        const now = new Date();
-        const year = parseInt("20" + expParts[1]);
-        const month = parseInt(expParts[0]);
-        if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) {
-            document.getElementById('expiry-error').textContent = "Card has expired.";
-            document.getElementById('expiry-error').classList.remove('hidden');
-            valid = false;
-        }
-    }
-    
-    // Validate CVV (3 or 4 digits)
-    const cvv = document.getElementById('card_cvv').value;
-    if (cvv.length < 3) {
-        document.getElementById('cvv-error').classList.remove('hidden');
-        valid = false;
-    }
-
-    if (!valid) return;
-
-    // Simulate Processing
     const payBtn = document.getElementById('pay-btn');
     const loader = document.getElementById('processing-loader');
     
     payBtn.disabled = true;
-    payBtn.innerHTML = '<i class="ti ti-check text-xl"></i> Submitting...';
+    payBtn.innerHTML = '<i class="ti ti-loader animate-spin text-xl"></i> Submitting...';
     loader.classList.remove('hidden');
     loader.classList.add('flex');
 
-    // Wait 2 seconds for dramatic effect
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Create FormData
+    const formData = new FormData();
+    formData.append('payment_method', 'bank');
+    formData.append('total_amount', finalTotalAmount);
+    formData.append('items', JSON.stringify(finalItemsPayload));
+    formData.append('receipt_file', fileInput.files[0]);
 
     // Submit Order to API
     try {
         const res = await fetch('api/orders.php', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                total_amount: finalTotalAmount,
-                items: finalItemsPayload
-            })
+            body: formData
         });
         const data = await res.json();
         
@@ -338,7 +389,7 @@ async function processPayment(e) {
         } else {
             alert(data.message || 'Error processing order.');
             payBtn.disabled = false;
-            payBtn.innerHTML = `<i class="ti ti-lock text-xl"></i> Pay LKR <span id="btn-total">${finalTotalAmount.toLocaleString()}</span>`;
+            payBtn.innerHTML = `<i class="ti ti-check text-xl"></i> Place Order (LKR <span id="btn-total">${finalTotalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>)`;
             loader.classList.add('hidden');
             loader.classList.remove('flex');
         }
@@ -346,7 +397,7 @@ async function processPayment(e) {
         console.error(err);
         alert('Network error occurred.');
         payBtn.disabled = false;
-        payBtn.innerHTML = `<i class="ti ti-lock text-xl"></i> Pay LKR <span id="btn-total">${finalTotalAmount.toLocaleString()}</span>`;
+        payBtn.innerHTML = `<i class="ti ti-check text-xl"></i> Place Order (LKR <span id="btn-total">${finalTotalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>)`;
         loader.classList.add('hidden');
         loader.classList.remove('flex');
     }

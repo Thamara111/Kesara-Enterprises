@@ -9,12 +9,17 @@ $has_supplier = in_array($role, ['admin', 'supplier_manager']);
 $has_delivery = in_array($role, ['admin', 'delivery_manager']);
 
 $pending_approvals_count = 0;
+$pending_verification_count = 0;
 if (isset($pdo)) {
     try {
         $stmt_pending = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'pending'");
         $pending_approvals_count = (int)$stmt_pending->fetchColumn();
+
+        $stmt_pending_orders = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending' AND deleted_at IS NULL");
+        $pending_verification_count = (int)$stmt_pending_orders->fetchColumn();
     } catch (\Exception $e) {
         $pending_approvals_count = 0;
+        $pending_verification_count = 0;
     }
 }
 ?>

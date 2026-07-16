@@ -2,7 +2,7 @@
 $admin_orders = [];
 if (isset($pdo) && $pdo !== null) {
     try {
-        $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, u.business_name AS company, u.first_name, u.last_name, u.email 
+        $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, o.payment_receipt, u.business_name AS company, u.first_name, u.last_name, u.email 
                              FROM orders o 
                              JOIN users u ON o.user_id = u.id 
                              WHERE o.deleted_at IS NULL");
@@ -14,8 +14,8 @@ if (isset($pdo) && $pdo !== null) {
             $status_lower = strtolower($ord['status']);
             $badgeText = strtoupper($ord['status']);
             if ($status_lower === 'pending') {
-                $badgeClass = 'bg-amber-50 text-amber-605 text-amber-600 border-amber-100';
-                $badgeText = 'PENDING PAYMENT';
+                $badgeClass = 'bg-amber-50 text-amber-600 border-amber-100';
+                $badgeText = 'VERIFICATION QUEUE';
             } elseif ($status_lower === 'processing') {
                 $badgeClass = 'bg-blue-50 text-blue-600 border-blue-100';
             } elseif ($status_lower === 'shipped') {
@@ -103,7 +103,8 @@ if (isset($pdo) && $pdo !== null) {
                 'date' => date('d M Y, g:i A', strtotime($ord['created_at'])),
                 'total' => number_format((float)$ord['total'], 2),
                 'items' => $items,
-                'timeline' => $timeline
+                'timeline' => $timeline,
+                'paymentReceipt' => $ord['payment_receipt']
             ];
         }
     } catch (\Exception $e) {
@@ -185,7 +186,7 @@ if (isset($pdo) && $pdo !== null) {
             <!-- Status Tabs -->
             <div class="flex flex-wrap gap-2 pb-2">
                 <button class="status-tab active-tab px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all" data-status="all">All</button>
-                <button class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all" data-status="pending">Pending</button>
+                <button class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all" data-status="pending">Verification Queue</button>
                 <button class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all" data-status="processing">Processing</button>
                 <button class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all" data-status="shipped">Shipped</button>
                 <button class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all" data-status="delivered">Delivered</button>
@@ -204,27 +205,28 @@ if (isset($pdo) && $pdo !== null) {
                 </div>
                 <?php else: ?>
                 <?php foreach ($admin_orders as $idx => $o): ?>
-                <div id="order-card-<?= $idx ?>" class="order-card border border-gray-100 rounded-3xl p-6 bg-white cursor-pointer relative"
-                     data-idx="<?= $idx ?>"
-                     data-id="<?= htmlspecialchars($o['id']) ?>"
-                     data-formatted-id="<?= htmlspecialchars($o['formattedId']) ?>"
-                     data-status="<?= htmlspecialchars($o['status']) ?>"
-                     data-badge="<?= htmlspecialchars($o['badge']) ?>"
-                     data-badgetext="<?= htmlspecialchars($o['badgeText']) ?>"
-                     data-company="<?= htmlspecialchars($o['company']) ?>"
-                     data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
-                     data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
-                     data-date="<?= htmlspecialchars($o['date']) ?>"
-                     data-total="<?= htmlspecialchars($o['total']) ?>"
-                     data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
-                     data-timeline="<?= htmlspecialchars(json_encode($o['timeline'])) ?>"
-                     onclick="selectOrder(this)">
+                 <div id="order-card-<?= $idx ?>" class="order-card border border-gray-100 rounded-3xl p-6 bg-white cursor-pointer relative"
+                      data-idx="<?= $idx ?>"
+                      data-id="<?= htmlspecialchars($o['id']) ?>"
+                      data-formatted-id="<?= htmlspecialchars($o['formattedId']) ?>"
+                      data-status="<?= htmlspecialchars($o['status']) ?>"
+                      data-badge="<?= htmlspecialchars($o['badge']) ?>"
+                      data-badgetext="<?= htmlspecialchars($o['badgeText']) ?>"
+                      data-company="<?= htmlspecialchars($o['company']) ?>"
+                      data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
+                      data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
+                      data-date="<?= htmlspecialchars($o['date']) ?>"
+                      data-total="<?= htmlspecialchars($o['total']) ?>"
+                      data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
+                      data-timeline="<?= htmlspecialchars(json_encode($o['timeline'])) ?>"
+                      data-payment-receipt="<?= htmlspecialchars($o['paymentReceipt'] ?? '') ?>"
+                      onclick="selectOrder(this)">
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <h3 class="text-sm font-bold text-gray-900"><?= htmlspecialchars($o['formattedId']) ?></h3>
                             <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5"><?= htmlspecialchars($o['company']) ?></p>
                         </div>
-                        <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'PENDING', $o['badgeText'])) ?></span>
+                        <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'VERIFICATION QUEUE', $o['badgeText'])) ?></span>
                     </div>
                     <div class="flex justify-between items-center text-xs font-medium">
                         <span class="text-gray-400"><?= htmlspecialchars(explode(',', $o['date'])[0]) ?></span>
@@ -263,10 +265,34 @@ if (isset($pdo) && $pdo !== null) {
         <div class="flex-1 overflow-y-auto p-10 space-y-10">
             <!-- Client Info Card -->
             <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
-                <div class="w-12 h-12 bg-brand-light text-brand rounded-2xl flex items-center justify-center font-black text-sm">KP</div>
+                <div id="d-initials" class="w-12 h-12 bg-brand-light text-brand rounded-2xl flex items-center justify-center font-black text-sm">KP</div>
                 <div>
                     <h3 id="d-client" class="text-sm font-bold text-gray-900">Kamal Perera</h3>
                     <p id="d-email" class="text-xs text-gray-400 font-semibold mt-0.5">kamal@abc.lk</p>
+                </div>
+            </div>
+
+            <!-- Payment Receipt Section -->
+            <div id="d-receipt-container" class="space-y-4 hidden">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment Receipt</h3>
+                <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-brand-light text-brand rounded-xl flex items-center justify-center border border-brand/10">
+                                <i class="ti ti-receipt text-xl"></i>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-gray-900">Bank Transfer Receipt</p>
+                                <p class="text-[10px] text-gray-400 mt-0.5">Customer Verification File</p>
+                            </div>
+                        </div>
+                        <button id="d-receipt-btn" onclick="openReceiptModal()" class="px-3.5 py-2 bg-brand text-brand-light hover:bg-brand-dark rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm">
+                            <i class="ti ti-eye"></i>View File
+                        </button>
+                    </div>
+                    <div id="d-receipt-preview" class="h-48 w-full border border-gray-100 rounded-2xl overflow-hidden bg-gray-50 flex items-center justify-center p-2">
+                        <!-- Preview content goes here -->
+                    </div>
                 </div>
             </div>
 
@@ -383,15 +409,35 @@ if (isset($pdo) && $pdo !== null) {
 .toast-info .toast-title { color: #374151; }
 .toast-info .toast-progress { background: #6b7280; }
 </style>
+<!-- Receipt Modal Popup -->
+<div id="receipt-modal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] flex items-center justify-center p-4" onclick="if(event.target === this) closeReceiptModal()">
+    <div class="bg-white rounded-3xl flex flex-col shadow-2xl relative overflow-hidden" style="width:820px;height:700px;">
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-100 flex items-center justify-between bg-white">
+            <div>
+                <h3 class="text-base font-bold text-gray-900">Payment Receipt</h3>
+                <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5" id="receipt-modal-title">Receipt Preview</p>
+            </div>
+            <button onclick="closeReceiptModal()" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                <i class="ti ti-x text-xl"></i>
+            </button>
+        </div>
+        <!-- Content Body -->
+        <div class="flex-1 p-4 bg-gray-50 overflow-auto flex items-center justify-center" id="receipt-modal-content">
+            <!-- Injected dynamically -->
+        </div>
+    </div>
+</div>
 
 <div id="toast-container"></div>
 <script>
 const availableDrivers = <?php echo json_encode($available_drivers); ?>;
 
 function getInitials(name) {
-    const parts = name.split(' ');
+    if (!name || typeof name !== 'string') return '';
+    const parts = name.trim().split(/\s+/);
     let initials = '';
-    parts.forEach(p => initials += p.charAt(0).toUpperCase());
+    parts.forEach(p => { if (p) initials += p.charAt(0).toUpperCase(); });
     return initials.substring(0, 2);
 }
 
@@ -419,11 +465,76 @@ function selectOrder(el, openDrawer = true) {
     badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ' + el.dataset.badge;
     badge.textContent = el.dataset.badgetext;
     
-    document.querySelector('.w-12.h-12.bg-brand-light').textContent = getInitials(el.dataset.clientname);
+    const initialsEl = document.getElementById('d-initials');
+    if (initialsEl) {
+        initialsEl.textContent = getInitials(el.dataset.clientname);
+    }
     document.getElementById('d-client').textContent = el.dataset.clientname;
     document.getElementById('d-email').textContent = el.dataset.clientemail;
     
     document.getElementById('d-total').textContent = 'LKR ' + el.dataset.total;
+    
+    // Render Payment Receipt
+    const receiptPath = el.dataset.paymentReceipt;
+    const receiptContainer = document.getElementById('d-receipt-container');
+    const receiptBtn = document.getElementById('d-receipt-btn');
+    const receiptPreview = document.getElementById('d-receipt-preview');
+
+    if (receiptPath && receiptPath.trim() !== '') {
+        receiptContainer.classList.remove('hidden');
+        const fullReceiptPath = '/' + receiptPath;
+        receiptBtn.dataset.receiptPath = fullReceiptPath;
+        
+        const ext = receiptPath.split('.').pop().toLowerCase();
+        if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+            receiptPreview.innerHTML = `<img src="${fullReceiptPath}" alt="Payment Receipt" class="max-h-40 object-contain rounded-lg hover:scale-105 transition-transform cursor-zoom-in" onclick="openReceiptModal()">`;
+        } else {
+            receiptPreview.innerHTML = `<div class="p-4 text-center text-xs font-medium text-gray-400 flex flex-col items-center gap-2 w-full cursor-pointer" onclick="openReceiptModal()">
+                <i class="ti ti-file-type-pdf text-3xl text-red-500"></i>
+                <span>PDF Document - Click to preview</span>
+            </div>`;
+        }
+    } else {
+        receiptContainer.classList.add('hidden');
+    }
+    renderOrderDetails(el);
+}
+
+// Modal Helpers (Global Scope)
+function openReceiptModal() {
+    const receiptBtn = document.getElementById('d-receipt-btn');
+    if (!receiptBtn) return;
+    const path = receiptBtn.dataset.receiptPath;
+    if (!path) return;
+    
+    const contentEl = document.getElementById('receipt-modal-content');
+    const ext = path.split('.').pop().toLowerCase();
+    
+    if (ext === 'pdf') {
+        contentEl.innerHTML = `<iframe src="${path}" class="w-full h-full border-0 rounded-2xl bg-white"></iframe>`;
+    } else {
+        contentEl.innerHTML = `<img src="${path}" alt="Payment Receipt" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:0.75rem;">`;
+    }
+    
+    const modal = document.getElementById('receipt-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function closeReceiptModal() {
+    const modal = document.getElementById('receipt-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+    const contentEl = document.getElementById('receipt-modal-content');
+    if (contentEl) contentEl.innerHTML = '';
+}
+
+// Continue selectOrder items and timeline rendering inside selectOrder function body
+function renderOrderDetails(el) {
     
     // Render Items
     const itemsContainer = document.getElementById('d-items');
@@ -477,7 +588,7 @@ function selectOrder(el, openDrawer = true) {
     if (status_lower === 'pending') {
         actionContainer.innerHTML = `
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="updateStatus(${oid}, 'processing')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Accept Payment</button>
+                <button onclick="updateStatus(${oid}, 'processing')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Approve & Process</button>
                 <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
             </div>
         `;
@@ -692,6 +803,20 @@ function closeOrderDetailPane() {
 }
 
 // ── Initial render ─────────────────────────────────────────────────────────
+const urlParams = new URLSearchParams(window.location.search);
+const tabParam = urlParams.get('tab');
+if (tabParam) {
+    const targetTab = document.querySelector(`.status-tab[data-status="${tabParam}"]`);
+    if (targetTab) {
+        document.querySelectorAll('.status-tab').forEach(b => {
+            b.classList.remove('active-tab');
+            b.classList.add('bg-gray-50', 'text-gray-400', 'border', 'border-transparent');
+        });
+        targetTab.classList.add('active-tab');
+        targetTab.classList.remove('bg-gray-50', 'text-gray-400', 'border', 'border-transparent');
+        activeStatus = tabParam;
+    }
+}
 applyFilters();
 // Pane starts hidden on all screen sizes — opens only when a row is clicked
 </script>

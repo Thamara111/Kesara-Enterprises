@@ -380,6 +380,28 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
                         <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
                     </div>
                 </div>
+
+                <!-- Simulation Controls Panel (Driver Only) -->
+                <div class="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-2 mt-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Simulation Controls</span>
+                        <span id="drv-sim-status" class="text-[10px] font-bold uppercase tracking-wider text-amber-600">Stopped</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button id="drv-btn-play" onclick="driverToggleSimulation()" class="flex flex-col items-center justify-center gap-1 p-2 bg-brand text-brand-light rounded-xl hover:opacity-90 transition-all font-bold text-[10px] shadow-md shadow-brand/10">
+                            <i class="ti ti-player-play text-sm"></i>
+                            <span id="drv-btn-play-text">Start</span>
+                        </button>
+                        <!-- <button id="drv-btn-speed" onclick="driverToggleSpeed()" class="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-all font-bold text-[10px]">
+                            <i class="ti ti-bolt text-sm text-amber-500"></i>
+                            <span id="drv-speed-label">1x</span>
+                        </button> -->
+                        <button onclick="driverStepNextStop()" class="flex flex-col items-center justify-center gap-1 p-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl transition-all font-bold text-[10px]">
+                            <i class="ti ti-arrow-forward-up text-sm text-blue-500"></i>
+                            <span>Skip</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- Stops List -->
@@ -396,7 +418,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
 
 <!-- Delivery Confirmation Modal (Slider Style for Native feel) -->
 <div id="confirm-modal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
-    <div class="bg-white w-full max-w-[480px] rounded-t-3xl p-6 space-y-6 transform translate-y-full transition-all duration-300">
+    <div class="bg-white w-full max-w-[380px] rounded-t-3xl p-6 space-y-6 transform translate-y-full transition-all duration-300">
         <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto"></div>
         <div class="text-center space-y-1">
             <h3 class="text-lg font-bold text-gray-900">Confirm Delivery</h3>
@@ -424,29 +446,93 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
     </div>
 </div>
 
-<!-- Delay / Failure Modal -->
+<!-- Did Not Deliver Modal (Enhanced) -->
 <div id="fail-modal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
-    <div class="bg-white w-full max-w-[480px] rounded-t-3xl p-6 space-y-6 transform translate-y-full transition-all duration-300">
+    <div class="bg-white w-full max-w-[380px] rounded-t-3xl p-6 space-y-5 transform translate-y-full transition-all duration-300">
         <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto"></div>
-        <div class="text-center space-y-1">
-            <h3 class="text-lg font-bold text-red-650">Report Delivery Issue</h3>
-            <p id="fail-stop-name" class="text-xs text-gray-500">KE-2025-00847 · ABC Garments</p>
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                <i class="ti ti-truck-off text-xl text-red-500"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-gray-900">Did Not Deliver</h3>
+                <p id="fail-stop-name" class="text-xs text-gray-500 mt-0.5">KE-2025-00847 · ABC Garments</p>
+            </div>
         </div>
 
-        <!-- Failure Reasons -->
+        <!-- Quick-select reasons -->
         <div class="space-y-2">
-            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Reason for Failure</label>
-            <select id="fail-reason" class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold text-gray-800 outline-none cursor-pointer">
-                <option>Customer Warehouse Closed</option>
-                <option>Representative Not Available</option>
-                <option>Rejected: Damage during transit</option>
-                <option>Incorrect delivery instructions</option>
-            </select>
+            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Select Reason</label>
+            <div class="grid grid-cols-2 gap-2" id="fail-reason-chips">
+                <button onclick="selectFailReason(this, 'Customer warehouse closed')" class="fail-chip px-3 py-2.5 rounded-xl border border-gray-200 text-[10px] font-bold text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-all text-left">
+                    <i class="ti ti-building-off block text-base mb-0.5"></i>Warehouse Closed
+                </button>
+                <button onclick="selectFailReason(this, 'Representative not available')" class="fail-chip px-3 py-2.5 rounded-xl border border-gray-200 text-[10px] font-bold text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-all text-left">
+                    <i class="ti ti-user-off block text-base mb-0.5"></i>No Representative
+                </button>
+                <button onclick="selectFailReason(this, 'Wrong address / location not found')" class="fail-chip px-3 py-2.5 rounded-xl border border-gray-200 text-[10px] font-bold text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-all text-left">
+                    <i class="ti ti-map-pin-off block text-base mb-0.5"></i>Wrong Address
+                </button>
+                <button onclick="selectFailReason(this, 'Customer refused delivery')" class="fail-chip px-3 py-2.5 rounded-xl border border-gray-200 text-[10px] font-bold text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-all text-left">
+                    <i class="ti ti-hand-stop block text-base mb-0.5"></i>Customer Refused
+                </button>
+                <button onclick="selectFailReason(this, 'Damaged goods — rejected')" class="fail-chip px-3 py-2.5 rounded-xl border border-gray-200 text-[10px] font-bold text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-all text-left">
+                    <i class="ti ti-package-off block text-base mb-0.5"></i>Damaged Goods
+                </button>
+                <button onclick="selectFailReason(this, 'Other reason (see notes)')" class="fail-chip px-3 py-2.5 rounded-xl border border-gray-200 text-[10px] font-bold text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-all text-left">
+                    <i class="ti ti-dots-circle-horizontal block text-base mb-0.5"></i>Other
+                </button>
+            </div>
         </div>
+
+        <!-- Optional notes -->
+        <div class="space-y-1.5">
+            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Additional Notes <span class="text-gray-300">(optional)</span></label>
+            <textarea id="fail-notes" rows="2" placeholder="Add any extra details here..." class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-red-200 resize-none transition-all"></textarea>
+        </div>
+
+        <input type="hidden" id="fail-reason" value="">
 
         <div class="grid grid-cols-2 gap-3">
             <button onclick="closeFailure()" class="px-4 py-3 bg-gray-100 hover:bg-gray-150 rounded-xl text-xs font-bold text-gray-700 transition-all">Cancel</button>
-            <button onclick="submitFailure()" class="px-4 py-3 bg-red-650 bg-red-600 text-white hover:opacity-90 rounded-xl text-xs font-bold transition-all shadow-lg shadow-red-100">Report Failure</button>
+            <button onclick="submitFailure()" style="background-color: #dc2626; color: white;" class="px-4 py-3 hover:opacity-90 rounded-xl text-xs font-bold transition-all shadow-lg shadow-red-100">Confirm Undelivered</button>
+        </div>
+    </div>
+</div>
+
+<!-- Pickup Confirmation Modal -->
+<div id="pickup-modal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-white w-full max-w-[380px] rounded-t-3xl p-6 space-y-5 transform translate-y-full transition-all duration-300">
+        <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto"></div>
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-brand-light flex items-center justify-center flex-shrink-0">
+                <i class="ti ti-package-import text-xl text-brand"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-gray-900">Confirm Pickup</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Verify you have collected all items</p>
+            </div>
+        </div>
+
+        <!-- Order list being picked up -->
+        <div class="space-y-1.5">
+            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Orders in this Run</label>
+            <div id="pickup-order-list" class="bg-gray-50 rounded-xl divide-y divide-gray-100 max-h-40 overflow-y-auto">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Checklist confirmation -->
+        <label class="flex items-start gap-3 cursor-pointer group">
+            <input type="checkbox" id="pickup-confirmed-check" class="mt-0.5 w-4 h-4 accent-brand rounded cursor-pointer">
+            <span class="text-xs font-semibold text-gray-700 leading-relaxed">I confirm that I have physically collected <strong>all packages</strong> listed above from the warehouse and they are loaded in my vehicle.</span>
+        </label>
+
+        <div class="grid grid-cols-2 gap-3">
+            <button onclick="closePickupModal()" class="px-4 py-3 bg-gray-100 hover:bg-gray-150 rounded-xl text-xs font-bold text-gray-700 transition-all">Cancel</button>
+            <button onclick="confirmPickup()" class="px-4 py-3 bg-brand text-brand-light hover:opacity-90 rounded-xl text-xs font-bold transition-all shadow-lg shadow-brand/10">
+                <i class="ti ti-truck-delivery mr-1"></i>Depart Now
+            </button>
         </div>
     </div>
 </div>
@@ -694,14 +780,25 @@ function renderDashboard() {
             const isNextStop = firstIncomplete && firstIncomplete.num === s.num;
             
             if (isNextStop && activeRun.badgeText !== 'Completed') {
-                actionsHtml = `
-                    <div class="mt-4 pt-3 border-t border-gray-100">
-                        <button onclick="departStop(${s.num})" class="w-full flex items-center justify-center gap-2 py-2.5 bg-brand text-brand-light hover:opacity-90 rounded-xl text-[10px] font-bold transition-colors shadow-md shadow-brand/10">
-                            <i class="ti ti-truck-delivery text-base"></i>
-                            Start Leg: Depart towards Stop
-                        </button>
-                    </div>
-                `;
+                if (activeRun.badgeText === 'Pending') {
+                    actionsHtml = `
+                        <div class="mt-4 pt-3 border-t border-gray-100">
+                            <button onclick="openPickupModal(${s.num})" class="w-full flex items-center justify-center gap-2 py-2.5 bg-brand text-brand-light hover:opacity-90 rounded-xl text-[10px] font-bold transition-colors shadow-md shadow-brand/10">
+                                <i class="ti ti-package-import text-base"></i>
+                                Confirm Pickup & Depart
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    actionsHtml = `
+                        <div class="mt-4 pt-3 border-t border-gray-100">
+                            <button onclick="departStop(${s.num})" class="w-full flex items-center justify-center gap-2 py-2.5 bg-brand text-brand-light hover:opacity-90 rounded-xl text-[10px] font-bold transition-colors shadow-md shadow-brand/10">
+                                <i class="ti ti-truck-delivery text-base"></i>
+                                Depart towards Stop ${s.num}
+                            </button>
+                        </div>
+                    `;
+                }
             }
         }
         
@@ -728,19 +825,93 @@ function renderDashboard() {
     }
 }
 
+// Extract numeric order ID from stop name "KE-2025-00123 · Company"
+function extractOrderId(stopName) {
+    const match = stopName.match(/KE-\d{4}-(\d+)/);
+    return match ? parseInt(match[1], 10) : null;
+}
+
+// POST order status update to DB via API
+function updateOrderStatus(orderId, status) {
+    if (!orderId) return;
+    fetch('/api/orders.php?action=update_status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: orderId, status: status })
+    }).catch(() => { /* silently fail — localStorage state stays intact */ });
+}
+
+// Pickup Confirmation Modal
+let pendingDepartStopNum = null;
+
+function openPickupModal(stopNum) {
+    pendingDepartStopNum = stopNum;
+    
+    // Populate order list
+    const listEl = document.getElementById('pickup-order-list');
+    if (activeRun && activeRun.stops) {
+        listEl.innerHTML = activeRun.stops.map(s => `
+            <div class="px-4 py-2.5 flex items-center gap-3">
+                <i class="ti ti-package text-brand text-sm flex-shrink-0"></i>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-bold text-gray-800 truncate">${s.name.split(' · ')[0]}</p>
+                    <p class="text-[10px] text-gray-400 truncate">${s.name.split(' · ')[1] || ''} · ${s.addr}</p>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    // Reset checkbox
+    document.getElementById('pickup-confirmed-check').checked = false;
+    
+    const modal = document.getElementById('pickup-modal');
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    modal.classList.add('opacity-100');
+    const panel = modal.querySelector('div');
+    panel.classList.remove('translate-y-full');
+    panel.classList.add('translate-y-0');
+}
+
+function closePickupModal() {
+    const modal = document.getElementById('pickup-modal');
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    modal.classList.remove('opacity-100');
+    const panel = modal.querySelector('div');
+    panel.classList.add('translate-y-full');
+    panel.classList.remove('translate-y-0');
+    pendingDepartStopNum = null;
+}
+
+function confirmPickup() {
+    const checked = document.getElementById('pickup-confirmed-check').checked;
+    if (!checked) {
+        showToast('Please confirm you have collected all packages', 'error');
+        return;
+    }
+    closePickupModal();
+    departStop(pendingDepartStopNum);
+}
+
 // Start moving towards stop
 function departStop(stopNum) {
     if (activeRun.badgeText === 'Pending') {
         activeRun.badgeText = 'Active';
         activeRun.badge = 'bg-blue-50 text-blue-770 border-blue-100';
-        logDriverTelemetry(`Run dispatched from depot.`, 'SYSTEM');
+        logDriverTelemetry(activeRun, `Run dispatched from depot.`, 'SYSTEM');
+        
+        // Mark ALL stops in this run as shipped in DB
+        activeRun.stops.forEach(s => {
+            const orderId = extractOrderId(s.name);
+            updateOrderStatus(orderId, 'shipped');
+        });
+        showToast('Orders marked as Shipped in system', 'info');
     }
     
     const stop = activeRun.stops.find(s => s.num === stopNum);
     if (!stop) return;
     
     stop.status = 'In progress';
-    logDriverTelemetry(`En route to Stop ${stop.num}: ${stop.name.split(' · ')[1]}`, 'GPS');
+    logDriverTelemetry(activeRun, `En route to Stop ${stop.num}: ${stop.name.split(' · ')[1]}`, 'GPS');
     
     // Save to localStorage
     localStorage.setItem('ke_assignments', JSON.stringify(assignments));
@@ -805,6 +976,10 @@ function submitDelivery() {
         stop.status = `Delivered ${timeStr}`;
         logDriverTelemetry(activeRun, `Stop ${stop.num} Delivered: Proof of delivery verified.`, 'DELIVERED');
         
+        // Update this stop's order to 'delivered' in DB
+        const orderId = extractOrderId(stop.name);
+        updateOrderStatus(orderId, 'delivered');
+        
         // If it was the last stop, mark run as completed!
         const nextIncomplete = activeRun.stops.find(s => s.status === 'Not started' || s.status === 'In progress');
         if (!nextIncomplete) {
@@ -820,6 +995,9 @@ function submitDelivery() {
                 document.getElementById('gps-toggle').checked = false;
                 document.getElementById('gps-telemetry-hud').style.display = 'none';
             }
+            
+            // Stop simulation ticker if running
+            stopDriverSimulation();
         }
         
         localStorage.setItem('ke_assignments', JSON.stringify(assignments));
@@ -829,11 +1007,32 @@ function submitDelivery() {
     }
 }
 
+// Reason chip selection for Did Not Deliver modal
+function selectFailReason(btn, reason) {
+    // Clear all chips
+    document.querySelectorAll('.fail-chip').forEach(c => {
+        c.classList.remove('border-red-400', 'bg-red-50', 'text-red-700');
+        c.classList.add('border-gray-200', 'text-gray-600');
+    });
+    // Highlight selected
+    btn.classList.add('border-red-400', 'bg-red-50', 'text-red-700');
+    btn.classList.remove('border-gray-200', 'text-gray-600');
+    document.getElementById('fail-reason').value = reason;
+}
+
 // Failure Modal Actions
 function openFailureModal(stopNum) {
     currentModalStopNum = stopNum;
     const stop = activeRun.stops.find(s => s.num === stopNum);
     document.getElementById('fail-stop-name').textContent = stop ? stop.name : '';
+    
+    // Reset reason state
+    document.getElementById('fail-reason').value = '';
+    document.getElementById('fail-notes').value = '';
+    document.querySelectorAll('.fail-chip').forEach(c => {
+        c.classList.remove('border-red-400', 'bg-red-50', 'text-red-700');
+        c.classList.add('border-gray-200', 'text-gray-600');
+    });
     
     const modal = document.getElementById('fail-modal');
     modal.classList.remove('opacity-0', 'pointer-events-none');
@@ -856,24 +1055,152 @@ function closeFailure() {
 
 function submitFailure() {
     const reason = document.getElementById('fail-reason').value;
+    const notes = document.getElementById('fail-notes').value.trim();
+    
+    if (!reason) {
+        showToast('Please select a reason', 'error');
+        return;
+    }
+    
     const stop = activeRun.stops.find(s => s.num === currentModalStopNum);
     if (stop) {
-        stop.status = `Failed: ${reason}`;
-        logDriverTelemetry(activeRun, `Stop ${stop.num} Failed: ${reason}`, 'WARN');
+        const fullReason = notes ? `${reason} — ${notes}` : reason;
+        stop.status = `Failed: ${fullReason}`;
+        logDriverTelemetry(activeRun, `Stop ${stop.num} Not Delivered: ${fullReason}`, 'WARN');
         
-        // Check if run completed (even if failed)
+        // Update order status to failed in DB
+        const orderId = extractOrderId(stop.name);
+        updateOrderStatus(orderId, 'failed');
+        
+        // Check if run completed (even with failures)
         const nextIncomplete = activeRun.stops.find(s => s.status === 'Not started' || s.status === 'In progress');
         if (!nextIncomplete) {
             activeRun.badgeText = 'Completed';
             activeRun.badge = 'bg-emerald-50 text-emerald-700 border-emerald-100';
             logDriverTelemetry(activeRun, `Run complete with issues. Returning to warehouse.`, 'SYSTEM');
+            stopDriverSimulation();
         }
         
         localStorage.setItem('ke_assignments', JSON.stringify(assignments));
         closeFailure();
         renderApp();
-        showToast('Issue reported successfully', 'error');
+        showToast('Non-delivery recorded', 'error');
     }
+}
+
+// ============================================================
+// DRIVER SIMULATION CONTROLS
+// ============================================================
+let driverSimInterval = null;
+let driverSimSpeed = 1; // 1x, 2x, 5x
+let driverIsSimulating = false;
+
+function driverToggleSimulation() {
+    if (!activeRun) return;
+    if (activeRun.badgeText === 'Completed') {
+        showToast('This run is already completed.', 'error');
+        return;
+    }
+
+    if (activeRun.badgeText === 'Pending') {
+        // Kick off the run: mark Active, set first stop In Progress
+        activeRun.badgeText = 'Active';
+        activeRun.badge = 'bg-blue-50 text-blue-770 border-blue-100';
+        activeRun.stops[0].status = 'In progress';
+        logDriverTelemetry(activeRun, `Run ${activeRun.id} started by driver. En route to Stop 1.`, 'SYSTEM');
+
+        // Mark ALL orders in this run as shipped
+        activeRun.stops.forEach(s => {
+            const orderId = extractOrderId(s.name);
+            updateOrderStatus(orderId, 'shipped');
+        });
+        showToast('Run started — orders marked as Shipped', 'success');
+
+        localStorage.setItem('ke_assignments', JSON.stringify(assignments));
+        renderApp();
+    }
+
+    if (driverIsSimulating) {
+        stopDriverSimulation();
+        showToast('Simulation paused', 'info');
+    } else {
+        driverIsSimulating = true;
+        document.getElementById('drv-sim-status').textContent = 'Live';
+        document.getElementById('drv-sim-status').className = 'text-[10px] font-bold uppercase tracking-wider text-emerald-600';
+        document.getElementById('drv-btn-play-text').textContent = 'Pause';
+        document.querySelector('#drv-btn-play i').className = 'ti ti-player-pause text-sm';
+        startDriverSimInterval();
+        showToast('Simulation running', 'success');
+    }
+}
+
+function stopDriverSimulation() {
+    driverIsSimulating = false;
+    if (driverSimInterval) { clearInterval(driverSimInterval); driverSimInterval = null; }
+    const statusEl = document.getElementById('drv-sim-status');
+    if (statusEl) {
+        statusEl.textContent = 'Stopped';
+        statusEl.className = 'text-[10px] font-bold uppercase tracking-wider text-amber-600';
+    }
+    const playTextEl = document.getElementById('drv-btn-play-text');
+    if (playTextEl) playTextEl.textContent = 'Start';
+    const playIconEl = document.querySelector('#drv-btn-play i');
+    if (playIconEl) playIconEl.className = 'ti ti-player-play text-sm';
+}
+
+function startDriverSimInterval() {
+    if (driverSimInterval) clearInterval(driverSimInterval);
+    const ms = Math.max(1500 / driverSimSpeed, 300);
+    driverSimInterval = setInterval(driverSimulateTick, ms);
+}
+
+function driverSimulateTick() {
+    if (!activeRun) return;
+    const inProgressStop = activeRun.stops.find(s => s.status === 'In progress');
+    if (!inProgressStop) {
+        // All stops done — complete the run
+        stopDriverSimulation();
+        activeRun.badgeText = 'Completed';
+        activeRun.badge = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+        logDriverTelemetry(activeRun, 'All stops completed. Returning to warehouse.', 'SYSTEM');
+        showToast('Run completed! All orders delivered.', 'success');
+        localStorage.setItem('ke_assignments', JSON.stringify(assignments));
+        renderApp();
+        return;
+    }
+
+    // Arrived at current stop — wait for driver action
+    stopDriverSimulation();
+    showToast(`Arrived at Stop ${inProgressStop.num}. Awaiting delivery confirmation.`, 'info');
+    logDriverTelemetry(activeRun, `Arrived at Stop ${inProgressStop.num}. Awaiting signature.`, 'SYSTEM');
+
+    localStorage.setItem('ke_assignments', JSON.stringify(assignments));
+    renderApp();
+}
+
+function driverToggleSpeed() {
+    if (driverSimSpeed === 1) {
+        driverSimSpeed = 2;
+        document.getElementById('drv-speed-label').textContent = '2x';
+    } else if (driverSimSpeed === 2) {
+        driverSimSpeed = 5;
+        document.getElementById('drv-speed-label').textContent = '5x';
+    } else {
+        driverSimSpeed = 1;
+        document.getElementById('drv-speed-label').textContent = '1x';
+    }
+    if (driverIsSimulating) {
+        clearInterval(driverSimInterval);
+        startDriverSimInterval();
+    }
+    showToast(`Speed set to ${driverSimSpeed}x`, 'info');
+}
+
+function driverStepNextStop() {
+    if (!activeRun) return;
+    if (activeRun.badgeText === 'Pending') { driverToggleSimulation(); return; }
+    if (activeRun.badgeText === 'Completed') { showToast('Already completed', 'error'); return; }
+    driverSimulateTick();
 }
 
 // GPS Simulation Ticker

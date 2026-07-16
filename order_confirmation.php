@@ -128,8 +128,11 @@ require_once __DIR__ . "/layouts/header.php";
             </div>
             <div class="text-center md:text-left flex-1">
                 <h1 class="text-2xl font-bold text-gray-900 mb-2">Order Placed Successfully</h1>
-                <p class="text-sm text-brand font-medium leading-relaxed mb-4">
-                    A confirmation has been sent to <span class="font-bold"><?= htmlspecialchars($order['email']) ?></span>
+                <p class="text-sm text-brand font-bold leading-relaxed mb-1">
+                    Thank you for uploading your payment receipt.
+                </p>
+                <p class="text-xs text-gray-500 font-semibold leading-relaxed mb-4">
+                    Our administration team is currently verifying the transaction and will initialize the order process shortly. We will notify you at <span class="font-bold text-gray-700"><?= htmlspecialchars($order['email']) ?></span> via email once confirmed.
                 </p>
                 <div class="flex flex-wrap items-center justify-center md:justify-start gap-4">
                     <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Order ID:</span>
@@ -221,7 +224,7 @@ require_once __DIR__ . "/layouts/header.php";
                         ];
 
                         $step_descriptions = [
-                            'pending' => 'Your order has been placed. Please complete the bank transfer to proceed.',
+                            'pending' => 'Our administration team is currently reviewing your uploaded payment receipt. We will verify the transaction and initialize order processing shortly, and notify you via email.',
                             'processing' => 'Payment confirmed. Our warehouse team is picking and packing your order.',
                             'shipped' => 'Your order has been dispatched! It will be delivered in 1-2 business days.',
                             'delivered' => 'Order delivered. Thank you for shopping with Kesara Enterprises!'
