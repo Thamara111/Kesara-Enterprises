@@ -15,6 +15,7 @@ CREATE TABLE users (
   last_name VARCHAR(50) NOT NULL,
   email VARCHAR(100) NOT NULL UNIQUE,
   phone VARCHAR(20) NOT NULL,
+  whatsapp_number VARCHAR(20) DEFAULT NULL,
   password VARCHAR(255) NOT NULL,
   business_name VARCHAR(100) NOT NULL,
   br_number VARCHAR(50) NOT NULL,
@@ -295,3 +296,13 @@ CREATE TABLE IF NOT EXISTS inquiries (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+-- WhatsApp Mock Messages
+CREATE TABLE IF NOT EXISTS mock_whatsapp_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  customer_id INT NULL,
+  phone VARCHAR(50) NOT NULL,
+  message TEXT NOT NULL,
+  status VARCHAR(50) DEFAULT 'delivered',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
