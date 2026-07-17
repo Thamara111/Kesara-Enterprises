@@ -9,18 +9,6 @@ header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers
 
 require_once __DIR__ . "/../database/connection.php";
 
-// Self-healing: ensure whatsapp_number column exists
-if (isset($pdo) && $pdo !== null) {
-    try {
-        $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'whatsapp_number'");
-        if (!$check->fetch()) {
-            $pdo->exec("ALTER TABLE users ADD COLUMN whatsapp_number VARCHAR(20) DEFAULT NULL");
-        }
-    } catch (\Exception $e) {
-        // Ignored
-    }
-}
-
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($method !== 'POST') {

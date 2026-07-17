@@ -11,13 +11,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $last_name = trim($_POST['last_name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $phone = trim($_POST['phone'] ?? '');
+        $whatsapp_number = trim($_POST['whatsapp_number'] ?? '');
         $password = $_POST['password'] ?? '';
         $business_name = trim($_POST['business_name'] ?? '');
         $br_number = trim($_POST['br_number'] ?? '');
         $business_type = trim($_POST['business_type'] ?? '');
         $address = trim($_POST['address'] ?? '');
 
-        if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($password) || empty($business_name) || empty($br_number) || empty($business_type) || empty($address)) {
+        if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($whatsapp_number) || empty($password) || empty($business_name) || empty($br_number) || empty($business_type) || empty($address)) {
             $error_message = "All fields are required.";
         } else {
             if ($pdo) {
@@ -28,15 +29,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $error_message = "An account with this email address already exists.";
                     } else {
                         $hashed_pass = password_hash($password, PASSWORD_BCRYPT);
-                        $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, password, business_name, br_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
-                        $insert_stmt->execute([$first_name, $last_name, $email, $phone, $hashed_pass, $business_name, $br_number, $business_type, $address]);
-                        $success_message = "Your wholesale account request has been submitted successfully! We will contact you within 24h.";
+                        $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, business_name, br_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+                        $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $business_type, $address]);
+                        
+                header("Location: ?mode=register&success=1", true, 303);
+                        exit;
                     }
                 } catch (\Exception $e) {
                     $error_message = "Database error: " . $e->getMessage();
                 }
             } else {
-                $success_message = "Your wholesale account request has been submitted successfully! We will contact you within 24h. (Offline Mode)";
+                header("Location: ?mode=register&success=1", true, 303);
+                exit;
             }
         }
     } elseif ($page_mode === 'login') {
@@ -464,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'success') {
-                    window.location.href = '/register?success=1';
+                    window.location.search = '?success=1';
                 } else {
                     showToast(data.message || 'Error requesting account.', 'error');
                     btn.disabled = false;
