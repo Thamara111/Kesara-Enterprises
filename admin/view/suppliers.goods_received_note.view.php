@@ -78,6 +78,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $up_po->execute([$new_status, $received_at, $po_id]);
 
         $pdo->commit();
+        
+        // Send email notification to admin about stock update
+        require_once __DIR__ . "/../../src/Mailer.php";
+        $subject = "Stock Updated: GRN-2025-" . str_pad($grn_id, 4, '0', STR_PAD_LEFT);
+        $body = "<h3>Goods Received Note Processed</h3>" .
+                "<p><strong>PO ID:</strong> PO-2025-" . str_pad($po_id, 4, '0', STR_PAD_LEFT) . "</p>" .
+                "<p><strong>Received By:</strong> " . htmlspecialchars($received_by) . "</p>" .
+                "<p>Inventory has been updated successfully.</p>";
+        \App\Mailer::send('admin@kesara.lk', $subject, $body);
+
         $success_msg = "Goods receipt confirmed and inventory updated successfully!";
         
         // Redirect to PO view

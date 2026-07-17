@@ -103,7 +103,7 @@ if (isset($pdo) && $pdo !== null) {
         
         // Mock WhatsApp integration
         if ($status === 'approved' || $status === 'suspended') {
-            $userStmt = $pdo->prepare("SELECT phone, first_name, admin_comment FROM users WHERE id = ?");
+            $userStmt = $pdo->prepare("SELECT email, phone, first_name, admin_comment FROM users WHERE id = ?");
             $userStmt->execute([$id]);
             $user = $userStmt->fetch();
             
@@ -123,6 +123,21 @@ if (isset($pdo) && $pdo !== null) {
                 
                 $waStmt = $pdo->prepare("INSERT INTO mock_whatsapp_messages (customer_id, phone, message) VALUES (?, ?, ?)");
                 $waStmt->execute([$id, $user['phone'], $fullMessage]);
+            }
+            
+            if ($user && !empty($user['email'])) {
+                require_once __DIR__ . "/../src/Mailer.php";
+                $emailSubject = $status === 'approved' ? "Your account has been approved!" : "Account Update: Suspended";
+                $emailBody = "<h3>Hello " . htmlspecialchars($user['first_name'] ?: 'Customer') . ",</h3>";
+                if ($status === 'approved') {
+                    $emailBody .= "<p>Your account at Kesara Enterprises has been approved! You can now log in and place orders.</p>";
+                } else {
+                    $emailBody .= "<p>Your account at Kesara Enterprises has been temporarily suspended.</p>";
+                }
+                if (!empty($user['admin_comment'])) {
+                    $emailBody .= "<p><strong>Admin Note:</strong><br/>" . nl2br(htmlspecialchars($user['admin_comment'])) . "</p>";
+                }
+                \App\Mailer::send($user['email'], $emailSubject, $emailBody);
             }
         }
         

@@ -61,6 +61,19 @@ if ($method === 'POST') {
                     $log_stmt = $pdo->prepare("INSERT INTO order_status_log (order_id, status, note, changed_by) VALUES (?, ?, ?, ?)");
                     $log_stmt->execute([$order_id, $status, $note, $user_id]);
                     
+                    // Send email notification for status update
+                    require_once __DIR__ . "/../src/Mailer.php";
+                    $user_stmt = $pdo->prepare("SELECT u.email, u.first_name FROM users u JOIN orders o ON o.user_id = u.id WHERE o.id = ?");
+                    $user_stmt->execute([$order_id]);
+                    $user_data = $user_stmt->fetch();
+                    if ($user_data && $user_data['email']) {
+                        $subject = "Order Status Update: " . ucfirst($status);
+                        $body = "<h3>Hello " . htmlspecialchars($user_data['first_name']) . ",</h3>" .
+                                "<p>Your order (ID: KE-2025-" . str_pad($order_id, 5, '0', STR_PAD_LEFT) . ") status has been updated to: <strong>" . ucfirst($status) . "</strong>.</p>" .
+                                "<p>Note: " . htmlspecialchars($note) . "</p>";
+                        \App\Mailer::send($user_data['email'], $subject, $body);
+                    }
+
                     $pdo->commit();
                     http_response_code(200);
                     echo json_encode(["status" => "success", "message" => "Status updated."]);
@@ -218,6 +231,20 @@ if ($method === 'POST') {
             $note = $payment_method === 'card' ? 'Order placed and paid via Credit Card.' : 'Order placed with bank transfer receipt.';
             $log_stmt = $pdo->prepare("INSERT INTO order_status_log (order_id, status, note, changed_by) VALUES (?, ?, ?, ?)");
             $log_stmt->execute([$order_id, $order_status, $note, $user_id]);
+
+            // Send order confirmation email
+            require_once __DIR__ . "/../src/Mailer.php";
+            $user_stmt = $pdo->prepare("SELECT email, first_name FROM users WHERE id = ?");
+            $user_stmt->execute([$user_id]);
+            $user_data = $user_stmt->fetch();
+            if ($user_data && $user_data['email']) {
+                $subject = "Order Confirmation: KE-2025-" . str_pad($order_id, 5, '0', STR_PAD_LEFT);
+                $body = "<h3>Thank you for your order, " . htmlspecialchars($user_data['first_name']) . "!</h3>" .
+                        "<p>Your order has been received and is currently marked as <strong>" . ucfirst($order_status) . "</strong>.</p>" .
+                        "<p>Total Amount: LKR " . number_format($total_amount, 2) . "</p>" .
+                        "<p>We will process it shortly.</p>";
+                \App\Mailer::send($user_data['email'], $subject, $body);
+            }
 
             $pdo->commit();
 

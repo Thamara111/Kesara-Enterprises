@@ -45,6 +45,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 $success = true;
                 
+                // Send email notification to admin
+                require_once __DIR__ . "/src/Mailer.php";
+                $subject = "New Inquiry: " . htmlspecialchars($inquiry_type);
+                $body = "<h3>New Inquiry Received</h3>" .
+                        "<p><strong>Name:</strong> " . htmlspecialchars($name) . "</p>" .
+                        "<p><strong>Business:</strong> " . htmlspecialchars($business_name) . "</p>" .
+                        "<p><strong>Email:</strong> " . htmlspecialchars($email) . "</p>" .
+                        "<p><strong>Phone:</strong> " . htmlspecialchars($phone) . "</p>" .
+                        "<p><strong>Message:</strong><br/>" . nl2br(htmlspecialchars($message)) . "</p>";
+                \App\Mailer::send('admin@kesara.lk', $subject, $body);
+
                 // Clear fields on success
                 $name = $business_name = $email = $phone = $inquiry_type = $message = '';
             } catch (\Exception $e) {

@@ -63,6 +63,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $hashed = password_hash($password, PASSWORD_BCRYPT);
                         $ins = $pdo->prepare("INSERT INTO delivery_personnel (name, email, password, phone, nic, licence_class, licence_expiry, vehicle_type, vehicle_number, status, joined_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', CURDATE())");
                         $ins->execute([$name, $email, $hashed, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number]);
+                        
+                        // Send welcome email to driver
+                        require_once __DIR__ . "/../src/Mailer.php";
+                        $subject = "Welcome to Kesara Delivery Team!";
+                        $body = "<h3>Hello " . htmlspecialchars($name) . ",</h3>" .
+                                "<p>Your driver registration was successful.</p>" .
+                                "<p>You can now log in to the driver portal using your email address and password.</p>";
+                        \App\Mailer::send($email, $subject, $body);
+
                         $success_message = "Registration successful! You can now log in.";
                     }
                 } catch (\Exception $e) {

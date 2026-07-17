@@ -74,6 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $stmt = $pdo->prepare("INSERT INTO suppliers (name, email, contact_person, phone, address, payment_terms, category, status, hold_reason, hold_since) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                     $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $category, $status, $hold_reason, $hold_since]);
                     $supplier_id = $pdo->lastInsertId();
+                    
+                    // Send welcome email to supplier
+                    require_once __DIR__ . "/../../src/Mailer.php";
+                    $subject = "Welcome to Kesara Enterprises Supplier Network";
+                    $body = "<h3>Hello " . htmlspecialchars($contact_person) . ",</h3>" .
+                            "<p>Your company <strong>" . htmlspecialchars($name) . "</strong> has been registered as a supplier with Kesara Enterprises.</p>" .
+                            "<p>We look forward to working with you.</p>";
+                    \App\Mailer::send($email, $subject, $body);
+
                     $success_msg = "Supplier created successfully.";
                 }
 
