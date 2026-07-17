@@ -38,7 +38,7 @@ if (!$can_see_prices) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout | Kesara Enterprises</title>
     <link href="/dist/output.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="/assets/tabler-icons.min.css">
 </head>
 <body class="bg-gray-50 min-h-screen text-gray-900 selection:bg-brand selection:text-white">
 

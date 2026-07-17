@@ -1,4 +1,5 @@
 <?php
+ob_start();
 $page_meta = [
     'title' => 'Your Cart | Kesara Enterprises',
     'description' => 'Review your wholesale order before checkout. Quality innerwear supplied across Sri Lanka.',

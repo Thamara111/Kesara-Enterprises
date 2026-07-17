@@ -138,7 +138,7 @@ require_once __DIR__ . "/layouts/header.php";
                     </div>
                     <!-- OpenStreetMap iframe -->
                     <div class="w-full h-80 rounded-2xl overflow-hidden border border-gray-100">
-                        <iframe width="100%" height="100%" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="https://www.openstreetmap.org/export/embed.html?bbox=79.855%2C6.915%2C79.885%2C6.945&amp;layer=mapnik&amp;marker=6.930%2C79.870" style="border: 0;"></iframe>
+                        <img src="/assets/images/static-map.png" alt="Location Map - Colombo 10" class="w-full h-full object-cover">
                     </div>
                 </div>
             </div>

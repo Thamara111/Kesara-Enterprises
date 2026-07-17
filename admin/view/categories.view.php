@@ -35,11 +35,7 @@ if (isset($pdo) && $pdo !== null) {
 }
 
 if (empty($categories_data)) {
-    $categories_data = [
-        ['id' => 1, 'name' => "Men's Briefs", 'slug' => 'mens-briefs', 'icon' => 'ti-shirt', 'description' => 'Comfortable cotton briefs for men.', 'image' => '', 'product_count' => 1],
-        ['id' => 2, 'name' => "Men's Boxers", 'slug' => 'mens-boxers', 'icon' => 'ti-shirt', 'description' => 'Premium stretch boxers.', 'image' => '', 'product_count' => 1],
-        ['id' => 3, 'name' => 'Ladies Innerwear', 'slug' => 'ladies-innerwear', 'icon' => 'ti-shirt', 'description' => 'Soft touch and premium hipster wear.', 'image' => '', 'product_count' => 1]
-    ];
+    $categories_data = [];
 }
 ?>
 

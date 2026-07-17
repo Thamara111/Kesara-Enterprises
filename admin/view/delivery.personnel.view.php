@@ -218,43 +218,7 @@ if (isset($pdo) && $pdo !== null) {
 }
 
 if (empty($admin_drivers)) {
-    // Static Fallback
-    $admin_drivers = [
-      [ 
-        'id' => 1,
-        'av' => 'NK', 
-        'avColor' => 'bg-emerald-100 text-emerald-700 border-emerald-200 shadow-emerald-100', 
-        'name' => 'Nuwan Karunaratne', 
-        'phone' => '+94 77 111 2222', 
-        'status' => 'on_run',
-        'badge' => 'bg-blue-50 text-blue-700 border-blue-100', 
-        'badgeText' => 'On run', 
-        'nic' => '198812345678', 
-        'vehicle_type' => 'motorbike',
-        'vehicle_number' => 'WP CAB-4421',
-        'licence_class' => 'B',
-        'licence_expiry' => '2027-01-15',
-        'vehicle' => 'Motorbike · WP CAB-4421', 
-        'licence' => 'B · expires Jan 2027', 
-        'zones' => ['Colombo', 'Gampaha'], 
-        'joined' => 'Mar 2022', 
-        'todayRun' => [
-          'id' => 'Assignment DA-2025-0312',
-          'desc' => '3 deliveries · Colombo 03, 07, 10',
-          'prog' => '2 of 3 delivered'
-        ], 
-        'ot' => '94%', 
-        'otW' => 94, 
-        'del' => 47, 
-        'fail' => 3, 
-        'avg' => '5.2 runs', 
-        'recent' => [
-          [ 'date' => '12 May', 'desc' => '3 drops · Colombo', 'status' => 'Done', 'failed' => false ],
-          [ 'date' => '11 May', 'desc' => '4 drops · Gampaha', 'status' => 'Done', 'failed' => false ],
-          [ 'date' => '10 May', 'desc' => '2 drops · Colombo', 'status' => '1 failed', 'failed' => true ]
-        ]
-      ]
-    ];
+    $admin_drivers = [];
 }
 
 $total_drivers = count($admin_drivers);
@@ -363,15 +327,15 @@ foreach ($admin_drivers as $d) {
                          data-licence-expiry="<?= htmlspecialchars($d['licence_expiry']) ?>"
                          data-vehicle="<?= htmlspecialchars($d['vehicle']) ?>"
                          data-licence="<?= htmlspecialchars($d['licence']) ?>"
-                         data-zones="<?= htmlspecialchars(json_encode($d['zones'])) ?>"
-                         data-joined="<?= htmlspecialchars($d['joined']) ?>"
-                         data-today-run="<?= htmlspecialchars(json_encode($d['todayRun'])) ?>"
-                         data-ot="<?= htmlspecialchars($d['ot']) ?>"
-                         data-ot-w="<?= htmlspecialchars($d['otW']) ?>"
-                         data-del="<?= htmlspecialchars($d['del']) ?>"
-                         data-fail="<?= htmlspecialchars($d['fail']) ?>"
-                         data-avg="<?= htmlspecialchars($d['avg']) ?>"
-                         data-recent="<?= htmlspecialchars(json_encode($d['recent'])) ?>">
+                         data-zones="<?= htmlspecialchars(json_encode($d['zones']), ENT_QUOTES, 'UTF-8') ?>"
+                         data-joined="<?= htmlspecialchars($d['joined'], ENT_QUOTES, 'UTF-8') ?>"
+                         data-today-run="<?= htmlspecialchars(json_encode($d['todayRun']), ENT_QUOTES, 'UTF-8') ?>"
+                         data-ot="<?= htmlspecialchars($d['ot'], ENT_QUOTES, 'UTF-8') ?>"
+                         data-ot-w="<?= htmlspecialchars($d['otW'], ENT_QUOTES, 'UTF-8') ?>"
+                         data-del="<?= htmlspecialchars($d['del'], ENT_QUOTES, 'UTF-8') ?>"
+                         data-fail="<?= htmlspecialchars($d['fail'], ENT_QUOTES, 'UTF-8') ?>"
+                         data-avg="<?= htmlspecialchars($d['avg'], ENT_QUOTES, 'UTF-8') ?>"
+                         data-recent="<?= htmlspecialchars(json_encode($d['recent']), ENT_QUOTES, 'UTF-8') ?>">
                         <div class="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold border shadow-sm group-hover:scale-105 transition-all <?= $d['avColor'] ?>">
                             <?= $d['av'] ?>
                         </div>

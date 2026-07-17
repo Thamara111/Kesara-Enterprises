@@ -193,48 +193,58 @@ if (isset($pdo) && $pdo !== null) {
                 <button class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all" data-status="cancelled">Cancelled</button>
             </div>
 
-            <!-- Order List Cards -->
-            <div id="order-list" class="space-y-3 pb-8">
-                <?php if (empty($admin_orders)): ?>
-                <div id="empty-state" class="flex flex-col items-center justify-center py-16 text-center hidden">
+            <!-- Order List Table -->
+            <div class="pb-8 overflow-x-auto w-full">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                            <th class="px-6 py-4 font-bold">Order ID</th>
+                            <th class="px-6 py-4 font-bold">Company</th>
+                            <th class="px-6 py-4 font-bold">Status</th>
+                            <th class="px-6 py-4 font-bold">Date</th>
+                            <th class="px-6 py-4 font-bold text-right">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="order-list">
+                        <?php if (!empty($admin_orders)): ?>
+                        <?php foreach ($admin_orders as $idx => $o): ?>
+                        <tr id="order-card-<?= $idx ?>" class="order-card border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer group"
+                            data-idx="<?= $idx ?>"
+                            data-id="<?= htmlspecialchars($o['id']) ?>"
+                            data-formatted-id="<?= htmlspecialchars($o['formattedId']) ?>"
+                            data-status="<?= htmlspecialchars($o['status']) ?>"
+                            data-badge="<?= htmlspecialchars($o['badge']) ?>"
+                            data-badgetext="<?= htmlspecialchars($o['badgeText']) ?>"
+                            data-company="<?= htmlspecialchars($o['company']) ?>"
+                            data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
+                            data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
+                            data-date="<?= htmlspecialchars($o['date']) ?>"
+                            data-total="<?= htmlspecialchars($o['total']) ?>"
+                            data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
+                            data-timeline="<?= htmlspecialchars(json_encode($o['timeline'])) ?>"
+                            data-payment-receipt="<?= htmlspecialchars($o['paymentReceipt'] ?? '') ?>"
+                            onclick="selectOrder(this)">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 group-hover:text-brand transition-colors"><?= htmlspecialchars($o['formattedId']) ?></td>
+                            <td class="px-6 py-4 text-xs font-bold text-gray-600 truncate max-w-[200px]"><?= htmlspecialchars($o['company']) ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2.5 py-1 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'VERIFICATION QUEUE', $o['badgeText'])) ?></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500 font-medium"><?= htmlspecialchars(explode(',', $o['date'])[0]) ?></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-extrabold text-gray-950 text-right">LKR <?= htmlspecialchars(explode('.', $o['total'])[0]) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+                
+                <!-- Empty State -->
+                <div id="empty-state" class="flex-col items-center justify-center py-16 text-center <?= empty($admin_orders) ? 'flex' : 'hidden' ?>">
                     <div class="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
                         <i class="ti ti-search-off text-2xl text-gray-300"></i>
                     </div>
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">No orders found</p>
                     <p class="text-[11px] text-gray-300 mt-1">Try adjusting your filters</p>
                 </div>
-                <?php else: ?>
-                <?php foreach ($admin_orders as $idx => $o): ?>
-                 <div id="order-card-<?= $idx ?>" class="order-card border border-gray-100 rounded-3xl p-6 bg-white cursor-pointer relative"
-                      data-idx="<?= $idx ?>"
-                      data-id="<?= htmlspecialchars($o['id']) ?>"
-                      data-formatted-id="<?= htmlspecialchars($o['formattedId']) ?>"
-                      data-status="<?= htmlspecialchars($o['status']) ?>"
-                      data-badge="<?= htmlspecialchars($o['badge']) ?>"
-                      data-badgetext="<?= htmlspecialchars($o['badgeText']) ?>"
-                      data-company="<?= htmlspecialchars($o['company']) ?>"
-                      data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
-                      data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
-                      data-date="<?= htmlspecialchars($o['date']) ?>"
-                      data-total="<?= htmlspecialchars($o['total']) ?>"
-                      data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
-                      data-timeline="<?= htmlspecialchars(json_encode($o['timeline'])) ?>"
-                      data-payment-receipt="<?= htmlspecialchars($o['paymentReceipt'] ?? '') ?>"
-                      onclick="selectOrder(this)">
-                    <div class="flex justify-between items-start mb-4">
-                        <div>
-                            <h3 class="text-sm font-bold text-gray-900"><?= htmlspecialchars($o['formattedId']) ?></h3>
-                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5"><?= htmlspecialchars($o['company']) ?></p>
-                        </div>
-                        <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'VERIFICATION QUEUE', $o['badgeText'])) ?></span>
-                    </div>
-                    <div class="flex justify-between items-center text-xs font-medium">
-                        <span class="text-gray-400"><?= htmlspecialchars(explode(',', $o['date'])[0]) ?></span>
-                        <span class="font-extrabold text-gray-950">LKR <?= htmlspecialchars(explode('.', $o['total'])[0]) ?></span>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-                <?php endif; ?>
             </div>
         </div>
     </div>

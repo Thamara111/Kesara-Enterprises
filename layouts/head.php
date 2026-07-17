@@ -43,13 +43,13 @@ $can_see_prices = $is_logged_in && $buyer_approved;
     <link href="/dist/output.css" rel="stylesheet">
     <link href="/dist/admin-layout.css" rel="stylesheet">
     <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="/assets/alpine.min.js"></script>
     
     <!-- PDF Generation (Local) -->
     <script src="/assets/js/html2pdf.bundle.min.js"></script>
     <script src="/assets/js/pdf-helper.js"></script>
     
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="/assets/tabler-icons.min.css">
 
     <style>
         * {
@@ -101,22 +101,29 @@ $can_see_prices = $is_logged_in && $buyer_approved;
         }
 
         .toast-notification {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: white;
+            border-radius: 12px;
+            padding: 16px 20px;
+            box-shadow: 0 10px 40px -10px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 12px;
-            padding: 16px;
-            background-color: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            transform: translateX(120%);
-            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+            z-index: 9999;
+            transform: translateY(100px) scale(0.9);
             opacity: 0;
-            border-left: 4px solid #cbd5e1;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            pointer-events: none;
+            max-width: 320px;
+            border-left: 4px solid #3b82f6;
         }
 
         .toast-notification.show {
-            transform: translateX(0);
+            transform: translateY(0) scale(1);
             opacity: 1;
+            pointer-events: auto;
         }
 
         .toast-notification.success {
@@ -156,6 +163,7 @@ $can_see_prices = $is_logged_in && $buyer_approved;
             line-height: 1.4;
         }
     </style>
+    <script type="module" src="/assets/turbo.es2017-esm.js"></script>
     <script>
         function showToast(message, type = 'success') {
             let container = document.getElementById('toast-container');

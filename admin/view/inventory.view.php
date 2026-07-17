@@ -43,21 +43,7 @@ if (isset($pdo) && $pdo !== null) {
 }
 
 if (empty($rows)) {
-    $rows = [
-      [ 'id' => 1, 'name'=>'Classic brief · Black · XL', 'sku'=>'KB-001', 'size'=> 'XL', 'stock'=>18, 'thresh'=>200, 'logs' => [
-          [ 'date' => '11 May', 'change' => '− 120 (order KE-00847)', 'class' => 'text-red-600', 'by' => 'Admin' ],
-          [ 'date' => '2 May', 'change' => '− 80 (order KE-00821)', 'class' => 'text-red-600', 'by' => 'System' ],
-          [ 'date' => '28 Apr', 'change' => '+ 500 (restock batch #38)', 'class' => 'text-emerald-600', 'by' => 'Admin' ]
-      ]],
-      [ 'id' => 2, 'name'=>'Ladies hipster · White · S', 'sku'=>'KL-003', 'size'=> 'S', 'stock'=>34, 'thresh'=>200, 'logs' => [
-          [ 'date' => '11 May', 'change' => '− 120 (order KE-00847)', 'class' => 'text-red-600', 'by' => 'Admin' ],
-          [ 'date' => '2 May', 'change' => '− 80 (order KE-00821)', 'class' => 'text-red-600', 'by' => 'System' ]
-      ]],
-      [ 'id' => 3, 'name'=>'Kids trunk · Navy · M',      'sku'=>'KC-012', 'size'=> 'M', 'stock'=>62, 'thresh'=>200, 'logs' => [] ],
-      [ 'id' => 4, 'name'=>'Stretch boxer · Navy · S',   'sku'=>'KB-008', 'size'=> 'S', 'stock'=>88, 'thresh'=>200, 'logs' => [] ],
-      [ 'id' => 5, 'name'=>'Modal trunk · Black · M',    'sku'=>'KB-015', 'size'=> 'M', 'stock'=>0,  'thresh'=>200, 'logs' => [] ],
-      [ 'id' => 6, 'name'=>'Classic brief · White · M',  'sku'=>'KB-001', 'size'=> 'M', 'stock'=>480,'thresh'=>200, 'logs' => [] ]
-    ];
+    $rows = [];
 }
 
 $total_skus = count($rows);

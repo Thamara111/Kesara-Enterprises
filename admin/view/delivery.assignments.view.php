@@ -122,104 +122,15 @@ if (isset($pdo) && $pdo !== null) {
 }
 
 if (empty($admin_assignments)) {
-    $admin_assignments = [
-      [ 
-        'id' => 'DA-2025-0312', 
-        'date' => 'Assigned 13 May, 8:00 AM', 
-        'badge' => 'bg-blue-50 text-blue-750 border border-blue-100', 
-        'badgeText' => 'Active', 
-        'av' => 'NK', 
-        'avColor' => 'bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-emerald-100', 
-        'driver' => 'Nuwan Karunaratne', 
-        'vehicle' => 'Motorbike · WP CAB-4421', 
-        'canCancel' => false,
-        'zone' => 'Colombo',
-        'stops' => [
-          [ 'num' => 1, 'name' => 'KE-2025-00847 · ABC Garments', 'addr' => 'No. 45, Factory Rd, Katunayake', 'status' => 'Delivered 9:22 AM', 'lat' => 7.1650, 'lng' => 79.8850 ],
-          [ 'num' => 2, 'name' => 'KE-2025-00843 · City Retail', 'addr' => 'No. 12, Main St, Colombo 07', 'status' => 'Delivered 10:48 AM', 'lat' => 6.9050, 'lng' => 79.8700 ],
-          [ 'num' => 3, 'name' => 'KE-2025-00839 · Fashion Hub', 'addr' => 'No. 88, Galle Rd, Colombo 03', 'status' => 'In progress', 'lat' => 6.9150, 'lng' => 79.8510 ]
-        ]
-      ],
-      [ 
-        'id' => 'DA-2025-0311', 
-        'date' => 'Assigned 13 May, 8:15 AM', 
-        'badge' => 'bg-blue-50 text-blue-750 border border-blue-100', 
-        'badgeText' => 'Active', 
-        'av' => 'PF', 
-        'avColor' => 'bg-blue-100 text-blue-700 border border-blue-200 shadow-blue-100', 
-        'driver' => 'Pradeep Fernando', 
-        'vehicle' => 'Motorbike · WP CBA-7788', 
-        'canCancel' => false,
-        'zone' => 'Colombo',
-        'stops' => [
-          [ 'num' => 1, 'name' => 'KE-2025-00845 · Seylan Stores', 'addr' => 'Seylan Centre, Colombo 05', 'status' => 'Delivered 9:55 AM', 'lat' => 6.8850, 'lng' => 79.8750 ],
-          [ 'num' => 2, 'name' => 'KE-2025-00840 · Metro Textiles', 'addr' => 'No. 67, Duplication Rd, Colombo 03', 'status' => 'In progress', 'lat' => 6.9100, 'lng' => 79.8520 ]
-        ]
-      ],
-      [ 
-        'id' => 'DA-2025-0310', 
-        'date' => 'Assigned 13 May, 7:30 AM', 
-        'badge' => 'bg-emerald-50 text-emerald-700 border border-emerald-100', 
-        'badgeText' => 'Completed', 
-        'av' => 'LW', 
-        'avColor' => 'bg-amber-100 text-amber-700 border border-amber-200 shadow-amber-100', 
-        'driver' => 'Lalith Wickrama', 
-        'vehicle' => 'Van · CP AAB-3344', 
-        'canCancel' => false,
-        'zone' => 'Kandy',
-        'stops' => [
-          [ 'num' => 1, 'name' => 'KE-2025-00842 · Kandy Boutique', 'addr' => 'No. 22, Peradeniya Rd, Kandy', 'status' => 'Delivered 10:30 AM', 'lat' => 7.2750, 'lng' => 80.6150 ],
-          [ 'num' => 2, 'name' => 'KE-2025-00838 · Hill Top Retail', 'addr' => 'No. 5, Dalada Veediya, Kandy', 'status' => 'Delivered 11:15 AM', 'lat' => 7.2930, 'lng' => 80.6360 ]
-        ]
-      ],
-      [ 
-        'id' => 'DA-2025-0309', 
-        'date' => 'Assigned 13 May, 8:30 AM', 
-        'badge' => 'bg-amber-50 text-amber-700 border border-amber-100', 
-        'badgeText' => 'Pending', 
-        'av' => 'SR', 
-        'avColor' => 'bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-indigo-100', 
-        'driver' => 'Saman Rajapaksa', 
-        'vehicle' => 'Van · WP CBB-1122', 
-        'canCancel' => true,
-        'zone' => 'Gampaha',
-        'stops' => [
-          [ 'num' => 1, 'name' => 'KE-2025-00848 · Nimal Traders', 'addr' => 'Gampaha Town', 'status' => 'Not started', 'lat' => 7.0890, 'lng' => 80.0150 ],
-          [ 'num' => 2, 'name' => 'KE-2025-00836 · Gampaha Retail', 'addr' => 'Gampaha', 'status' => 'Not started', 'lat' => 7.0920, 'lng' => 80.0050 ],
-          [ 'num' => 3, 'name' => 'KE-2025-00833 · Lakshmi Stores', 'addr' => 'Negombo Rd, Gampaha', 'status' => 'Not started', 'lat' => 7.0700, 'lng' => 79.9850 ],
-          [ 'num' => 4, 'name' => 'KE-2025-00829 · Best Buy Outlet', 'addr' => 'Ja-Ela, Gampaha', 'status' => 'Not started', 'lat' => 7.0750, 'lng' => 79.8900 ]
-        ]
-      ],
-      [ 
-        'id' => 'DA-2025-0308', 
-        'date' => 'Assigned 13 May, 6:45 AM', 
-        'badge' => 'bg-emerald-50 text-emerald-700 border border-emerald-100', 
-        'badgeText' => 'Completed', 
-        'av' => 'NK', 
-        'avColor' => 'bg-emerald-100 text-emerald-700 border border-emerald-200 shadow-emerald-100', 
-        'driver' => 'Nuwan Karunaratne', 
-        'vehicle' => 'Motorbike · WP CAB-4421', 
-        'canCancel' => false,
-        'zone' => 'Colombo',
-        'stops' => [
-          [ 'num' => 1, 'name' => 'KE-2025-00835 · ABC Garments', 'addr' => 'Katunayake', 'status' => 'Delivered 7:50 AM', 'lat' => 7.1650, 'lng' => 79.8850 ],
-          [ 'num' => 2, 'name' => 'KE-2025-00832 · Quick Fashion', 'addr' => 'Colombo 10', 'status' => 'Delivered 8:30 AM', 'lat' => 6.9290, 'lng' => 79.8680 ],
-          [ 'num' => 3, 'name' => 'KE-2025-00828 · Style Zone', 'addr' => 'Colombo 04', 'status' => 'Delivered 9:05 AM', 'lat' => 6.8900, 'lng' => 79.8560 ]
-        ]
-      ]
-    ];
+    $admin_assignments = [];
 }
 
 if (empty($driver_info_map)) {
-    $driver_info_map = [
-      'SR' => [ 'vehicle' => 'Van · WP CBB-1122', 'zone' => 'Gampaha', 'ot' => '88%' ],
-      'LW' => [ 'vehicle' => 'Van · CP AAB-3344', 'zone' => 'Kandy', 'ot' => '96%' ],
-      'KP' => [ 'vehicle' => 'Lorry · SP AAC-5566', 'zone' => 'Southern', 'ot' => '89%' ]
-    ];
+    $driver_info_map = [];
 }
 
 if (empty($unassigned_orders)) {
-    $unassigned_orders = [846, 844, 841];
+    $unassigned_orders = [];
 }
 
 $today_total = count($admin_assignments);

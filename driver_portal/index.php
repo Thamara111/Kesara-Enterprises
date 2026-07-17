@@ -200,7 +200,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
     <!-- Tailwind CSS production output -->
     <link href="/dist/output.css" rel="stylesheet">
     <!-- Tabler Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <link rel="stylesheet" href="/assets/tabler-icons.min.css">
     
     <style>
         body {
@@ -431,7 +431,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
         <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto"></div>
         <div class="text-center space-y-1">
             <h3 class="text-lg font-bold text-gray-900">Confirm Delivery</h3>
-            <p id="confirm-stop-name" class="text-xs text-gray-500">KE-2025-00847 · ABC Garments</p>
+            <p id="confirm-stop-name" class="text-xs text-gray-500"></p>
         </div>
 
         <!-- Simulated Signature Pad -->
@@ -465,7 +465,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
             </div>
             <div>
                 <h3 class="text-base font-bold text-gray-900">Did Not Deliver</h3>
-                <p id="fail-stop-name" class="text-xs text-gray-500 mt-0.5">KE-2025-00847 · ABC Garments</p>
+                <p id="fail-stop-name" class="text-xs text-gray-500 mt-0.5"></p>
             </div>
         </div>
 

@@ -128,16 +128,10 @@ if (!function_exists('getColorClass')) {
 }
 
 // Fallback values if empty
-if ($current_month_revenue == 0) $current_month_revenue = 1400000.00;
+if ($current_month_revenue == 0) $current_month_revenue = 0.00;
 
 if (empty($stock_by_variant)) {
-    $stock_by_variant = [
-        ['colour' => 'White', 'size' => 'M', 'total_qty' => 500],
-        ['colour' => 'White', 'size' => 'L', 'total_qty' => 420],
-        ['colour' => 'Black', 'size' => 'L', 'total_qty' => 180],
-        ['colour' => 'Pink', 'size' => 'S', 'total_qty' => 80],
-        ['colour' => 'Grey', 'size' => 'M', 'total_qty' => 350],
-    ];
+    $stock_by_variant = [];
 }
 
 
@@ -161,15 +155,11 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
         <div class="flex items-center gap-4">
             <div class="relative">
                 <i class="ti ti-calendar absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
-                <select onchange="window.location.href='/admin-dashboard?filter_month=' + this.value" class="bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest outline-none appearance-none cursor-pointer">
+                <select id="dashboard-filter" onchange="loadDashboardAjax(this.value)" class="bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-6 py-3 text-xs font-bold text-gray-500 uppercase tracking-widest outline-none appearance-none cursor-pointer disabled:opacity-50">
                     <option value="this_month" <?= $filter_month === 'this_month' ? 'selected' : '' ?>>This Month</option>
                     <option value="last_month" <?= $filter_month === 'last_month' ? 'selected' : '' ?>>Last Month</option>
                     <option value="last_quarter" <?= $filter_month === 'last_quarter' ? 'selected' : '' ?>>Last Quarter</option>
                 </select>
-            </div>
-            <button class="bg-gray-900 text-white font-bold px-6 py-3 rounded-2xl text-xs uppercase tracking-widest hover:bg-gray-800 transition-all flex items-center gap-2" onclick="downloadPDF('dashboard-container', 'Dashboard_Overview')">
-                <i class="ti ti-download"></i> Export PDF
-            </button>
         </div>
     </header>
 
@@ -258,7 +248,7 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
                         </div>
                     </div>
                     <div class="h-[300px]">
-                        <canvas id="revenueChart"></canvas>
+                        <canvas id="revenueChart" data-months='<?= htmlspecialchars(json_encode($chart_months), ENT_QUOTES, 'UTF-8') ?>' data-revenue='<?= htmlspecialchars(json_encode($chart_revenue), ENT_QUOTES, 'UTF-8') ?>'></canvas>
                     </div>
                 </div>
             </div>
@@ -267,7 +257,7 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
             <div class="bg-white border border-gray-100 rounded-3xl p-5 md:p-10 shadow-sm relative overflow-hidden flex flex-col">
                 <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-10 text-center">Order Status Distribution</h2>
                 <div class="flex-1 min-h-[220px]">
-                    <canvas id="statusChart"></canvas>
+                    <canvas id="statusChart" data-pending="<?= (int)$status_counts['Pending'] ?>" data-processing="<?= (int)$status_counts['Processing'] ?>" data-shipped="<?= (int)$status_counts['Shipped'] ?>" data-delivered="<?= (int)$status_counts['Delivered'] ?>"></canvas>
                 </div>
                 <div class="grid grid-cols-2 gap-4 mt-10">
                     <div class="flex items-center gap-3">
@@ -426,78 +416,130 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
     </div>
 </main>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="/assets/chart.umd.js"></script>
 <script>
 const isDark = false; // Forced light mode for admin panel clarity
 const gridColor = 'rgba(0,0,0,0.03)';
 const labelColor = '#94a3b8';
 
-// REVENUE BAR CHART
-new Chart(document.getElementById('revenueChart'), {
-  type: 'bar',
-  data: {
-    labels: <?php echo json_encode($chart_months); ?>,
-    datasets: [{
-      label: 'Revenue (LKR)',
-      data: <?php echo json_encode($chart_revenue); ?>,
-      backgroundColor: '#0F6E56',
-      borderRadius: 12,
-      borderSkipped: false,
-      barThickness: 32
-    }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { 
-        legend: { display: false }, 
-        tooltip: {
-            backgroundColor: '#111827',
-            titleFont: { size: 10, weight: 'bold' },
-            bodyFont: { size: 12, weight: 'bold' },
-            padding: 12,
-            cornerRadius: 12,
-            callbacks: { label: ctx => ' LKR ' + (ctx.raw/1000).toFixed(0) + 'K' }
-        }
-    },
-    scales: {
-      x: { ticks: { color: labelColor, font: { size: 10, weight: 'bold' } }, grid: { display: false }, border: { display: false } },
-      y: { ticks: { color: labelColor, font: { size: 10, weight: 'bold' }, callback: v => (v/1000)+'K' }, grid: { color: gridColor }, border: { display: false } }
-    }
-  }
-});
+let revenueChart = null;
+let statusChart = null;
 
-// STATUS DONUT CHART
-new Chart(document.getElementById('statusChart'), {
-  type: 'doughnut',
-  data: {
-    labels: ['Pending','Processing','Shipped','Delivered'],
-    datasets: [{
-      data: [
-        <?= $status_counts['Pending'] ?>, 
-        <?= $status_counts['Processing'] ?>, 
-        <?= $status_counts['Shipped'] ?>, 
-        <?= $status_counts['Delivered'] ?>
-      ],
-      backgroundColor: ['#f59e0b','#3b82f6','#6366f1','#0F6E56'],
-      borderWidth: 8,
-      borderColor: '#ffffff',
-      hoverOffset: 12
-    }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    cutout: '75%',
-    plugins: { 
-        legend: { display: false }, 
-        tooltip: {
-            backgroundColor: '#111827',
-            padding: 12,
-            cornerRadius: 12,
-            callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.raw + ' Orders' }
+function initDashboardCharts() {
+    const revEl = document.getElementById('revenueChart');
+    const statEl = document.getElementById('statusChart');
+
+    if (!revEl || !statEl) return;
+
+    if (revenueChart) revenueChart.destroy();
+    if (statusChart) statusChart.destroy();
+
+    const chartMonths = JSON.parse(revEl.getAttribute('data-months') || '[]');
+    const chartRevenue = JSON.parse(revEl.getAttribute('data-revenue') || '[]');
+
+    // REVENUE BAR CHART
+    revenueChart = new Chart(revEl, {
+      type: 'bar',
+      data: {
+        labels: chartMonths,
+        datasets: [{
+          label: 'Revenue (LKR)',
+          data: chartRevenue,
+          backgroundColor: '#0F6E56',
+          borderRadius: 12,
+          borderSkipped: false,
+          barThickness: 32
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { 
+            legend: { display: false }, 
+            tooltip: {
+                backgroundColor: '#111827',
+                titleFont: { size: 10, weight: 'bold' },
+                bodyFont: { size: 12, weight: 'bold' },
+                padding: 12,
+                cornerRadius: 12,
+                callbacks: { label: ctx => ' LKR ' + (ctx.raw/1000).toFixed(0) + 'K' }
+            }
+        },
+        scales: {
+          x: { ticks: { color: labelColor, font: { size: 10, weight: 'bold' } }, grid: { display: false }, border: { display: false } },
+          y: { ticks: { color: labelColor, font: { size: 10, weight: 'bold' }, callback: v => (v/1000)+'K' }, grid: { color: gridColor }, border: { display: false } }
         }
+      }
+    });
+
+    const pending = parseInt(statEl.getAttribute('data-pending')) || 0;
+    const processing = parseInt(statEl.getAttribute('data-processing')) || 0;
+    const shipped = parseInt(statEl.getAttribute('data-shipped')) || 0;
+    const delivered = parseInt(statEl.getAttribute('data-delivered')) || 0;
+
+    // STATUS DONUT CHART
+    statusChart = new Chart(statEl, {
+      type: 'doughnut',
+      data: {
+        labels: ['Pending','Processing','Shipped','Delivered'],
+        datasets: [{
+          data: [pending, processing, shipped, delivered],
+          backgroundColor: ['#f59e0b','#3b82f6','#6366f1','#0F6E56'],
+          borderWidth: 8,
+          borderColor: '#ffffff',
+          hoverOffset: 12
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '75%',
+        plugins: { 
+            legend: { display: false }, 
+            tooltip: {
+                backgroundColor: '#111827',
+                padding: 12,
+                cornerRadius: 12,
+                callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.raw + ' Orders' }
+            }
+        }
+      }
+    });
+}
+
+// Initialize on first load
+initDashboardCharts();
+
+// AJAX Dynamic loading
+async function loadDashboardAjax(filter) {
+    const main = document.getElementById('dashboard-container');
+    const sel = document.getElementById('dashboard-filter');
+    
+    if (sel) sel.disabled = true;
+    main.style.opacity = '0.5';
+    main.style.pointerEvents = 'none';
+    
+    try {
+        const url = '/admin-dashboard?filter_month=' + filter;
+        const res = await fetch(url);
+        const html = await res.text();
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const newMain = doc.getElementById('dashboard-container');
+        
+        if (newMain) {
+            main.innerHTML = newMain.innerHTML;
+            initDashboardCharts();
+            window.history.pushState({}, '', url);
+        }
+    } catch (e) {
+        console.error("Dashboard update failed:", e);
+    } finally {
+        main.style.opacity = '1';
+        main.style.pointerEvents = 'auto';
+        const newSel = document.getElementById('dashboard-filter');
+        if (newSel) newSel.disabled = false;
     }
-  }
-});
+}
 </script>

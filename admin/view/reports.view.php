@@ -96,32 +96,20 @@ if (isset($pdo) && $pdo !== null) {
 }
 
 // Fallbacks for display
-if ($total_revenue == 0) $total_revenue = 1400000;
-if ($total_orders == 0) $total_orders = 47;
-if ($avg_order_value == 0) $avg_order_value = 29787;
-if ($units_sold == 0) $units_sold = 18200;
+if ($total_revenue == 0) $total_revenue = 0;
+if ($total_orders == 0) $total_orders = 0;
+if ($avg_order_value == 0) $avg_order_value = 0;
+if ($units_sold == 0) $units_sold = 0;
 
 if (empty($category_names)) {
-    $category_names = ["Men's briefs", "Men's boxers", "Ladies", "Trunks", "Children"];
-    $category_percentages = [38, 24, 22, 10, 6];
+    $category_names = [];
+    $category_percentages = [];
 }
 if (empty($product_performance)) {
-    $product_performance = [
-        ['name' => 'Classic Brief', 'units' => 6200, 'revenue' => 682000],
-        ['name' => 'Stretch Boxer', 'units' => 3800, 'revenue' => 589000],
-        ['name' => 'Ladies Hipster', 'units' => 3100, 'revenue' => 403000],
-        ['name' => 'Kids Trunk', 'units' => 2700, 'revenue' => 235000],
-        ['name' => 'Modal Trunk', 'units' => 2400, 'revenue' => 380000],
-    ];
+    $product_performance = [];
 }
 if (empty($top_customers)) {
-    $top_customers = [
-        ['business_name' => 'Seylan Stores', 'spend' => 312000],
-        ['business_name' => 'Fashion Hub', 'spend' => 248000],
-        ['business_name' => 'City Retail', 'spend' => 186000],
-        ['business_name' => 'ABC Garments', 'spend' => 144000],
-        ['business_name' => 'Nimal Traders', 'spend' => 98000],
-    ];
+    $top_customers = [];
 }
 ?>
 
@@ -149,10 +137,10 @@ if (empty($top_customers)) {
     </div>
 
     <!-- Tabs -->
-    <div class="px-8 py-4 border-b border-gray-100 flex gap-4 overflow-x-auto no-scrollbar">
-        <button class="chip on" onclick="switchTab(this,'sales')">Sales Report</button>
-        <button class="chip" onclick="switchTab(this,'products')">Top Products</button>
-        <button class="chip" onclick="switchTab(this,'customers')">Top Customers</button>
+    <div class="px-8 py-8 border-b border-gray-100 flex items-center gap-4 overflow-x-auto no-scrollbar">
+        <button class="chip on px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'sales')">Sales Report</button>
+        <button class="chip px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'products')">Top Products</button>
+        <button class="chip px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'customers')">Top Customers</button>
     </div>
 
     <div class="p-8 space-y-12 max-w-7xl w-full mx-auto">
@@ -330,22 +318,7 @@ if (empty($top_customers)) {
 </div>
 
 <style>
-    .chip {
-        padding: 0.5rem 1rem;
-        border-radius: 0.75rem;
-        font-size: 0.75rem;
-        font-weight: 700;
-        border: 1px solid #e5e7eb;
-        color: #6b7280;
-        cursor: pointer;
-        transition: all 0.15s ease-in-out;
-        white-space: nowrap;
-        flex-shrink: 0;
-        background-color: transparent;
-    }
-    .chip:hover {
-        background-color: #f3f4f6;
-    }
+
     .chip.on {
         background-color: #0F6E56;
         color: #ffffff;
@@ -356,7 +329,7 @@ if (empty($top_customers)) {
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="/assets/chart.umd.js"></script>
 <script>
 const grid = 'rgba(0,0,0,0.04)';
 const lbl = '#9ca3af';
