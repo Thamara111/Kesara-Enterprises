@@ -57,32 +57,29 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
-// Fallback to mock data if product is not found or database is offline
+// Mock Product Fallback
 if (!$product) {
     $product = [
-        'id' => 1,
-        'name' => 'Classic Cotton Brief',
-        'sku' => 'KB-001',
-        'description' => "Classic cut men's brief made from soft combed cotton. Suitable for all-day wear. Available in solid colours. Ideal for retail bundles and supermarket stocking.",
-        'moq' => 50,
-        'base_price' => 108.00,
-        'status' => 'In Stock'
+        'id' => 999,
+        'sku' => $sku,
+        'name' => 'Premium Men\'s Briefs (Classic Fit)',
+        'description' => 'Crafted from 100% breathable combed cotton, these premium briefs offer all-day comfort and support. Features a durable elastic waistband and double-stitched hems. Ideal for everyday wear.',
+        'sizes' => 'S, M, L, XL',
+        'colors' => 'White, Black, Navy, Grey',
+        'images' => '["https://images.unsplash.com/photo-1582214399042-16a224a51e60?q=80&w=800"]',
+        'discount' => 5
     ];
-    $category_name = "Briefs";
-
+    
     $pricing_tiers = [
-        ['min_qty' => 50, 'max_qty' => 99, 'price' => 120.00],
-        ['min_qty' => 100, 'max_qty' => 499, 'price' => 108.00],
-        ['min_qty' => 500, 'max_qty' => null, 'price' => 95.00]
+        ['min_qty' => 1, 'price' => 450.00],
+        ['min_qty' => 50, 'price' => 420.00],
+        ['min_qty' => 100, 'price' => 390.00],
+        ['min_qty' => 500, 'price' => 360.00]
     ];
-
+    
     $variations = [
-        ['size' => 'S', 'colour' => 'White', 'quantity' => 10],
-        ['size' => 'M', 'colour' => 'White', 'quantity' => 10],
-        ['size' => 'L', 'colour' => 'White', 'quantity' => 10],
-        ['size' => 'XL', 'colour' => 'White', 'quantity' => 10],
-        ['size' => 'M', 'colour' => 'Black', 'quantity' => 10],
-        ['size' => 'L', 'colour' => 'Black', 'quantity' => 10]
+        ['size' => 'M', 'colour' => 'White', 'quantity' => 120],
+        ['size' => 'L', 'colour' => 'Black', 'quantity' => 50]
     ];
 }
 
@@ -740,7 +737,7 @@ function selectSize(idx, size) {
 
 function addToCart() {
     if (qty < moq) {
-        alert("Minimum Order Quantity is " + moq + " units in total across all selections.");
+        uiAlert("Minimum Order Quantity is " + moq + " units in total across all selections.");
         return;
     }
     const productId = <?= (int) $product['id'] ?>;
@@ -767,7 +764,7 @@ function addToCart() {
     }
 
     if (addedCount === 0) {
-        alert("Please select a quantity for at least one color and size combination.");
+        uiAlert("Please select a quantity for at least one color and size combination.");
         return;
     }
     
@@ -836,15 +833,15 @@ function submitQuoteRequest(e) {
     .then(res => res.json())
     .then(resData => {
         if (resData.status === 'success') {
-            alert('Your quote request has been submitted successfully! Our wholesale team will contact you shortly.');
+            showToast('Your quote request has been submitted successfully! Our wholesale team will contact you shortly.', 'success');
             closeQuoteModal();
         } else {
-            alert('Error: ' + (resData.message || 'Validation failed.'));
+            uiAlert('Error: ' + (resData.message || 'Validation failed.'));
         }
     })
     .catch(err => {
         console.error(err);
-        alert('Network error submitting quote request.');
+        uiAlert('Network error submitting quote request.');
     })
     .finally(() => {
         btn.disabled = false;

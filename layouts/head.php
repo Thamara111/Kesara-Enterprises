@@ -199,7 +199,78 @@ $can_see_prices = $is_logged_in && $buyer_approved;
                 toast.addEventListener('transitionend', onTransitionEnd);
             }, 4000);
         }
+        window.uiConfirm = function(message, onConfirm) {
+            const modal = document.getElementById('global-confirm-modal');
+            const box = document.getElementById('global-confirm-box');
+            document.getElementById('global-confirm-message').textContent = message;
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            // force reflow
+            void modal.offsetWidth;
+            modal.classList.remove('opacity-0');
+            box.classList.remove('scale-95');
+
+            const close = () => {
+                modal.classList.add('opacity-0');
+                box.classList.add('scale-95');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }, 300);
+                
+                document.getElementById('global-confirm-cancel').onclick = null;
+                document.getElementById('global-confirm-ok').onclick = null;
+            };
+
+            document.getElementById('global-confirm-cancel').onclick = close;
+            document.getElementById('global-confirm-ok').onclick = () => {
+                close();
+                if (onConfirm) onConfirm();
+            };
+        };
+
+        window.uiAlert = function(message, type = 'error') {
+            showToast(message, type);
+        };
+        
+        // Override Turbo Confirm if Turbo is active
+        document.addEventListener("turbo:load", function() {
+            if (window.Turbo) {
+                Turbo.setConfirmMethod((message, element) => {
+                    return new Promise(resolve => {
+                        window.uiConfirm(message, () => resolve(true));
+                        // If they cancel, we also need to resolve(false).
+                        // Let's patch uiConfirm to optionally return a promise or handle cancel.
+                        const oldClose = document.getElementById('global-confirm-cancel').onclick;
+                        document.getElementById('global-confirm-cancel').onclick = () => {
+                            if(oldClose) oldClose();
+                            resolve(false);
+                        };
+                    });
+                });
+            }
+        });
     </script>
 </head>
 
 <body class="font-sans">
+    
+    <!-- Global Confirm Modal -->
+    <div id="global-confirm-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[10000] hidden items-center justify-center p-4 opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform scale-95 transition-transform duration-300" id="global-confirm-box">
+            <div class="flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
+                    <i class="ti ti-alert-triangle text-amber-500 text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-gray-900 mb-1">Confirm Action</h3>
+                    <p class="text-sm text-gray-500 leading-relaxed" id="global-confirm-message"></p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button id="global-confirm-cancel" class="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 transition-colors">Cancel</button>
+                <button id="global-confirm-ok" class="px-4 py-2 rounded-xl text-sm font-bold text-white bg-brand shadow-lg shadow-brand/20 hover:opacity-90 transition-all">Confirm</button>
+            </div>
+        </div>
+    </div>

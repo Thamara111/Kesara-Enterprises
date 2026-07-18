@@ -362,8 +362,8 @@ function selectSupplier(el, openDrawer = true) {
   
   // Open drawer
   if (openDrawer) {
-    const pane = document.getElementById('supplier-detail-pane');
-    const backdrop = document.getElementById('supplier-detail-backdrop');
+    var pane = document.getElementById('supplier-detail-pane');
+    var backdrop = document.getElementById('supplier-detail-backdrop');
     if (pane) pane.classList.remove('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('hidden');
@@ -371,14 +371,14 @@ function selectSupplier(el, openDrawer = true) {
     }
   }
   
-  const av = document.getElementById('d-av');
+  var av = document.getElementById('d-av');
   av.textContent = el.dataset.initials;
   av.className = 'w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-bold border shadow-lg mb-4 ' + el.dataset.av;
   
   document.getElementById('d-name').textContent = el.dataset.name;
   document.getElementById('d-email').textContent = el.dataset.email;
   
-  const badge = document.getElementById('d-badge');
+  var badge = document.getElementById('d-badge');
   badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ' + el.dataset.badge;
   badge.textContent = el.dataset.badgetext;
   
@@ -390,13 +390,13 @@ function selectSupplier(el, openDrawer = true) {
   document.getElementById('d-products').innerHTML = el.dataset.products;
   
   // Performance
-  const ontimeW = parseInt(el.dataset.ontimew);
+  var ontimeW = parseInt(el.dataset.ontimew);
   document.getElementById('d-bar-ot').style.width = ontimeW + '%';
   document.getElementById('d-bar-ot').style.backgroundColor = barColor(ontimeW);
   document.getElementById('d-ot').textContent = el.dataset.ontime;
   document.getElementById('d-ot').style.color = barText(ontimeW);
   
-  const qualityW = parseInt(el.dataset.qualityw);
+  var qualityW = parseInt(el.dataset.qualityw);
   document.getElementById('d-bar-qual').style.width = qualityW + '%';
   document.getElementById('d-bar-qual').style.backgroundColor = barColor(qualityW);
   document.getElementById('d-qual').textContent = el.dataset.quality;
@@ -409,12 +409,12 @@ function selectSupplier(el, openDrawer = true) {
 }
 
 function applyFilters() {
-    const q = (document.getElementById('supp-search')?.value || '').toLowerCase().trim();
-    const cat = (document.getElementById('supp-cat')?.value || '').toLowerCase();
-    const status = (document.getElementById('supp-status')?.value || '').toLowerCase();
+    var q = (document.getElementById('supp-search')?.value || '').toLowerCase().trim();
+    var cat = (document.getElementById('supp-cat')?.value || '').toLowerCase();
+    var status = (document.getElementById('supp-status')?.value || '').toLowerCase();
 
     document.querySelectorAll('.supplier-row').forEach(r => {
-        let visible = true;
+        var visible = true;
         
         if (cat !== 'all' && r.dataset.cat.toLowerCase() !== cat) {
             visible = false;
@@ -437,8 +437,8 @@ document.getElementById('supp-cat')?.addEventListener('change', applyFilters);
 document.getElementById('supp-status')?.addEventListener('change', applyFilters);
 
 function closeSupplierDetailPane() {
-  const pane = document.getElementById('supplier-detail-pane');
-  const backdrop = document.getElementById('supplier-detail-backdrop');
+  var pane = document.getElementById('supplier-detail-pane');
+  var backdrop = document.getElementById('supplier-detail-backdrop');
   if (pane) pane.classList.add('translate-x-full');
   if (backdrop) {
       backdrop.classList.remove('opacity-100');
@@ -451,7 +451,7 @@ function closeSupplierDetailPane() {
 }
 
 // Initial Render
-const firstSupplier = document.querySelector('.supplier-row');
+var firstSupplier = document.querySelector('.supplier-row');
 if (firstSupplier) selectSupplier(firstSupplier, false);
 closeSupplierDetailPane();
 </script>

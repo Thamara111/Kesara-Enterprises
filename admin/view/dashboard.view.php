@@ -418,24 +418,24 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
 
 <script src="/assets/chart.umd.js"></script>
 <script>
-const isDark = false; // Forced light mode for admin panel clarity
-const gridColor = 'rgba(0,0,0,0.03)';
-const labelColor = '#94a3b8';
+var isDark = false; // Forced light mode for admin panel clarity
+var gridColor = 'rgba(0,0,0,0.03)';
+var labelColor = '#94a3b8';
 
-let revenueChart = null;
-let statusChart = null;
+var revenueChart = null;
+var statusChart = null;
 
 function initDashboardCharts() {
-    const revEl = document.getElementById('revenueChart');
-    const statEl = document.getElementById('statusChart');
+    var revEl = document.getElementById('revenueChart');
+    var statEl = document.getElementById('statusChart');
 
     if (!revEl || !statEl) return;
 
     if (revenueChart) revenueChart.destroy();
     if (statusChart) statusChart.destroy();
 
-    const chartMonths = JSON.parse(revEl.getAttribute('data-months') || '[]');
-    const chartRevenue = JSON.parse(revEl.getAttribute('data-revenue') || '[]');
+    var chartMonths = JSON.parse(revEl.getAttribute('data-months') || '[]');
+    var chartRevenue = JSON.parse(revEl.getAttribute('data-revenue') || '[]');
 
     // REVENUE BAR CHART
     revenueChart = new Chart(revEl, {
@@ -472,10 +472,10 @@ function initDashboardCharts() {
       }
     });
 
-    const pending = parseInt(statEl.getAttribute('data-pending')) || 0;
-    const processing = parseInt(statEl.getAttribute('data-processing')) || 0;
-    const shipped = parseInt(statEl.getAttribute('data-shipped')) || 0;
-    const delivered = parseInt(statEl.getAttribute('data-delivered')) || 0;
+    var pending = parseInt(statEl.getAttribute('data-pending')) || 0;
+    var processing = parseInt(statEl.getAttribute('data-processing')) || 0;
+    var shipped = parseInt(statEl.getAttribute('data-shipped')) || 0;
+    var delivered = parseInt(statEl.getAttribute('data-delivered')) || 0;
 
     // STATUS DONUT CHART
     statusChart = new Chart(statEl, {
@@ -512,21 +512,21 @@ initDashboardCharts();
 
 // AJAX Dynamic loading
 async function loadDashboardAjax(filter) {
-    const main = document.getElementById('dashboard-container');
-    const sel = document.getElementById('dashboard-filter');
+    var main = document.getElementById('dashboard-container');
+    var sel = document.getElementById('dashboard-filter');
     
     if (sel) sel.disabled = true;
     main.style.opacity = '0.5';
     main.style.pointerEvents = 'none';
     
     try {
-        const url = '/admin-dashboard?filter_month=' + filter;
-        const res = await fetch(url);
-        const html = await res.text();
+        var url = '/admin-dashboard?filter_month=' + filter;
+        var res = await fetch(url);
+        var html = await res.text();
         
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        const newMain = doc.getElementById('dashboard-container');
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+        var newMain = doc.getElementById('dashboard-container');
         
         if (newMain) {
             main.innerHTML = newMain.innerHTML;
@@ -538,7 +538,7 @@ async function loadDashboardAjax(filter) {
     } finally {
         main.style.opacity = '1';
         main.style.pointerEvents = 'auto';
-        const newSel = document.getElementById('dashboard-filter');
+        var newSel = document.getElementById('dashboard-filter');
         if (newSel) newSel.disabled = false;
     }
 }

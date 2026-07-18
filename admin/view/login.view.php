@@ -160,15 +160,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </main>
 
 <script>
-  let attempts = 0;
-  let locked = false;
-  let countdownTimer = null;
+  var attempts = 0;
+  var locked = false;
+  var countdownTimer = null;
 
   function tryLogin() {
     if (locked) return;
-    const email = document.getElementById('email-input').value.trim();
-    const pw = document.getElementById('pw-input').value;
-    const warnArea = document.getElementById('warn-area');
+    var email = document.getElementById('email-input').value.trim();
+    var pw = document.getElementById('pw-input').value;
+    var warnArea = document.getElementById('warn-area');
 
     if (!email || !pw) {
       warnArea.innerHTML = `
@@ -181,7 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Prepare URL-encoded form data
-    const formData = new URLSearchParams();
+    var formData = new URLSearchParams();
     formData.append('email', email);
     formData.append('password', pw);
 
@@ -205,7 +205,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setTimeout(() => window.location.href = '/admin-dashboard', 1200);
       } else {
         attempts++;
-        const remaining = 5 - attempts;
+        var remaining = 5 - attempts;
         
         if (attempts >= 5) {
           locked = true;
@@ -237,11 +237,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   function startCountdown(seconds) {
-    const el = document.getElementById('countdown');
+    var el = document.getElementById('countdown');
     countdownTimer = setInterval(() => {
       seconds--;
-      const m = Math.floor(seconds / 60);
-      const s = seconds % 60;
+      var m = Math.floor(seconds / 60);
+      var s = seconds % 60;
       el.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
       if (seconds <= 0) {
         clearInterval(countdownTimer);
@@ -262,8 +262,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   function togglePw() {
-    const inp = document.getElementById('pw-input');
-    const icon = document.getElementById('eye-icon');
+    var inp = document.getElementById('pw-input');
+    var icon = document.getElementById('eye-icon');
     if (inp.type === 'password') {
       inp.type = 'text';
       icon.classList.remove('ti-eye');

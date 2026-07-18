@@ -1,7 +1,8 @@
 function downloadPDF(elementId, reportName) {
     const element = document.getElementById(elementId);
     if (!element) {
-        alert("Report content not found.");
+        if(window.uiAlert) window.uiAlert("Report content not found.");
+        else alert("Report content not found.");
         return;
     }
     

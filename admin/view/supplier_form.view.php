@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 }
 ?>
 
-<form method="POST" id="supplierForm" class="flex-1 flex overflow-hidden bg-gray-50/50">
+<form method="POST" id="supplierForm" class="flex-1 flex overflow-hidden bg-gray-50/50" data-turbo="false">
     <input type="hidden" name="action" id="formAction" value="save">
     <input type="hidden" name="supplied_items" id="suppliedItemsInput" value="<?php echo htmlspecialchars(implode(',', $supplied_items)); ?>">
 
@@ -278,20 +278,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 </form>
 
 <script>
-let suppliedItems = [];
+var suppliedItems = [];
 
 // Initialize supplied items
-const initialItems = document.getElementById('suppliedItemsInput').value;
+var initialItems = document.getElementById('suppliedItemsInput').value;
 if (initialItems) {
     suppliedItems = initialItems.split(',').filter(item => item.trim() !== '');
 }
 
 function renderTags() {
-    const container = document.getElementById('suppliedItemsContainer');
+    var container = document.getElementById('suppliedItemsContainer');
     container.innerHTML = '';
     
     suppliedItems.forEach((item, idx) => {
-        const tag = document.createElement('span');
+        var tag = document.createElement('span');
         tag.className = 'group flex items-center gap-2 px-4 py-2 bg-brand/5 border border-brand/20 rounded-xl text-xs font-bold text-brand';
         tag.innerHTML = `${item} <button type="button" onclick="removeTag(${idx})" class="ti ti-x text-brand/40 group-hover:text-brand"></button>`;
         container.appendChild(tag);
@@ -301,8 +301,8 @@ function renderTags() {
 }
 
 function addSuppliedItem() {
-    const input = document.getElementById('addItemInput');
-    const val = input.value.trim();
+    var input = document.getElementById('addItemInput');
+    var val = input.value.trim();
     if (val && !suppliedItems.includes(val)) {
         suppliedItems.push(val);
         renderTags();
@@ -316,10 +316,10 @@ function removeTag(idx) {
 }
 
 function deleteSupplier() {
-    if (confirm("Are you sure you want to delete this supplier? This action cannot be undone.")) {
+    uiConfirm("Are you sure you want to delete this supplier? This action cannot be undone.", () => {
         document.getElementById('formAction').value = 'delete';
         document.getElementById('supplierForm').submit();
-    }
+    });
 }
 
 // Initial render

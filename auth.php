@@ -77,19 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error_message = "Database error: " . $e->getMessage();
                 }
             } else {
-                if ($email === 'kamal@abc.lk' && $password === 'admin123') {
-                    if (session_status() === PHP_SESSION_NONE) {
-                        session_start();
-                    }
-                    $_SESSION['user_id'] = 1;
-                    $_SESSION['user_email'] = 'kamal@abc.lk';
-                    $_SESSION['user_name'] = 'Kamal Perera';
-                    
-                    header("Location: /account");
-                    exit;
-                } else {
-                    $error_message = "Invalid email or password. (Offline Mode)";
-                }
+                $error_message = "Database connection unavailable. Please try again later.";
             }
         }
     }

@@ -190,15 +190,15 @@ function restoreItem(table, id) {
     .then(res => res.json())
     .then(data => {
         if(data.status === 'success') location.reload();
-        else alert('Error: ' + data.message);
+        else showToast('Error: ' + data.message, 'error');
     });
 }
 
 function confirmHardDelete(table, id) {
     document.getElementById('hd-table').value = table;
     document.getElementById('hd-id').value = id;
-    const modal = document.getElementById('hard-delete-modal');
-    const content = document.getElementById('hard-delete-content');
+    var modal = document.getElementById('hard-delete-modal');
+    var content = document.getElementById('hard-delete-content');
     modal.style.display = 'flex';
     setTimeout(() => {
         content.classList.remove('scale-95', 'opacity-0');
@@ -207,8 +207,8 @@ function confirmHardDelete(table, id) {
 }
 
 function closeHardDeleteModal() {
-    const modal = document.getElementById('hard-delete-modal');
-    const content = document.getElementById('hard-delete-content');
+    var modal = document.getElementById('hard-delete-modal');
+    var content = document.getElementById('hard-delete-content');
     content.classList.remove('scale-100', 'opacity-100');
     content.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
@@ -217,8 +217,8 @@ function closeHardDeleteModal() {
 }
 
 function executeHardDelete() {
-    const table = document.getElementById('hd-table').value;
-    const id = document.getElementById('hd-id').value;
+    var table = document.getElementById('hd-table').value;
+    var id = document.getElementById('hd-id').value;
     fetch('/api/trash.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -227,7 +227,7 @@ function executeHardDelete() {
     .then(res => res.json())
     .then(data => {
         if(data.status === 'success') location.reload();
-        else alert('Error: ' + data.message);
+        else showToast('Error: ' + data.message, 'error');
     });
 }
 </script>

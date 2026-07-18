@@ -188,8 +188,8 @@
 </style>
 
 <script>
-// Mock Warehouse coordinates
-const WAREHOUSES = {
+// Warehouse coordinates
+var WAREHOUSES = {
   'Colombo': [6.9535, 79.8886],
   'Gampaha': [7.0873, 80.0144],
   'Kandy': [7.2906, 80.6337],
@@ -228,23 +228,10 @@ if (isset($pdo) && $pdo !== null) {
             }
             $status_text = $row['status'] === 'completed' ? 'Delivered' : ($row['status'] === 'in_progress' ? 'In progress' : 'Pending');
             
-            // Map coordinates based on company name/address
-            $lat = null;
-            $lng = null;
-            if (stripos($row['company'], 'ABC Garments') !== false || stripos($row['company_address'], 'Katunayake') !== false) {
-                $lat = 7.1650;
-                $lng = 79.8850;
-            } elseif (stripos($row['company'], 'Seylan') !== false || stripos($row['company_address'], 'Colombo 05') !== false || stripos($row['company_address'], 'Galle Road') !== false) {
-                $lat = 6.8850;
-                $lng = 79.8750;
-            } elseif (stripos($row['company'], 'Fashion') !== false || stripos($row['company_address'], 'Colombo 03') !== false || stripos($row['company_address'], 'Kurunegala') !== false) {
-                $lat = 6.9150;
-                $lng = 79.8510;
-            } else {
-                $hash = crc32($row['company'] ?: 'default');
-                $lat = 6.9000 + (($hash % 100) - 50) / 1000.0;
-                $lng = 79.8700 + ((intval($hash / 100) % 100) - 50) / 1000.0;
-            }
+            // Map coordinates based on company name
+            $hash = crc32($row['company'] ?: 'default');
+            $lat = 6.9000 + (($hash % 100) - 50) / 1000.0;
+            $lng = 79.8700 + ((intval($hash / 100) % 100) - 50) / 1000.0;
             
             $grouped[$key]['stops'][] = [
                 'num' => count($grouped[$key]['stops']) + 1,
@@ -296,24 +283,24 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 ?>
-const defaultAssignments = <?php echo !empty($php_assignments) ? json_encode($php_assignments) : '[]'; ?>;
+var defaultAssignments = <?php echo !empty($php_assignments) ? json_encode($php_assignments) : '[]'; ?>;
 
 // Global Variables
-let assignments = [];
-let activeRun = null;
-let map = null;
-let warehouseMarker = null;
-let stopMarkers = [];
-let vehicleMarker = null;
-let routePolyline = null;
+var assignments = [];
+var activeRun = null;
+var map = null;
+var warehouseMarker = null;
+var stopMarkers = [];
+var vehicleMarker = null;
+var routePolyline = null;
 
 // Simulation State
-let isSimulating = false;
-let simInterval = null;
-let simSpeed = 1; // Speed multiplier (1x, 2x, 5x)
-let currentLegIndex = 0; // index of stop we are moving towards (0 for Stop 1, etc.)
-let currentStepIndex = 0; // index along interpolated leg path
-let legInterpolatedPaths = []; // array of coordinate arrays for each leg
+var isSimulating = false;
+var simInterval = null;
+var simSpeed = 1; // Speed multiplier (1x, 2x, 5x)
+var currentLegIndex = 0; // index of stop we are moving towards (0 for Stop 1, etc.)
+var currentStepIndex = 0; // index along interpolated leg path
+var legInterpolatedPaths = []; // array of coordinate arrays for each leg
 
 // Load Initial Data
 function initData() {
@@ -322,9 +309,9 @@ function initData() {
 
 // Show Custom Toast
 function showToast(message, type = 'success') {
-    const toast = document.getElementById('custom-toast');
-    const msgEl = document.getElementById('toast-msg');
-    const iconEl = document.getElementById('toast-icon');
+    var toast = document.getElementById('custom-toast');
+    var msgEl = document.getElementById('toast-msg');
+    var iconEl = document.getElementById('toast-icon');
     
     msgEl.textContent = message;
     
@@ -366,13 +353,13 @@ function initMap() {
 
 // Populate UI Elements
 function populateRunsDropdown() {
-    const selector = document.getElementById('run-selector');
+    var selector = document.getElementById('run-selector');
     selector.innerHTML = '';
     
     assignments.forEach(a => {
-        const option = document.createElement('option');
+        var option = document.createElement('option');
         option.value = a.id;
-        let stopsDone = a.stops.filter(s => s.status.startsWith('Delivered')).length;
+        var stopsDone = a.stops.filter(s => s.status.startsWith('Delivered')).length;
         option.textContent = `${a.id} — ${a.driver.split(' ')[0]} (${stopsDone}/${a.stops.length} stops) [${a.badgeText}]`;
         selector.appendChild(option);
     });
@@ -385,11 +372,11 @@ function getWarehouseCoords(zone) {
 
 // Linear interpolation to make the vehicle move smoothly between points
 function interpolatePoints(p1, p2, steps) {
-    let points = [];
+    var points = [];
     for (let i = 0; i <= steps; i++) {
-        let t = i / steps;
-        let lat = p1[0] + (p2[0] - p1[0]) * t;
-        let lng = p1[1] + (p2[1] - p1[1]) * t;
+        var t = i / steps;
+        var lat = p1[0] + (p2[0] - p1[0]) * t;
+        var lng = p1[1] + (p2[1] - p1[1]) * t;
         points.push([lat, lng]);
     }
     return points;
@@ -404,15 +391,15 @@ function updateUI(run) {
     document.getElementById('t-vehicle').textContent = run.vehicle;
     
     // Status Badge
-    const badge = document.getElementById('t-status-badge');
+    var badge = document.getElementById('t-status-badge');
     badge.className = 'px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border ' + run.badge;
     badge.textContent = run.badgeText;
     
     // Metrics
-    const completedCount = run.stops.filter(s => s.status.startsWith('Delivered')).length;
+    var completedCount = run.stops.filter(s => s.status.startsWith('Delivered')).length;
     document.getElementById('t-progress').textContent = `${completedCount} / ${run.stops.length}`;
     
-    const estFinishEl = document.getElementById('t-eta');
+    var estFinishEl = document.getElementById('t-eta');
     if (run.badgeText === 'Completed') {
         estFinishEl.textContent = 'Finished';
         estFinishEl.className = 'text-xl font-bold text-emerald-600 mt-1';
@@ -425,10 +412,10 @@ function updateUI(run) {
     }
 
     // Stop Timeline
-    const timeline = document.getElementById('t-stops');
+    var timeline = document.getElementById('t-stops');
     timeline.innerHTML = run.stops.map(s => {
-        let statusClass = 'bg-gray-50 text-gray-500 border border-gray-100';
-        let markerDot = 'bg-gray-200 border-gray-300';
+        var statusClass = 'bg-gray-50 text-gray-500 border border-gray-100';
+        var markerDot = 'bg-gray-200 border-gray-300';
         
         if (s.status.startsWith('Delivered')) {
             statusClass = 'bg-emerald-50 text-emerald-700 border border-emerald-100';
@@ -457,9 +444,9 @@ function updateUI(run) {
 
     // Update Floating Map HUD
     document.getElementById('hud-id').textContent = run.id;
-    const hudDesc = document.getElementById('hud-desc');
-    const hudSub = document.getElementById('hud-sub');
-    const hudDot = document.getElementById('hud-dot');
+    var hudDesc = document.getElementById('hud-desc');
+    var hudSub = document.getElementById('hud-sub');
+    var hudDot = document.getElementById('hud-dot');
     
     if (run.badgeText === 'Completed') {
         hudDesc.textContent = 'Delivery run completed successfully.';
@@ -472,7 +459,7 @@ function updateUI(run) {
         hudSub.className = 'text-xs text-amber-600 font-bold';
         hudDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
     } else {
-        const nextInProg = run.stops.find(s => s.status === 'In progress') || run.stops.find(s => s.status === 'Not started');
+        var nextInProg = run.stops.find(s => s.status === 'In progress') || run.stops.find(s => s.status === 'Not started');
         hudDesc.textContent = nextInProg ? `En route to Stop ${nextInProg.num}: ${nextInProg.name.split(' · ')[1] || nextInProg.name}` : 'En route';
         hudSub.textContent = 'Live GPS Connection Active';
         hudSub.className = 'text-xs text-blue-600 font-bold';
@@ -482,16 +469,16 @@ function updateUI(run) {
 
 // Generate logs to the Activity telemetry window
 function logTelemetry(message, type = 'INFO') {
-    const telDiv = document.getElementById('t-telemetry');
-    const timestamp = new Date().toLocaleTimeString([], { hour12: false });
+    var telDiv = document.getElementById('t-telemetry');
+    var timestamp = new Date().toLocaleTimeString([], { hour12: false });
     
-    let colorClass = 'text-emerald-400';
+    var colorClass = 'text-emerald-400';
     if (type === 'GPS') colorClass = 'text-blue-300';
     if (type === 'DELIVERED') colorClass = 'text-emerald-300 font-bold';
     if (type === 'SYSTEM') colorClass = 'text-gray-400';
     if (type === 'WARN') colorClass = 'text-amber-400';
     
-    const logSpan = document.createElement('div');
+    var logSpan = document.createElement('div');
     logSpan.className = `py-0.5 border-b border-white/5 last:border-b-0 ${colorClass}`;
     logSpan.innerHTML = `[${timestamp}] [${type}] ${message}`;
     telDiv.appendChild(logSpan);
@@ -509,11 +496,11 @@ function drawRouteOnMap(run) {
     if (routePolyline) map.removeLayer(routePolyline);
     routePolyline = null;
     
-    const warehouseCoords = getWarehouseCoords(run.zone || 'Colombo');
+    var warehouseCoords = getWarehouseCoords(run.zone || 'Colombo');
     
     // 1. Draw Warehouse Marker
-    const whHtml = `<div class="w-8 h-8 rounded-full bg-brand border border-white flex items-center justify-center shadow-lg text-white"><i class="ti ti-building-warehouse text-base"></i></div>`;
-    const whIcon = L.divIcon({
+    var whHtml = `<div class="w-8 h-8 rounded-full bg-brand border border-white flex items-center justify-center shadow-lg text-white"><i class="ti ti-building-warehouse text-base"></i></div>`;
+    var whIcon = L.divIcon({
         html: whHtml,
         className: 'custom-marker-warehouse',
         iconSize: [32, 32],
@@ -523,30 +510,30 @@ function drawRouteOnMap(run) {
         .bindPopup(`<b>KE Central Warehouse (${run.zone || 'Colombo'})</b>`);
         
     // 2. Draw Stop Markers & Gather Route Coordinates
-    let routeCoords = [warehouseCoords];
+    var routeCoords = [warehouseCoords];
     
     run.stops.forEach(s => {
         // Fallback coordinates if missing
         if (!s.lat || !s.lng) {
             // Generate minor random offset from warehouse for custom runs
-            const offset = (Math.random() - 0.5) * 0.05;
+            var offset = (Math.random() - 0.5) * 0.05;
             s.lat = warehouseCoords[0] + offset;
             s.lng = warehouseCoords[1] + (Math.random() - 0.5) * 0.05;
         }
         
-        let markerColor = 'bg-amber-500';
+        var markerColor = 'bg-amber-500';
         if (s.status.startsWith('Delivered')) markerColor = 'bg-emerald-500';
         if (s.status === 'In progress') markerColor = 'bg-blue-500';
         
-        const stopHtml = `<div class="w-7 h-7 rounded-full border border-white flex items-center justify-center shadow-md text-white text-xs font-bold ${markerColor}">${s.num}</div>`;
-        const stopIcon = L.divIcon({
+        var stopHtml = `<div class="w-7 h-7 rounded-full border border-white flex items-center justify-center shadow-md text-white text-xs font-bold ${markerColor}">${s.num}</div>`;
+        var stopIcon = L.divIcon({
             html: stopHtml,
             className: 'custom-marker-stop',
             iconSize: [28, 28],
             iconAnchor: [14, 14]
         });
         
-        const stopM = L.marker([s.lat, s.lng], { icon: stopIcon }).addTo(map)
+        var stopM = L.marker([s.lat, s.lng], { icon: stopIcon }).addTo(map)
             .bindPopup(`<b>Stop ${s.num}: ${s.name}</b><br><span class="text-xs text-gray-500">${s.addr}</span><br><b class="text-xs mt-1 block">Status: ${s.status}</b>`);
         
         stopMarkers.push(stopM);
@@ -563,29 +550,29 @@ function drawRouteOnMap(run) {
     
     // 4. Place Vehicle Marker
     // Prioritize simulated GPS coordinates from localStorage if they exist
-    let initialVehiclePos = warehouseCoords;
+    var initialVehiclePos = warehouseCoords;
     if (run.sim_coords) {
         initialVehiclePos = run.sim_coords;
     } else if (run.badgeText === 'Completed') {
-        const lastStop = run.stops[run.stops.length - 1];
+        var lastStop = run.stops[run.stops.length - 1];
         initialVehiclePos = [lastStop.lat, lastStop.lng];
     } else if (run.badgeText === 'Active') {
         // Find current active index
-        const firstIncompleteIdx = run.stops.findIndex(s => !s.status.startsWith('Delivered'));
+        var firstIncompleteIdx = run.stops.findIndex(s => !s.status.startsWith('Delivered'));
         if (firstIncompleteIdx > 0) {
-            const lastCompletedStop = run.stops[firstIncompleteIdx - 1];
+            var lastCompletedStop = run.stops[firstIncompleteIdx - 1];
             initialVehiclePos = [lastCompletedStop.lat, lastCompletedStop.lng];
         } else if (firstIncompleteIdx === 0) {
             initialVehiclePos = warehouseCoords;
         }
     }
     
-    let vehicleIconClass = 'ti-motorbike';
+    var vehicleIconClass = 'ti-motorbike';
     if (run.vehicle.toLowerCase().includes('van')) vehicleIconClass = 'ti-van';
     else if (run.vehicle.toLowerCase().includes('lorry')) vehicleIconClass = 'ti-truck';
     
-    const vehicleHtml = `<div class="w-9 h-9 rounded-full bg-brand-light border-2 border-brand flex items-center justify-center shadow-lg text-brand text-base transition-all"><i class="ti ${vehicleIconClass}"></i></div>`;
-    const vIcon = L.divIcon({
+    var vehicleHtml = `<div class="w-9 h-9 rounded-full bg-brand-light border-2 border-brand flex items-center justify-center shadow-lg text-brand text-base transition-all"><i class="ti ${vehicleIconClass}"></i></div>`;
+    var vIcon = L.divIcon({
         html: vehicleHtml,
         className: 'custom-marker-vehicle',
         iconSize: [36, 36],
@@ -596,7 +583,7 @@ function drawRouteOnMap(run) {
         .bindPopup(`<b>Live Tracking: ${run.driver}</b><br><span class="text-xs text-gray-500">${run.vehicle}</span>`);
         
     // 5. Fit map bounds to show route
-    const bounds = L.latLngBounds(routeCoords);
+    var bounds = L.latLngBounds(routeCoords);
     map.fitBounds(bounds, { padding: [50, 50] });
     
     // 6. Precompute leg interpolation coordinates for simulation
@@ -607,7 +594,7 @@ function drawRouteOnMap(run) {
     
     // Determine active index for simulation leg
     if (run.badgeText === 'Active') {
-        const activeIdx = run.stops.findIndex(s => !s.status.startsWith('Delivered'));
+        var activeIdx = run.stops.findIndex(s => !s.status.startsWith('Delivered'));
         currentLegIndex = activeIdx !== -1 ? activeIdx : 0;
         currentStepIndex = 0;
     } else {
@@ -674,10 +661,10 @@ window.addEventListener('storage', (e) => {
         
         // Find current active run in updated array
         if (activeRun) {
-            const updatedRun = assignments.find(a => a.id === activeRun.id);
+            var updatedRun = assignments.find(a => a.id === activeRun.id);
             if (updatedRun) {
                 // Sync status and stops
-                const oldSimCoords = activeRun.sim_coords;
+                var oldSimCoords = activeRun.sim_coords;
                 activeRun = updatedRun;
                 updateUI(activeRun);
                 
@@ -692,19 +679,19 @@ window.addEventListener('storage', (e) => {
         }
         
         // Refresh runs selector dropdown text
-        const currentSelVal = document.getElementById('run-selector').value;
+        var currentSelVal = document.getElementById('run-selector').value;
         populateRunsDropdown();
         document.getElementById('run-selector').value = currentSelVal;
     }
 });
 
 function closeTrackingSidebar() {
-    const sidebar = document.getElementById('tracking-sidebar');
+    var sidebar = document.getElementById('tracking-sidebar');
     if (sidebar) sidebar.classList.add('-translate-x-full');
 }
 
 function openTrackingSidebar() {
-    const sidebar = document.getElementById('tracking-sidebar');
+    var sidebar = document.getElementById('tracking-sidebar');
     if (sidebar) sidebar.classList.remove('-translate-x-full');
 }
 
@@ -719,8 +706,8 @@ function startApp() {
     populateRunsDropdown();
     
     // Route to requested ID from query parameters or default to first
-    const urlParams = new URLSearchParams(window.location.search);
-    const requestedId = urlParams.get('id');
+    var urlParams = new URLSearchParams(window.location.search);
+    var requestedId = urlParams.get('id');
     
     if (requestedId && assignments.some(a => a.id === requestedId)) {
         document.getElementById('run-selector').value = requestedId;

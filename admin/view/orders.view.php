@@ -257,11 +257,11 @@ if (isset($pdo) && $pdo !== null) {
         <!-- Profile Header -->
         <div class="p-8 border-b border-gray-100 bg-white flex justify-between items-center">
             <div>
-                <h2 id="d-id" class="text-xl font-extrabold text-gray-900 tracking-tight">KE-2025-00847</h2>
-                <p id="d-company" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">ABC Garments</p>
+                <h2 id="d-id" class="text-xl font-extrabold text-gray-900 tracking-tight">&mdash;</h2>
+                <p id="d-company" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">&mdash;</p>
             </div>
             <div class="flex items-center gap-3">
-                <span id="d-badge" class="px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider">Pending</span>
+                <span id="d-badge" class="px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider hidden"></span>
                 <button class="flex items-center justify-center p-1.5 text-gray-400 hover:text-gray-900 bg-white border border-gray-200 rounded-xl transition-all shadow-sm" onclick="downloadPDF('order-detail-pane', 'Invoice')" title="Download Invoice PDF">
                     <i class="ti ti-file-text text-xl"></i>
                 </button>
@@ -275,10 +275,10 @@ if (isset($pdo) && $pdo !== null) {
         <div class="flex-1 overflow-y-auto p-10 space-y-10">
             <!-- Client Info Card -->
             <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex items-center gap-4">
-                <div id="d-initials" class="w-12 h-12 bg-brand-light text-brand rounded-2xl flex items-center justify-center font-black text-sm">KP</div>
+                <div id="d-initials" class="w-12 h-12 bg-brand-light text-brand rounded-2xl flex items-center justify-center font-black text-sm">&mdash;</div>
                 <div>
-                    <h3 id="d-client" class="text-sm font-bold text-gray-900">Kamal Perera</h3>
-                    <p id="d-email" class="text-xs text-gray-400 font-semibold mt-0.5">kamal@abc.lk</p>
+                    <h3 id="d-client" class="text-sm font-bold text-gray-900">&mdash;</h3>
+                    <p id="d-email" class="text-xs text-gray-400 font-semibold mt-0.5">&mdash;</p>
                 </div>
             </div>
 
@@ -316,7 +316,7 @@ if (isset($pdo) && $pdo !== null) {
                     
                     <div class="pt-6 border-t border-gray-100 flex justify-between items-center">
                         <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Grand Total</span>
-                        <span id="d-total" class="text-xl font-extrabold text-brand">LKR 71,933.00</span>
+                        <span id="d-total" class="text-xl font-extrabold text-brand">LKR 0.00</span>
                     </div>
                 </div>
             </div>
@@ -441,12 +441,12 @@ if (isset($pdo) && $pdo !== null) {
 
 <div id="toast-container"></div>
 <script>
-const availableDrivers = <?php echo json_encode($available_drivers); ?>;
+var availableDrivers = <?php echo json_encode($available_drivers); ?>;
 
 function getInitials(name) {
     if (!name || typeof name !== 'string') return '';
-    const parts = name.trim().split(/\s+/);
-    let initials = '';
+    var parts = name.trim().split(/\s+/);
+    var initials = '';
     parts.forEach(p => { if (p) initials += p.charAt(0).toUpperCase(); });
     return initials.substring(0, 2);
 }
@@ -459,8 +459,8 @@ function selectOrder(el, openDrawer = true) {
     
     // Open detail pane drawer if requested
     if (openDrawer) {
-        const pane = document.getElementById('order-detail-pane');
-        const backdrop = document.getElementById('order-detail-backdrop');
+        var pane = document.getElementById('order-detail-pane');
+        var backdrop = document.getElementById('order-detail-backdrop');
         if (pane) pane.classList.remove('translate-x-full');
         if (backdrop) {
             backdrop.classList.remove('hidden');
@@ -471,11 +471,11 @@ function selectOrder(el, openDrawer = true) {
     document.getElementById('d-id').textContent = el.dataset.formattedId;
     document.getElementById('d-company').textContent = el.dataset.company;
     
-    const badge = document.getElementById('d-badge');
+    var badge = document.getElementById('d-badge');
     badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ' + el.dataset.badge;
     badge.textContent = el.dataset.badgetext;
     
-    const initialsEl = document.getElementById('d-initials');
+    var initialsEl = document.getElementById('d-initials');
     if (initialsEl) {
         initialsEl.textContent = getInitials(el.dataset.clientname);
     }
@@ -485,17 +485,17 @@ function selectOrder(el, openDrawer = true) {
     document.getElementById('d-total').textContent = 'LKR ' + el.dataset.total;
     
     // Render Payment Receipt
-    const receiptPath = el.dataset.paymentReceipt;
-    const receiptContainer = document.getElementById('d-receipt-container');
-    const receiptBtn = document.getElementById('d-receipt-btn');
-    const receiptPreview = document.getElementById('d-receipt-preview');
+    var receiptPath = el.dataset.paymentReceipt;
+    var receiptContainer = document.getElementById('d-receipt-container');
+    var receiptBtn = document.getElementById('d-receipt-btn');
+    var receiptPreview = document.getElementById('d-receipt-preview');
 
     if (receiptPath && receiptPath.trim() !== '') {
         receiptContainer.classList.remove('hidden');
-        const fullReceiptPath = '/' + receiptPath;
+        var fullReceiptPath = '/' + receiptPath;
         receiptBtn.dataset.receiptPath = fullReceiptPath;
         
-        const ext = receiptPath.split('.').pop().toLowerCase();
+        var ext = receiptPath.split('.').pop().toLowerCase();
         if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
             receiptPreview.innerHTML = `<img src="${fullReceiptPath}" alt="Payment Receipt" class="max-h-40 object-contain rounded-lg hover:scale-105 transition-transform cursor-zoom-in" onclick="openReceiptModal()">`;
         } else {
@@ -512,13 +512,13 @@ function selectOrder(el, openDrawer = true) {
 
 // Modal Helpers (Global Scope)
 function openReceiptModal() {
-    const receiptBtn = document.getElementById('d-receipt-btn');
+    var receiptBtn = document.getElementById('d-receipt-btn');
     if (!receiptBtn) return;
-    const path = receiptBtn.dataset.receiptPath;
+    var path = receiptBtn.dataset.receiptPath;
     if (!path) return;
     
-    const contentEl = document.getElementById('receipt-modal-content');
-    const ext = path.split('.').pop().toLowerCase();
+    var contentEl = document.getElementById('receipt-modal-content');
+    var ext = path.split('.').pop().toLowerCase();
     
     if (ext === 'pdf') {
         contentEl.innerHTML = `<iframe src="${path}" class="w-full h-full border-0 rounded-2xl bg-white"></iframe>`;
@@ -526,7 +526,7 @@ function openReceiptModal() {
         contentEl.innerHTML = `<img src="${path}" alt="Payment Receipt" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:0.75rem;">`;
     }
     
-    const modal = document.getElementById('receipt-modal');
+    var modal = document.getElementById('receipt-modal');
     if (modal) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
@@ -534,12 +534,12 @@ function openReceiptModal() {
 }
 
 function closeReceiptModal() {
-    const modal = document.getElementById('receipt-modal');
+    var modal = document.getElementById('receipt-modal');
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
-    const contentEl = document.getElementById('receipt-modal-content');
+    var contentEl = document.getElementById('receipt-modal-content');
     if (contentEl) contentEl.innerHTML = '';
 }
 
@@ -547,8 +547,8 @@ function closeReceiptModal() {
 function renderOrderDetails(el) {
     
     // Render Items
-    const itemsContainer = document.getElementById('d-items');
-    let items = [];
+    var itemsContainer = document.getElementById('d-items');
+    var items = [];
     try { items = JSON.parse(el.dataset.items || '[]'); } catch (e) {}
     itemsContainer.innerHTML = items.map(item => `
         <div class="py-4 flex justify-between items-center text-xs first:pt-0 last:pb-0">
@@ -561,13 +561,13 @@ function renderOrderDetails(el) {
     `).join('');
     
     // Render Timeline
-    const timelineContainer = document.getElementById('d-timeline');
-    let timeline = [];
+    var timelineContainer = document.getElementById('d-timeline');
+    var timeline = [];
     try { timeline = JSON.parse(el.dataset.timeline || '[]'); } catch (e) {}
     timelineContainer.innerHTML = timeline.map((step, sIdx) => {
-        let dotClass = 'bg-white border-gray-250 text-gray-300';
-        let titleClass = 'text-gray-400';
-        let descClass = 'text-gray-300';
+        var dotClass = 'bg-white border-gray-250 text-gray-300';
+        var titleClass = 'text-gray-400';
+        var descClass = 'text-gray-300';
         
         if (step.s === 'done') {
             dotClass = 'bg-brand text-brand-light shadow-md shadow-brand/10 border-brand';
@@ -591,9 +591,9 @@ function renderOrderDetails(el) {
     }).join('');
     
     // Actions Footer
-    const actionContainer = document.getElementById('d-actions');
-    const status_lower = el.dataset.status.toLowerCase();
-    const oid = el.dataset.id;
+    var actionContainer = document.getElementById('d-actions');
+    var status_lower = el.dataset.status.toLowerCase();
+    var oid = el.dataset.id;
     
     if (status_lower === 'pending') {
         actionContainer.innerHTML = `
@@ -603,7 +603,7 @@ function renderOrderDetails(el) {
             </div>
         `;
     } else if (status_lower === 'processing') {
-        let driverSelectHTML = '';
+        var driverSelectHTML = '';
         if (availableDrivers && availableDrivers.length > 0) {
             driverSelectHTML = `
                 <div class="mb-4">
@@ -642,18 +642,18 @@ function renderOrderDetails(el) {
 }
 
 // Filter state
-let activeStatus = 'all';
-let searchQuery   = '';
-let sortOrder     = 'newest';
+var activeStatus = 'all';
+var searchQuery   = '';
+var sortOrder     = 'newest';
 
 function applyFilters() {
-    const q = searchQuery.toLowerCase().trim();
-    const list = document.getElementById('order-list');
-    const rows = Array.from(document.querySelectorAll('.order-card'));
-    let visibleCount = 0;
+    var q = searchQuery.toLowerCase().trim();
+    var list = document.getElementById('order-list');
+    var rows = Array.from(document.querySelectorAll('.order-card'));
+    var visibleCount = 0;
 
     rows.forEach(r => {
-        let visible = true;
+        var visible = true;
         
         if (activeStatus !== 'all' && r.dataset.status.toLowerCase() !== activeStatus) {
             visible = false;
@@ -670,19 +670,19 @@ function applyFilters() {
     });
 
     rows.sort((a, b) => {
-        const da = new Date(a.dataset.date);
-        const db = new Date(b.dataset.date);
+        var da = new Date(a.dataset.date);
+        var db = new Date(b.dataset.date);
         return sortOrder === 'newest' ? db - da : da - db;
     });
 
     rows.forEach(r => list.appendChild(r));
 
-    let emptyState = document.getElementById('empty-state');
+    var emptyState = document.getElementById('empty-state');
     if (emptyState) {
         emptyState.style.display = visibleCount === 0 ? 'flex' : 'none';
     }
 
-    const firstVisible = rows.find(r => r.style.display !== 'none');
+    var firstVisible = rows.find(r => r.style.display !== 'none');
     if (firstVisible) {
         selectOrder(firstVisible, false);
     }
@@ -717,14 +717,14 @@ document.getElementById('order-sort').addEventListener('change', e => {
 });
 
 function showToast(message, variant = 'success', duration = 3500) {
-    const icons = {
+    var icons = {
         success: '<i class="ti ti-circle-check"></i>',
         error:   '<i class="ti ti-circle-x"></i>',
         info:    '<i class="ti ti-info-circle"></i>'
     };
-    const titles = { success: 'Success', error: 'Error', info: 'Info' };
+    var titles = { success: 'Success', error: 'Error', info: 'Info' };
 
-    const t = document.createElement('div');
+    var t = document.createElement('div');
     t.className = `toast toast-${variant}`;
     t.innerHTML = `
         <div class="toast-icon">${icons[variant]}</div>
@@ -747,7 +747,7 @@ function showToast(message, variant = 'success', duration = 3500) {
 }
 
 function updateStatus(id, status) {
-    const labels = {
+    var labels = {
         processing: 'Payment accepted — order is now processing.',
         shipped:    'Order dispatched and marked as shipped.',
         delivered:  'Delivery confirmed successfully.',
@@ -762,7 +762,7 @@ function updateStatus(id, status) {
     .then(res => res.json())
     .then(data => {
         if (data.status === 'success') {
-            const variant = status === 'cancelled' ? 'error' : 'success';
+            var variant = status === 'cancelled' ? 'error' : 'success';
             showToast(labels[status] || `Status updated to ${status}.`, variant);
             setTimeout(() => window.location.reload(), 1000);
         } else {
@@ -776,8 +776,8 @@ function updateStatus(id, status) {
 }
 
 function dispatchOrder(oid) {
-    const driverSelect = document.getElementById('assign-driver-select');
-    const driverId = driverSelect ? driverSelect.value : '';
+    var driverSelect = document.getElementById('assign-driver-select');
+    var driverId = driverSelect ? driverSelect.value : '';
     if (!driverId) {
         showToast('Please select a driver to dispatch this cargo.', 'error');
         return;
@@ -804,8 +804,8 @@ function dispatchOrder(oid) {
 }
 
 function closeOrderDetailPane() {
-    const pane = document.getElementById('order-detail-pane');
-    const backdrop = document.getElementById('order-detail-backdrop');
+    var pane = document.getElementById('order-detail-pane');
+    var backdrop = document.getElementById('order-detail-backdrop');
     if (pane) pane.classList.add('translate-x-full');
     if (backdrop) backdrop.classList.add('hidden');
     // Deselect cards
@@ -813,10 +813,10 @@ function closeOrderDetailPane() {
 }
 
 // ── Initial render ─────────────────────────────────────────────────────────
-const urlParams = new URLSearchParams(window.location.search);
-const tabParam = urlParams.get('tab');
+var urlParams = new URLSearchParams(window.location.search);
+var tabParam = urlParams.get('tab');
 if (tabParam) {
-    const targetTab = document.querySelector(`.status-tab[data-status="${tabParam}"]`);
+    var targetTab = document.querySelector(`.status-tab[data-status="${tabParam}"]`);
     if (targetTab) {
         document.querySelectorAll('.status-tab').forEach(b => {
             b.classList.remove('active-tab');

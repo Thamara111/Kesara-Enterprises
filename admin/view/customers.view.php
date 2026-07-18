@@ -243,16 +243,16 @@ if (empty($admin_customers)) {
         <!-- Detail Header -->
         <div class="p-8 border-b border-gray-200 bg-white">
             <div class="flex items-start justify-between mb-6">
-                <div class="w-16 h-16 rounded-2xl bg-brand flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-brand/20" id="d-avatar">KP</div>
+                <div class="w-16 h-16 rounded-2xl bg-brand flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-brand/20" id="d-avatar">&mdash;</div>
                 <div class="flex items-center gap-3">
-                    <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider" id="d-badge">Approved</span>
+                    <span class="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider hidden" id="d-badge"></span>
                     <button onclick="closeDetailPane()" class="p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none" aria-label="Close details">
                         <i class="ti ti-x text-xl"></i>
                     </button>
                 </div>
             </div>
-            <h2 class="text-xl font-bold text-gray-900" id="d-company">ABC Garments</h2>
-            <p class="text-xs text-gray-500 mt-1" id="d-name">Kamal Perera</p>
+            <h2 class="text-xl font-bold text-gray-900" id="d-company">&mdash;</h2>
+            <p class="text-xs text-gray-500 mt-1" id="d-name">&mdash;</p>
         </div>
 
         <!-- Detail Content -->
@@ -262,9 +262,9 @@ if (empty($admin_customers)) {
                 <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Contact Info</h3>
                 <div class="grid grid-cols-[80px_1fr] gap-x-2 gap-y-3 text-xs font-medium">
                     <span class="text-gray-400">Email</span>
-                    <span class="text-gray-900 break-all" id="d-email">kamal@abcgarments.lk</span>
+                    <span class="text-gray-900 break-all" id="d-email">&mdash;</span>
                     <span class="text-gray-400">Phone</span>
-                    <span class="text-gray-900" id="d-phone">+94 77 123 4567</span>
+                    <span class="text-gray-900" id="d-phone">&mdash;</span>
                     <span class="text-gray-400">WhatsApp</span>
                     <a id="d-whatsapp" href="#" target="_blank" class="text-green-600 font-semibold flex items-center gap-1 hover:underline"><i class="ti ti-brand-whatsapp"></i><span id="d-whatsapp-text">—</span></a>
                 </div>
@@ -275,11 +275,11 @@ if (empty($admin_customers)) {
                 <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Business Details</h3>
                 <div class="grid grid-cols-[80px_1fr] gap-x-2 gap-y-3 text-xs font-medium">
                     <span class="text-gray-400">BR Number</span>
-                    <span class="text-gray-900" id="d-br">PV 12345</span>
+                    <span class="text-gray-900" id="d-br">&mdash;</span>
                     <span class="text-gray-400">Type</span>
-                    <span class="text-gray-900" id="d-type">Retailer</span>
+                    <span class="text-gray-900" id="d-type">&mdash;</span>
                     <span class="text-gray-400">Address</span>
-                    <span class="text-gray-900 leading-relaxed" id="d-address">No. 45, Factory Road, Katunayake</span>
+                    <span class="text-gray-900 leading-relaxed" id="d-address">&mdash;</span>
                 </div>
             </div>
 
@@ -292,11 +292,11 @@ if (empty($admin_customers)) {
             <div class="grid grid-cols-2 gap-4">
                 <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Orders Count</p>
-                    <p class="text-xl font-bold text-gray-900 mt-1" id="d-orders">14</p>
+                    <p class="text-xl font-bold text-gray-900 mt-1" id="d-orders">0</p>
                 </div>
                 <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
                     <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total spent</p>
-                    <p class="text-xl font-bold text-brand mt-1" id="d-spent">LKR 1.2M</p>
+                    <p class="text-xl font-bold text-brand mt-1" id="d-spent">LKR 0</p>
                 </div>
             </div>
 
@@ -406,8 +406,8 @@ function selectCustomer(el, openDrawer = true) {
     
     // Open drawer
     if (openDrawer) {
-        const pane = document.getElementById('detail-pane');
-        const backdrop = document.getElementById('customer-detail-backdrop');
+        var pane = document.getElementById('detail-pane');
+        var backdrop = document.getElementById('customer-detail-backdrop');
         if (pane) pane.classList.remove('translate-x-full');
         if (backdrop) {
             backdrop.classList.remove('hidden');
@@ -420,9 +420,9 @@ function selectCustomer(el, openDrawer = true) {
     document.getElementById('d-name').textContent = el.dataset.originalName;
     document.getElementById('d-email').textContent = el.dataset.originalEmail;
     document.getElementById('d-phone').textContent = el.dataset.originalPhone;
-    const waNum = (el.dataset.whatsapp || '').replace(/\D/g, '');
-    const waEl = document.getElementById('d-whatsapp');
-    const waTxt = document.getElementById('d-whatsapp-text');
+    var waNum = (el.dataset.whatsapp || '').replace(/\D/g, '');
+    var waEl = document.getElementById('d-whatsapp');
+    var waTxt = document.getElementById('d-whatsapp-text');
     if (waTxt) waTxt.textContent = el.dataset.whatsapp || '—';
     if (waEl) waEl.href = waNum ? `https://wa.me/${waNum}` : '#';
     document.getElementById('d-br').textContent = el.dataset.br;
@@ -436,9 +436,9 @@ function selectCustomer(el, openDrawer = true) {
 
     document.getElementById('d-recent-orders').innerHTML = el.dataset.recentorders;
 
-    const actionDiv = document.getElementById('d-actions');
-    const actions = el.dataset.actions;
-    const cid = el.dataset.id;
+    var actionDiv = document.getElementById('d-actions');
+    var actions = el.dataset.actions;
+    var cid = el.dataset.id;
     if (actions === 'pending') {
         actionDiv.innerHTML = `
             <div class="grid grid-cols-2 gap-3">
@@ -471,16 +471,16 @@ function selectCustomer(el, openDrawer = true) {
 }
 
 // ── Filtering state ──────────────────────────────────────────────
-let _activeChip  = 'all';  // 'all' | 'pending' | 'approved' | 'suspended' | 'rejected'
+var _activeChip  = 'all';  // 'all' | 'pending' | 'approved' | 'suspended' | 'rejected'
 
 function applyFilters() {
-    const q    = (document.getElementById('customer-search')?.value || '').toLowerCase().trim();
-    const sort = document.getElementById('customer-sort')?.value || 'newest';
-    const list = document.getElementById('customer-list');
-    const rows = Array.from(document.querySelectorAll('.customer-row'));
+    var q    = (document.getElementById('customer-search')?.value || '').toLowerCase().trim();
+    var sort = document.getElementById('customer-sort')?.value || 'newest';
+    var list = document.getElementById('customer-list');
+    var rows = Array.from(document.querySelectorAll('.customer-row'));
 
     rows.forEach(r => {
-        let visible = true;
+        var visible = true;
         if (_activeChip !== 'all' && r.dataset.status !== _activeChip) visible = false;
         
         if (q && !r.dataset.company.includes(q)
@@ -496,9 +496,9 @@ function applyFilters() {
     if (sort === 'alpha') {
         rows.sort((a, b) => a.dataset.originalCompany.localeCompare(b.dataset.originalCompany));
     } else if (sort === 'spend') {
-        const parseSpend = s => {
+        var parseSpend = s => {
             if (!s || s === '\u2014') return 0;
-            const n = parseFloat(s.replace(/[^\d.]/g, ''));
+            var n = parseFloat(s.replace(/[^\d.]/g, ''));
             return s.includes('M') ? n * 1e6 : s.includes('K') ? n * 1e3 : n;
         };
         rows.sort((a, b) => parseSpend(b.dataset.spent) - parseSpend(a.dataset.spent));
@@ -509,8 +509,8 @@ function applyFilters() {
     rows.forEach(r => list.appendChild(r));
 
     // Show empty state if no visible rows
-    let visibleCount = rows.filter(r => r.style.display !== 'none').length;
-    let emptyState = document.getElementById('empty-state');
+    var visibleCount = rows.filter(r => r.style.display !== 'none').length;
+    var emptyState = document.getElementById('empty-state');
     if (!emptyState) {
         emptyState = document.createElement('div');
         emptyState.id = 'empty-state';
@@ -529,7 +529,7 @@ function applyFilters() {
 
 // ── Initial render ────────────────────────────────────────────────
 applyFilters();
-const firstRow = document.querySelector('.customer-row');
+var firstRow = document.querySelector('.customer-row');
 if (firstRow) {
     selectCustomer(firstRow, false);
 }
@@ -546,9 +546,9 @@ function filterChip(el) {
 // refreshRowStatus removed as it's now handled inline in updateStatus
 
 function showToast(message, variant = 'success', duration = 3500) {
-    const icons = { success: '<i class="ti ti-circle-check"></i>', error: '<i class="ti ti-circle-x"></i>', info: '<i class="ti ti-info-circle"></i>' };
-    const titles = { success: 'Success', error: 'Error', info: 'Info' };
-    const t = document.createElement('div');
+    var icons = { success: '<i class="ti ti-circle-check"></i>', error: '<i class="ti ti-circle-x"></i>', info: '<i class="ti ti-info-circle"></i>' };
+    var titles = { success: 'Success', error: 'Error', info: 'Info' };
+    var t = document.createElement('div');
     t.className = `toast toast-${variant}`;
     t.innerHTML = `
         <div class="toast-icon">${icons[variant]}</div>
@@ -571,24 +571,24 @@ function updateStatus(id, newStatus) {
     .then(res => res.json())
     .then(data => {
         if (data.status === 'success') {
-            const rowEl = document.querySelector(`.customer-row[data-id="${id}"]`);
+            var rowEl = document.querySelector(`.customer-row[data-id="${id}"]`);
             if (rowEl) {
                 rowEl.dataset.actions = newStatus === 'approved' ? 'normal' : newStatus;
 
-                const statusMap = {
+                var statusMap = {
                     approved:  { badge: 'bg-emerald-100 text-emerald-700', badgeText: 'Approved',  note: '' },
                     pending:   { badge: 'bg-amber-100 text-amber-700',    badgeText: 'Pending',    note: '<div class="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex gap-3"><i class="ti ti-clock text-amber-600 mt-0.5"></i><p class="text-xs text-amber-700 leading-relaxed font-medium">Awaiting approval. BR number not yet verified.</p></div>' },
                     suspended: { badge: 'bg-purple-100 text-purple-700',  badgeText: 'Suspended',  note: '<div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3"><i class="ti ti-ban text-red-600 mt-0.5"></i><p class="text-xs text-red-700 leading-relaxed font-medium">Account suspended.</p></div>' },
                     rejected:  { badge: 'bg-red-100 text-red-700',        badgeText: 'Rejected',   note: '<div class="p-4 bg-red-50 rounded-2xl border border-red-100 flex gap-3"><i class="ti ti-x text-red-600 mt-0.5"></i><p class="text-xs text-red-700 leading-relaxed font-medium">Account rejected.</p></div>' }
                 };
-                const m = statusMap[newStatus];
+                var m = statusMap[newStatus];
                 if (m) { 
                     rowEl.dataset.badge = m.badge; 
                     rowEl.dataset.badgetext = m.badgeText; 
                     rowEl.dataset.note = m.note; 
                     rowEl.dataset.status = m.badgeText.toLowerCase();
                     
-                    const badgeSpan = rowEl.querySelector('span.rounded-full');
+                    var badgeSpan = rowEl.querySelector('span.rounded-full');
                     if (badgeSpan) {
                         badgeSpan.className = `px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${m.badge} border`;
                         badgeSpan.textContent = m.badgeText;
@@ -603,8 +603,8 @@ function updateStatus(id, newStatus) {
                 }
             }
             
-            const labels = { approved: 'Customer account approved.', suspended: 'Customer account suspended.', rejected: 'Customer account rejected.' };
-            const variant = (newStatus === 'suspended' || newStatus === 'rejected') ? 'error' : 'success';
+            var labels = { approved: 'Customer account approved.', suspended: 'Customer account suspended.', rejected: 'Customer account rejected.' };
+            var variant = (newStatus === 'suspended' || newStatus === 'rejected') ? 'error' : 'success';
             showToast(labels[newStatus] || data.message || `Status updated to ${newStatus}.`, variant);
         } else {
             showToast(data.message || 'Failed to update customer status.', 'error');
@@ -616,11 +616,11 @@ function updateStatus(id, newStatus) {
     });
 }
 
-let _activeCustomerId = null;
+var _activeCustomerId = null;
 
 function loadComment(customerId) {
     _activeCustomerId = customerId;
-    const ta = document.getElementById('d-comment');
+    var ta = document.getElementById('d-comment');
     if (!ta) return;
     ta.value = '';
     ta.placeholder = 'Loading...';
@@ -634,9 +634,9 @@ function loadComment(customerId) {
 }
 
 function saveComment() {
-    const ta = document.getElementById('d-comment');
+    var ta = document.getElementById('d-comment');
     if (!ta || !_activeCustomerId) return;
-    const comment = ta.value.trim();
+    var comment = ta.value.trim();
     fetch('/api/customers.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -654,8 +654,8 @@ function saveComment() {
 }
 
 function closeDetailPane() {
-    const pane = document.getElementById('detail-pane');
-    const backdrop = document.getElementById('customer-detail-backdrop');
+    var pane = document.getElementById('detail-pane');
+    var backdrop = document.getElementById('customer-detail-backdrop');
     if (pane) pane.classList.add('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('opacity-100');

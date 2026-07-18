@@ -151,9 +151,9 @@ function getStatusBadgeClass($status) {
 
 <script>
 function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
-    const msgEl = document.getElementById('toast-message');
-    const icon = document.getElementById('toast-icon');
+    var toast = document.getElementById('toast');
+    var msgEl = document.getElementById('toast-message');
+    var icon = document.getElementById('toast-icon');
     
     msgEl.textContent = message;
     icon.className = type === 'success' ? 'ti ti-check text-green-400 text-xl' : 'ti ti-alert-triangle text-red-400 text-xl';

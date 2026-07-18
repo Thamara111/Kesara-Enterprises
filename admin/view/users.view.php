@@ -197,8 +197,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Password Visibility Toggle
     document.querySelectorAll('.toggle-password-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-            const targetId = this.getAttribute('data-target');
-            const input = document.getElementById(targetId);
+            var targetId = this.getAttribute('data-target');
+            var input = document.getElementById(targetId);
             if (input) {
                 if (input.type === 'password') {
                     input.type = 'text';
@@ -215,8 +215,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Password Strength Checker
     window.checkStaffPasswordStrength = function(password) {
-        const bar = document.getElementById('staff-strengthBar');
-        const label = document.getElementById('staff-strengthLabel');
+        var bar = document.getElementById('staff-strengthBar');
+        var label = document.getElementById('staff-strengthLabel');
         if (!bar || !label) return;
 
         if (!password) {
@@ -226,16 +226,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        let score = 0;
+        var score = 0;
         if (password.length >= 8) score++;
         if (/[a-z]/.test(password)) score++;
         if (/[A-Z]/.test(password)) score++;
         if (/\d/.test(password)) score++;
         if (/[^A-Za-z0-9]/.test(password)) score++;
 
-        let width = "0%";
-        let colorClass = "bg-gray-300";
-        let text = "";
+        var width = "0%";
+        var colorClass = "bg-gray-300";
+        var text = "";
 
         if (password.length < 8) {
             width = "20%";

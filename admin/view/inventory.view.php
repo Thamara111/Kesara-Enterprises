@@ -329,7 +329,7 @@ foreach ($rows as $r) {
 </style>
 
 <script>
-let selEl = null;
+var selEl = null;
 
 function pct(s,t){ return Math.min(100, Math.round(s/t*100)); }
 function barColor(p){ return p<=15?'#E24B4A':p<=50?'#EF9F27':'#1D9E75'; }
@@ -339,17 +339,17 @@ function statusColor(p){ return p<=15?'#791F1F':p<=50?'#633806':'#085041'; }
 function badgeClass(p){ return p===0?'bg-gray-100 text-gray-500 border-gray-200':p<=15?'bg-red-100 text-red-700':p<=50?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700'; }
 function badgeText(p){ return p===0?'Out of stock':p<=15?'Critical':p<=50?'Low stock':'In stock'; }
 
-let activeFilter = 'All';
+var activeFilter = 'All';
 
 function applyFilters() {
-    let visibleCount = 0;
+    var visibleCount = 0;
     document.querySelectorAll('.inv-row').forEach(r => {
-        const stock = parseInt(r.dataset.stock);
-        const thresh = parseInt(r.dataset.thresh);
-        const p = pct(stock, thresh);
-        const status = stock === 0 ? 'Out of stock' : p <= 15 ? 'Critical' : p <= 50 ? 'Low stock' : 'In stock';
+        var stock = parseInt(r.dataset.stock);
+        var thresh = parseInt(r.dataset.thresh);
+        var p = pct(stock, thresh);
+        var status = stock === 0 ? 'Out of stock' : p <= 15 ? 'Critical' : p <= 50 ? 'Low stock' : 'In stock';
         
-        let visible = true;
+        var visible = true;
         if (activeFilter !== 'All' && status !== activeFilter) {
             visible = false;
         }
@@ -361,9 +361,9 @@ function applyFilters() {
 
 function renderDetail(el){
   if (!el) return;
-  const stock = parseInt(el.dataset.stock);
-  const thresh = parseInt(el.dataset.thresh);
-  const p = pct(stock, thresh);
+  var stock = parseInt(el.dataset.stock);
+  var thresh = parseInt(el.dataset.thresh);
+  var p = pct(stock, thresh);
   document.getElementById('d-name').textContent = el.dataset.name;
   document.getElementById('d-sku').textContent = 'SKU: '+el.dataset.sku;
   document.getElementById('d-stock').textContent = stock;
@@ -376,8 +376,8 @@ function renderDetail(el){
   document.getElementById('adj-qty').value = Math.max(0, thresh - stock);
   document.getElementById('thresh-input').value = thresh;
   
-  const logContainer = document.getElementById('adj-log');
-  let logs = [];
+  var logContainer = document.getElementById('adj-log');
+  var logs = [];
   try { logs = JSON.parse(el.dataset.logs || '[]'); } catch (e) {}
   
   if (logs && logs.length > 0) {
@@ -395,37 +395,37 @@ function renderDetail(el){
 }
 
 function updateAdjLabel(){
-  const t = document.getElementById('adj-type').value;
-  const labels = {add:'Quantity to add',remove:'Quantity to remove',set:'Set exact quantity'};
+  var t = document.getElementById('adj-type').value;
+  var labels = {add:'Quantity to add',remove:'Quantity to remove',set:'Set exact quantity'};
   document.getElementById('adj-qty-label').textContent = labels[t];
   updatePreview();
 }
 
 function updatePreview(){
-  const t = document.getElementById('adj-type').value;
-  const q = parseInt(document.getElementById('adj-qty').value)||0;
+  var t = document.getElementById('adj-type').value;
+  var q = parseInt(document.getElementById('adj-qty').value)||0;
   if (!selEl) return;
-  const stock = parseInt(selEl.dataset.stock);
-  let next = t==='add'?stock+q:t==='remove'?Math.max(0,stock-q):q;
+  var stock = parseInt(selEl.dataset.stock);
+  var next = t==='add'?stock+q:t==='remove'?Math.max(0,stock-q):q;
   document.getElementById('adj-preview').textContent = next+' units';
 }
 
 document.getElementById('adj-qty').addEventListener('input', updatePreview);
 
 function applyAdj(){
-  const t = document.getElementById('adj-type').value;
-  const q = parseInt(document.getElementById('adj-qty').value)||0;
-  const note = document.getElementById('adj-note').value || 'Manual adjustment';
+  var t = document.getElementById('adj-type').value;
+  var q = parseInt(document.getElementById('adj-qty').value)||0;
+  var note = document.getElementById('adj-note').value || 'Manual adjustment';
   if (!selEl) return;
-  const prev = parseInt(selEl.dataset.stock);
-  const newStock = t==='add'?prev+q:t==='remove'?Math.max(0,prev-q):q;
-  const diff = newStock - prev;
-  const sign = diff>=0?'+':'';
+  var prev = parseInt(selEl.dataset.stock);
+  var newStock = t==='add'?prev+q:t==='remove'?Math.max(0,prev-q):q;
+  var diff = newStock - prev;
+  var sign = diff>=0?'+':'';
   
   // Update dataset
   selEl.dataset.stock = newStock;
   
-  let logs = [];
+  var logs = [];
   try { logs = JSON.parse(selEl.dataset.logs || '[]'); } catch (e) {}
   logs.unshift({
       date: 'Now',
@@ -436,10 +436,10 @@ function applyAdj(){
   selEl.dataset.logs = JSON.stringify(logs);
 
   // Update DOM inline
-  const thresh = parseInt(selEl.dataset.thresh);
-  const p = pct(newStock, thresh);
-  const bc = badgeClass(p);
-  const bt = badgeText(p);
+  var thresh = parseInt(selEl.dataset.thresh);
+  var p = pct(newStock, thresh);
+  var bc = badgeClass(p);
+  var bt = badgeText(p);
 
   selEl.querySelector('.stock-val').textContent = newStock;
   selEl.querySelector('.stock-val').style.color = stockColor(p);
@@ -464,8 +464,8 @@ function selectRow(el, openDrawer = true){
   selEl = el;
   renderDetail(el);
   if (openDrawer) {
-    const pane = document.getElementById('adj-pane');
-    const backdrop = document.getElementById('inventory-detail-backdrop');
+    var pane = document.getElementById('adj-pane');
+    var backdrop = document.getElementById('inventory-detail-backdrop');
     if (pane) pane.classList.remove('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('hidden');
@@ -483,15 +483,15 @@ function chipFilter(el){
   applyFilters();
   
   // Find first matching visible row
-  const firstVisible = Array.from(document.querySelectorAll('.inv-row')).find(r => r.style.display !== 'none');
+  var firstVisible = Array.from(document.querySelectorAll('.inv-row')).find(r => r.style.display !== 'none');
   if (firstVisible) {
       selectRow(firstVisible, false);
   }
 }
 
 function closeAdjPane() {
-  const pane = document.getElementById('adj-pane');
-  const backdrop = document.getElementById('inventory-detail-backdrop');
+  var pane = document.getElementById('adj-pane');
+  var backdrop = document.getElementById('inventory-detail-backdrop');
   if (pane) pane.classList.add('translate-x-full');
   if (backdrop) {
       backdrop.classList.remove('opacity-100');
@@ -501,7 +501,7 @@ function closeAdjPane() {
 
 // Initial render
 applyFilters();
-const firstRow = document.querySelector('.inv-row');
+var firstRow = document.querySelector('.inv-row');
 if (firstRow) {
   selectRow(firstRow, false);
 }

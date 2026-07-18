@@ -479,7 +479,7 @@ foreach ($admin_drivers as $d) {
     <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-lg w-full">
         <h2 id="modalTitle" class="text-xl font-bold text-gray-900 mb-6">Add New Personnel</h2>
         
-        <form method="POST" id="driverForm">
+        <form method="POST" id="driverForm" data-turbo="false">
             <input type="hidden" name="action" id="driverActionInput" value="add_driver">
             <input type="hidden" name="driver_id" id="driverIdInput" value="">
             
@@ -556,23 +556,23 @@ foreach ($admin_drivers as $d) {
     </div>
 </div>
 
-<form id="statusActionForm" method="POST" class="hidden">
+<form id="statusActionForm" method="POST" class="hidden" data-turbo="false">
     <input type="hidden" name="action" value="toggle_driver_status">
     <input type="hidden" name="driver_id" id="toggleDriverIdInput">
 </form>
 
 <script>
-let currentSelectedDriver = null;
+var currentSelectedDriver = null;
 
 function barColor(w){ return w>=90?'#10b981':w>=75?'#f59e0b':'#ef4444'; }
 function barText(w){ return w>=90?'#047857':w>=75?'#b45309':'#b91c1c'; }
 
-let activeFilter = 'All';
+var activeFilter = 'All';
 
 function applyFilters() {
     document.querySelectorAll('.driver-row').forEach(r => {
-        const status = r.dataset.badgeText;
-        let visible = true;
+        var status = r.dataset.badgeText;
+        var visible = true;
         if (activeFilter !== 'All' && status !== activeFilter) {
             visible = false;
         }
@@ -592,7 +592,7 @@ function chipFilter(el) {
   closeDriverDetailPane();
   applyFilters();
   
-  const firstVisible = Array.from(document.querySelectorAll('.driver-row')).find(r => r.style.display !== 'none');
+  var firstVisible = Array.from(document.querySelectorAll('.driver-row')).find(r => r.style.display !== 'none');
   if (firstVisible) {
       selectRow(firstVisible, false);
   }
@@ -622,8 +622,8 @@ function selectRow(el, openDrawer = true) {
 
   // Open drawer
   if (openDrawer) {
-    const pane = document.getElementById('driver-detail-pane');
-    const backdrop = document.getElementById('driver-detail-backdrop');
+    var pane = document.getElementById('driver-detail-pane');
+    var backdrop = document.getElementById('driver-detail-backdrop');
     if (pane) pane.classList.remove('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('hidden');
@@ -631,14 +631,14 @@ function selectRow(el, openDrawer = true) {
     }
   }
   
-  const av = document.getElementById('d-av');
+  var av = document.getElementById('d-av');
   av.textContent = el.dataset.av;
   av.className = 'w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-bold border shadow-lg mb-4 ' + el.dataset.avColor;
   
   document.getElementById('d-name').textContent = el.dataset.name;
   document.getElementById('d-phone').textContent = el.dataset.phone;
   
-  const badge = document.getElementById('d-badge');
+  var badge = document.getElementById('d-badge');
   badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ' + el.dataset.badge;
   badge.textContent = el.dataset.badgeText;
   
@@ -650,7 +650,7 @@ function selectRow(el, openDrawer = true) {
   document.getElementById('d-assign-btn').href = '/admin-assignments?driver_id=' + el.dataset.id;
   
   // Toggle Deactivate/Activate button label
-  const deactivateBtn = document.getElementById('d-deactivate');
+  var deactivateBtn = document.getElementById('d-deactivate');
   if (el.dataset.status === 'inactive') {
       deactivateBtn.className = 'flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-emerald-100 rounded-xl text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition-all';
       deactivateBtn.innerHTML = '<i class="ti ti-circle-check text-base"></i> Activate';
@@ -660,7 +660,7 @@ function selectRow(el, openDrawer = true) {
   }
 
   // Zones as badges
-  let zones = [];
+  var zones = [];
   try { zones = JSON.parse(el.dataset.zones || '[]'); } catch (e) {}
   document.getElementById('d-zones').innerHTML = zones.map(z => `
     <span class="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-[10px] font-bold">${z}</span>
@@ -669,9 +669,9 @@ function selectRow(el, openDrawer = true) {
   document.getElementById('d-joined').textContent = el.dataset.joined;
   
   // Today's active run
-  let todayRun = null;
+  var todayRun = null;
   try { todayRun = JSON.parse(el.dataset.todayRun || 'null'); } catch (e) {}
-  const runDiv = document.getElementById('d-today-run');
+  var runDiv = document.getElementById('d-today-run');
   if (todayRun) {
     runDiv.innerHTML = `
       <div class="flex justify-between items-start">
@@ -690,7 +690,7 @@ function selectRow(el, openDrawer = true) {
   }
   
   // Performance
-  const otW = parseInt(el.dataset.otW);
+  var otW = parseInt(el.dataset.otW);
   document.getElementById('d-bar-ot').style.width = otW + '%';
   document.getElementById('d-bar-ot').style.backgroundColor = barColor(otW);
   document.getElementById('d-ot').textContent = el.dataset.ot;
@@ -701,7 +701,7 @@ function selectRow(el, openDrawer = true) {
   document.getElementById('d-avg').textContent = el.dataset.avg;
   
   // Recent runs
-  let recent = [];
+  var recent = [];
   try { recent = JSON.parse(el.dataset.recent || '[]'); } catch (e) {}
   document.getElementById('d-recent').innerHTML = recent.map(r => `
     <div class="flex justify-between items-center text-xs py-2 border-b border-gray-100 last:border-b-0">
@@ -716,8 +716,8 @@ function selectRow(el, openDrawer = true) {
 }
 
 function closeDriverDetailPane() {
-  const pane = document.getElementById('driver-detail-pane');
-  const backdrop = document.getElementById('driver-detail-backdrop');
+  var pane = document.getElementById('driver-detail-pane');
+  var backdrop = document.getElementById('driver-detail-backdrop');
   if (pane) pane.classList.add('translate-x-full');
   if (backdrop) {
       backdrop.classList.remove('opacity-100');
@@ -778,15 +778,17 @@ function closeDriverModal() {
 }
 
 function toggleDriverStatus() {
-    if (currentSelectedDriver && confirm(`Are you sure you want to change the status of ${currentSelectedDriver.name}?`)) {
-        document.getElementById('toggleDriverIdInput').value = currentSelectedDriver.id;
-        document.getElementById('statusActionForm').submit();
+    if (currentSelectedDriver) {
+        uiConfirm(`Are you sure you want to change the status of ${currentSelectedDriver.name}?`, () => {
+            document.getElementById('toggleDriverIdInput').value = currentSelectedDriver.id;
+            document.getElementById('statusActionForm').submit();
+        });
     }
 }
 
 // Initial Render
 applyFilters();
-const firstRow = document.querySelector('.driver-row');
+var firstRow = document.querySelector('.driver-row');
 if (firstRow) {
   setTimeout(() => {
     selectRow(firstRow, false);

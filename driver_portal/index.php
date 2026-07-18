@@ -126,22 +126,10 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
             }
             $status_text = $row['status'] === 'completed' ? 'Delivered' : ($row['status'] === 'in_progress' ? 'In progress' : 'Pending');
             
-            $lat = null;
-            $lng = null;
-            if (stripos($row['company'], 'ABC Garments') !== false || stripos($row['company_address'], 'Katunayake') !== false) {
-                $lat = 7.1650;
-                $lng = 79.8850;
-            } elseif (stripos($row['company'], 'Seylan') !== false || stripos($row['company_address'], 'Colombo 05') !== false || stripos($row['company_address'], 'Galle Road') !== false) {
-                $lat = 6.8850;
-                $lng = 79.8750;
-            } elseif (stripos($row['company'], 'Fashion') !== false || stripos($row['company_address'], 'Colombo 03') !== false || stripos($row['company_address'], 'Kurunegala') !== false) {
-                $lat = 6.9150;
-                $lng = 79.8510;
-            } else {
-                $hash = crc32($row['company'] ?: 'default');
-                $lat = 6.9000 + (($hash % 100) - 50) / 1000.0;
-                $lng = 79.8700 + ((intval($hash / 100) % 100) - 50) / 1000.0;
-            }
+            // Map coordinates based on company name
+            $hash = crc32($row['company'] ?: 'default');
+            $lat = 6.9000 + (($hash % 100) - 50) / 1000.0;
+            $lng = 79.8700 + ((intval($hash / 100) % 100) - 50) / 1000.0;
             
             $grouped[$key]['stops'][] = [
                 'num' => count($grouped[$key]['stops']) + 1,
@@ -434,16 +422,13 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
             <p id="confirm-stop-name" class="text-xs text-gray-500"></p>
         </div>
 
-        <!-- Simulated Signature Pad -->
+        <!-- Signature Area -->
         <div class="space-y-1.5">
-            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Customer Signature Mock</label>
-            <div class="h-32 bg-gray-50 border border-gray-200 border-dashed rounded-2xl flex items-center justify-center text-xs text-gray-400 font-medium relative overflow-hidden select-none cursor-pointer" onclick="signMockup()">
-                <div id="sig-placeholder" class="space-y-1 text-center">
+            <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Customer Signature</label>
+            <div class="h-32 bg-gray-50 border border-gray-200 border-dashed rounded-2xl flex items-center justify-center text-xs text-gray-400 font-medium relative overflow-hidden select-none">
+                <div class="space-y-1 text-center">
                     <i class="ti ti-signature text-2xl text-gray-300"></i>
-                    <p>Tap to sign automatically</p>
-                </div>
-                <div id="sig-drawn" style="display: none;" class="w-full h-full flex items-center justify-center font-serif text-3xl italic text-gray-800 tracking-wider">
-                    ABC Garments Representative
+                    <p>Signature Pad</p>
                 </div>
             </div>
         </div>
@@ -603,7 +588,7 @@ const DRIVERS = <?php echo !empty($php_drivers) ? json_encode($php_drivers) : '[
   { id: "SR", name: "Saman Rajapaksa", vehicle: "Van · WP CBB-1122", avColor: "bg-indigo-100 text-indigo-700 border-indigo-200" }
 ]'; ?>;
 
-// Mock Warehouse coords
+// Warehouse coords
 const WAREHOUSES = {
   'Colombo': [6.9535, 79.8886],
   'Gampaha': [7.0873, 80.0144],
@@ -967,17 +952,7 @@ function closeConfirmation() {
     panel.classList.remove('translate-y-0');
 }
 
-function signMockup() {
-    document.getElementById('sig-placeholder').style.display = 'none';
-    document.getElementById('sig-drawn').style.display = 'flex';
-}
-
 function submitDelivery() {
-    const hasSignature = document.getElementById('sig-drawn').style.display === 'flex';
-    if (!hasSignature) {
-        showToast('Please sign to confirm delivery', 'error');
-        return;
-    }
     
     const stop = activeRun.stops.find(s => s.num === currentModalStopNum);
     if (stop) {

@@ -23,20 +23,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
         
         try {
+            // Fetch supplier details (name, email, contact)
+            $supp_stmt = $pdo->prepare("SELECT name, email, contact_person, payment_terms FROM suppliers WHERE id = ?");
+            $supp_stmt->execute([$supplier_id]);
+            $supp = $supp_stmt->fetch();
+            
             $pdo->beginTransaction();
             
             $stmt = $pdo->prepare("INSERT INTO purchase_orders (supplier_id, status, ordered_at, expected_at, total) VALUES (?, 'sent', NOW(), ?, ?)");
             $stmt->execute([$supplier_id, $expected_at, $total]);
             $new_po_id = $pdo->lastInsertId();
+            $po_ref = 'PO-2025-' . str_pad($new_po_id, 4, '0', STR_PAD_LEFT);
             
             $item_stmt = $pdo->prepare("INSERT INTO purchase_order_items (po_id, product_id, item_name, qty_ordered, qty_received, unit_cost) VALUES (?, NULL, ?, ?, 0, ?)");
+            $item_rows_html = '';
+            $item_total = 0;
             for ($i = 0; $i < count($item_names); $i++) {
                 if (empty($item_names[$i])) continue;
-                $item_stmt->execute([$new_po_id, $item_names[$i], (int)$item_qtys[$i], (float)$item_costs[$i]]);
+                $qty  = (int)$item_qtys[$i];
+                $cost = (float)$item_costs[$i];
+                $item_stmt->execute([$new_po_id, $item_names[$i], $qty, $cost]);
+                $line_total = $qty * $cost;
+                $item_total += $line_total;
+                $item_rows_html .= '
+                    <tr>
+                        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#1f2937;">' . htmlspecialchars($item_names[$i]) . '</td>
+                        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:center;">' . $qty . '</td>
+                        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:right;">LKR ' . number_format($cost, 2) . '</td>
+                        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:700;color:#0F6E56;text-align:right;">LKR ' . number_format($line_total, 2) . '</td>
+                    </tr>';
             }
             
             $pdo->commit();
-            $success_msg = "Purchase Order raised successfully!";
+            
+            // Send PO email to supplier
+            require_once __DIR__ . '/../../src/Mailer.php';
+            $contact_name = $supp['contact_person'] ?: $supp['name'];
+            $expected_formatted = date('d M Y', strtotime($expected_at));
+            $email_body = '
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f9fafb;">
+<div style="max-width:600px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.07);">
+    <div style="background:#0F6E56;padding:32px 40px;">
+        <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Purchase Order — ' . $po_ref . '</h1>
+        <p style="margin:8px 0 0;color:rgba(255,255,255,0.75);font-size:13px;">Kesara Enterprises · ' . date('d M Y') . '</p>
+    </div>
+    <div style="padding:32px 40px;">
+        <p style="font-size:14px;color:#374151;margin:0 0 24px;">Dear <strong>' . htmlspecialchars($contact_name) . '</strong>,</p>
+        <p style="font-size:14px;color:#374151;margin:0 0 24px;">Please find below our Purchase Order <strong>' . $po_ref . '</strong>. Kindly confirm receipt and arrange delivery by the expected date.</p>
+        
+        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;border-collapse:collapse;margin-bottom:24px;">
+            <thead>
+                <tr style="background:#f9fafb;">
+                    <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;color:#6b7280;text-align:left;letter-spacing:0.05em;">Item</th>
+                    <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;color:#6b7280;text-align:center;letter-spacing:0.05em;">Qty</th>
+                    <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;color:#6b7280;text-align:right;letter-spacing:0.05em;">Unit Cost</th>
+                    <th style="padding:10px 16px;font-size:11px;text-transform:uppercase;color:#6b7280;text-align:right;letter-spacing:0.05em;">Total</th>
+                </tr>
+            </thead>
+            <tbody>' . $item_rows_html . '</tbody>
+            <tfoot>
+                <tr style="background:#f9fafb;">
+                    <td colspan="3" style="padding:12px 16px;font-size:13px;font-weight:700;color:#1f2937;text-align:right;">Order Total</td>
+                    <td style="padding:12px 16px;font-size:15px;font-weight:800;color:#0F6E56;text-align:right;">LKR ' . number_format($item_total, 2) . '</td>
+                </tr>
+            </tfoot>
+        </table>
+        
+        <table width="100%" style="margin-bottom:28px;">
+            <tr>
+                <td style="font-size:12px;color:#6b7280;padding:4px 0;">Expected Delivery</td>
+                <td style="font-size:12px;font-weight:700;color:#1f2937;text-align:right;padding:4px 0;">' . $expected_formatted . '</td>
+            </tr>
+            <tr>
+                <td style="font-size:12px;color:#6b7280;padding:4px 0;">Payment Terms</td>
+                <td style="font-size:12px;font-weight:700;color:#1f2937;text-align:right;padding:4px 0;">' . htmlspecialchars($supp['payment_terms'] ?: 'Net 30') . '</td>
+            </tr>
+        </table>
+        
+        <p style="font-size:13px;color:#6b7280;margin:0;">Please reply to this email to confirm the order. Thank you for your continued partnership.</p>
+    </div>
+    <div style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f0f0f0;">
+        <p style="margin:0;font-size:11px;color:#9ca3af;">Kesara Enterprises · Wholesale Garment Manufacturer · noreply@kesara.lk</p>
+    </div>
+</div>
+</body>
+</html>';
+            
+            \App\Mailer::send($supp['email'], 'Purchase Order ' . $po_ref . ' from Kesara Enterprises', $email_body);
+            
+            // JS redirect — header() can't be used here as head.php has already sent HTML output
+            echo "<script>showToast('Purchase Order " . $po_ref . " raised and emailed to " . htmlspecialchars($supp['name'], ENT_QUOTES) . " successfully!', 'success'); setTimeout(() => window.location.href = '/admin-purchase-orders', 1500);</script>";
+            exit;
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             $error_msg = "Error creating Purchase Order: " . $e->getMessage();
@@ -398,7 +477,7 @@ if (isset($pdo) && $pdo !== null) {
 </div>
 
 <!-- Forms for actions -->
-<form id="actionForm" method="POST" class="hidden">
+<form id="actionForm" method="POST" class="hidden" data-turbo="false">
     <input type="hidden" name="action" id="actionInput">
     <input type="hidden" name="po_id" id="poIdInput">
 </form>
@@ -408,7 +487,7 @@ if (isset($pdo) && $pdo !== null) {
     <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-2xl w-full">
         <h2 class="text-xl font-bold text-gray-900 mb-6">Raise New Purchase Order</h2>
         
-        <form method="POST">
+        <form method="POST" data-turbo="false">
             <input type="hidden" name="action" value="raise_po">
             
             <div class="grid grid-cols-2 gap-4 mb-6">
@@ -432,20 +511,25 @@ if (isset($pdo) && $pdo !== null) {
                     <button type="button" onclick="addPOItemRow()" class="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-xl text-[10px] font-bold text-brand hover:bg-brand/10 transition-all">+ Add Item</button>
                 </div>
                 
-                <div class="grid grid-cols-[1fr_80px_120px_40px] gap-3 mb-2 text-[9px] font-extrabold text-gray-400 uppercase tracking-wider pl-1">
-                    <span>Item Name / Description</span>
-                    <span class="text-center">Quantity</span>
-                    <span>Unit Cost (LKR)</span>
-                    <span></span>
-                </div>
-
-                <div id="poItemsContainer" class="space-y-3 max-h-60 overflow-y-auto pr-2">
-                    <div class="grid grid-cols-[1fr_80px_120px_40px] gap-3 items-center">
-                        <input type="text" name="item_names[]" placeholder="e.g. Combed Cotton Fabric" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold">
-                        <input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold">
-                        <input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold">
-                        <button type="button" onclick="removePOItemRow(this)" class="text-red-500 hover:text-red-700 text-center"><i class="ti ti-trash text-base"></i></button>
-                    </div>
+                <div class="max-h-60 overflow-y-auto border border-gray-200 rounded-xl bg-white">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-50 sticky top-0 z-10 border-b border-gray-200">
+                            <tr>
+                                <th class="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Item Name / Description</th>
+                                <th class="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center w-24">Quantity</th>
+                                <th class="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-36">Unit Cost (LKR)</th>
+                                <th class="py-3 px-3 w-14"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="poItemsContainer" class="divide-y divide-gray-100">
+                            <tr class="hover:bg-gray-50/50 transition-colors">
+                                <td class="p-2"><input type="text" name="item_names[]" placeholder="e.g. Combed Cotton Fabric" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold"></td>
+                                <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold"></td>
+                                <td class="p-2"><input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold"></td>
+                                <td class="p-2 text-center"><button type="button" onclick="removePOItemRow(this)" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><i class="ti ti-trash text-base"></i></button></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
             
@@ -480,7 +564,7 @@ if (isset($pdo) && $pdo !== null) {
 </style>
 
 <script>
-let currentSelectedPOId = 0;
+var currentSelectedPOId = 0;
 
 function getItemBadgeClass(pct) {
   if (pct === '100%') return 'bg-emerald-50 border-emerald-100 text-emerald-700';
@@ -518,7 +602,7 @@ function selectPO(el, openDrawer = true) {
   document.getElementById('d-record-grn-link').href = '/admin-goods-received?po_id=' + el.dataset.id;
   
   // Toggle Visibility of GRN button
-  const status_lower = el.dataset.status;
+  var status_lower = el.dataset.status;
   if (status_lower === 'received') {
       document.getElementById('d-record-grn-link').classList.add('hidden');
   } else {
@@ -527,8 +611,8 @@ function selectPO(el, openDrawer = true) {
 
   // Open drawer
   if (openDrawer) {
-    const pane = document.getElementById('po-detail-pane');
-    const backdrop = document.getElementById('po-detail-backdrop');
+    var pane = document.getElementById('po-detail-pane');
+    var backdrop = document.getElementById('po-detail-backdrop');
     if (pane) pane.classList.remove('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('hidden');
@@ -539,37 +623,37 @@ function selectPO(el, openDrawer = true) {
   document.getElementById('d-po-num').textContent = el.dataset.num;
   document.getElementById('d-po-date').textContent = el.dataset.date;
   
-  const badge = document.getElementById('d-badge');
+  var badge = document.getElementById('d-badge');
   badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ' + el.dataset.badge;
   badge.textContent = el.dataset.badgeText;
   
   document.getElementById('d-supp').textContent = el.dataset.supp;
   document.getElementById('d-contact').textContent = el.dataset.contact;
   
-  const payment = document.getElementById('d-payment');
+  var payment = document.getElementById('d-payment');
   payment.textContent = el.dataset.payment;
   
-  const expected = document.getElementById('d-expected');
+  var expected = document.getElementById('d-expected');
   expected.textContent = el.dataset.expected;
   expected.className = 'text-xs font-bold ' + el.dataset.expectedColor;
   
   document.getElementById('d-total').textContent = el.dataset.total;
   
-  const alertStyles = {
+  var alertStyles = {
     overdue: { bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-700', icon: 'ti-alert-triangle' },
     warn: { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-700', icon: 'ti-clock' },
     info: { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-700', icon: 'ti-info-circle' },
     ok: { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-700', icon: 'ti-circle-check' }
   };
   
-  const al = document.getElementById('d-alert');
-  const style = alertStyles[el.dataset.alert] || alertStyles['info'];
+  var al = document.getElementById('d-alert');
+  var style = alertStyles[el.dataset.alert] || alertStyles['info'];
   al.className = `p-4 rounded-2xl flex items-start gap-3 border text-xs ${style.bg} ${style.border} ${style.text}`;
   al.querySelector('i').className = `ti ${style.icon} text-lg flex-shrink-0`;
   document.getElementById('d-alert-text').textContent = el.dataset.alertText;
   
   // Render items
-  let items = [];
+  var items = [];
   try { items = JSON.parse(el.dataset.items || '[]'); } catch (e) {}
   document.getElementById('d-items').innerHTML = items.map(item => `
     <div class="flex justify-between items-start gap-4 py-2 border-b border-gray-100 last:border-b-0">
@@ -585,7 +669,7 @@ function selectPO(el, openDrawer = true) {
   `).join('');
   
   // Render timeline
-  let timeline = [];
+  var timeline = [];
   try { timeline = JSON.parse(el.dataset.timeline || '[]'); } catch (e) {}
   document.getElementById('d-timeline').innerHTML = timeline.map(t => `
     <div class="relative flex gap-4">
@@ -598,7 +682,7 @@ function selectPO(el, openDrawer = true) {
   `).join('');
   
   // Toggle Cancel button visibility
-  const cancelBtn = document.getElementById('d-cancel-btn');
+  var cancelBtn = document.getElementById('d-cancel-btn');
   if (el.dataset.badgeText === 'Received' || el.dataset.badgeText === 'Fully received') {
     cancelBtn.classList.add('hidden');
   } else {
@@ -606,12 +690,12 @@ function selectPO(el, openDrawer = true) {
   }
 }
 
-let activeFilter = 'All';
+var activeFilter = 'All';
 
 function applyFilters() {
     document.querySelectorAll('.po-row').forEach(r => {
-        const status = r.dataset.badgeText;
-        let visible = true;
+        var status = r.dataset.badgeText;
+        var visible = true;
         if (activeFilter !== 'All' && status !== activeFilter) {
             visible = false;
         }
@@ -631,15 +715,15 @@ function chipFilter(el) {
   closePODetailPane();
   applyFilters();
   
-  const firstVisible = Array.from(document.querySelectorAll('.po-row')).find(r => r.style.display !== 'none');
+  var firstVisible = Array.from(document.querySelectorAll('.po-row')).find(r => r.style.display !== 'none');
   if (firstVisible) {
       selectPO(firstVisible, false);
   }
 }
 
 function closePODetailPane() {
-  const pane = document.getElementById('po-detail-pane');
-  const backdrop = document.getElementById('po-detail-backdrop');
+  var pane = document.getElementById('po-detail-pane');
+  var backdrop = document.getElementById('po-detail-backdrop');
   if (pane) pane.classList.add('translate-x-full');
   if (backdrop) {
       backdrop.classList.remove('opacity-100');
@@ -663,24 +747,24 @@ function closeRaisePOModal() {
 }
 
 function addPOItemRow() {
-    const container = document.getElementById('poItemsContainer');
-    const row = document.createElement('div');
-    row.className = 'grid grid-cols-[1fr_80px_120px_40px] gap-3 items-center';
+    var container = document.getElementById('poItemsContainer');
+    var row = document.createElement('tr');
+    row.className = 'hover:bg-gray-50/50 transition-colors';
     row.innerHTML = `
-        <input type="text" name="item_names[]" placeholder="e.g. Branded Elastic" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold">
-        <input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold">
-        <input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required class="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold">
-        <button type="button" onclick="removePOItemRow(this)" class="text-red-500 hover:text-red-700 text-center"><i class="ti ti-trash text-base"></i></button>
+        <td class="p-2"><input type="text" name="item_names[]" placeholder="e.g. Branded Elastic" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold"></td>
+        <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold"></td>
+        <td class="p-2"><input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold"></td>
+        <td class="p-2 text-center"><button type="button" onclick="removePOItemRow(this)" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><i class="ti ti-trash text-base"></i></button></td>
     `;
     container.appendChild(row);
 }
 
 function removePOItemRow(btn) {
-    const rows = document.getElementById('poItemsContainer').children;
+    var rows = document.getElementById('poItemsContainer').children;
     if (rows.length > 1) {
-        btn.parentElement.remove();
+        btn.closest('tr').remove();
     } else {
-        alert("At least one purchase item is required.");
+        uiAlert("At least one purchase item is required.");
     }
 }
 
@@ -690,28 +774,32 @@ function printPO() {
 }
 
 function resendPO() {
-    if (currentSelectedPOId > 0 && confirm("Simulate sending this PO again to the supplier?")) {
-        document.getElementById('actionInput').value = 'resend_po';
-        document.getElementById('poIdInput').value = currentSelectedPOId;
-        document.getElementById('actionForm').submit();
+    if (currentSelectedPOId > 0) {
+        uiConfirm("Simulate sending this PO again to the supplier?", () => {
+            document.getElementById('actionInput').value = 'resend_po';
+            document.getElementById('poIdInput').value = currentSelectedPOId;
+            document.getElementById('actionForm').submit();
+        });
     }
 }
 
 function cancelPO() {
-    if (currentSelectedPOId > 0 && confirm("Are you sure you want to cancel and delete this Purchase Order?")) {
-        document.getElementById('actionInput').value = 'cancel_po';
-        document.getElementById('poIdInput').value = currentSelectedPOId;
-        document.getElementById('actionForm').submit();
+    if (currentSelectedPOId > 0) {
+        uiConfirm("Are you sure you want to cancel and delete this Purchase Order?", () => {
+            document.getElementById('actionInput').value = 'cancel_po';
+            document.getElementById('poIdInput').value = currentSelectedPOId;
+            document.getElementById('actionForm').submit();
+        });
     }
 }
 
 // Initial Render
 applyFilters();
-const firstRow = document.querySelector('.po-row');
+var firstRow = document.querySelector('.po-row');
 if (firstRow) {
-  setTimeout(() => {
-    selectPO(firstRow, false);
-    closePODetailPane();
-  }, 100);
+    setTimeout(() => {
+        selectPO(firstRow, false);
+        closePODetailPane();
+    }, 100);
 }
 </script>

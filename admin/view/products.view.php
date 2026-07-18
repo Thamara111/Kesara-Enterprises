@@ -329,7 +329,7 @@ if (empty($all_categories)) {
 
 
 <script>
-let selectedIdx = -1;
+var selectedIdx = -1;
 
 function selectProd(el, openDrawer = true) {
     if (el) {
@@ -340,7 +340,7 @@ function selectProd(el, openDrawer = true) {
         return;
     }
     
-    const id = parseInt(el.dataset.id || "0");
+    var id = parseInt(el.dataset.id || "0");
     document.getElementById('form-mode-label').textContent = 'Edit Product';
     document.getElementById('f-id').value = id;
     document.getElementById('f-name').value = el.dataset.originalName || '';
@@ -352,16 +352,16 @@ function selectProd(el, openDrawer = true) {
     document.getElementById('f-waistband').value = el.dataset.waistband || '';
 
     // Set existing images across 6 slots
-    let prodImages = [];
+    var prodImages = [];
     try { prodImages = JSON.parse(el.dataset.images || '[]'); } catch (e) {}
     for (let i = 0; i < 6; i++) {
-        const imgUrl = prodImages[i] || '';
+        var imgUrl = prodImages[i] || '';
         document.getElementById('f-image-url-' + i).value = imgUrl;
         document.getElementById('f-image-file-' + i).value = ''; // Reset file input
         updateProductPreviewFromUrl(imgUrl, i);
     }
     // Set colors
-    const colors = el.dataset.colors ? el.dataset.colors.split(',').map(c => c.trim()) : [];
+    var colors = el.dataset.colors ? el.dataset.colors.split(',').map(c => c.trim()) : [];
     document.getElementById('f-colors').value = el.dataset.colors || '';
     document.querySelectorAll('.color-chip').forEach(btn => {
         if (colors.includes(btn.textContent.trim())) {
@@ -374,7 +374,7 @@ function selectProd(el, openDrawer = true) {
     });
 
     // Set sizes
-    const sizes = el.dataset.sizes ? el.dataset.sizes.split(',').map(s => s.trim()) : [];
+    var sizes = el.dataset.sizes ? el.dataset.sizes.split(',').map(s => s.trim()) : [];
     document.getElementById('f-sizes').value = el.dataset.sizes || '';
     document.querySelectorAll('.size-chip').forEach(btn => {
         if (sizes.includes(btn.textContent.trim())) {
@@ -392,14 +392,14 @@ function selectProd(el, openDrawer = true) {
     } else {
         document.getElementById('btn-prod-delete').classList.add('hidden');
     }
-    let tiers = [];
+    var tiers = [];
     try { tiers = JSON.parse(el.dataset.tiers || '[]'); } catch (e) {}
     renderTiers(tiers);
     
     // Open drawer
     if (openDrawer) {
-        const pane = document.getElementById('product-form-pane');
-        const backdrop = document.getElementById('product-form-backdrop');
+        var pane = document.getElementById('product-form-pane');
+        var backdrop = document.getElementById('product-form-backdrop');
         if (pane) pane.classList.remove('translate-x-full');
         if (backdrop) {
             backdrop.classList.remove('hidden');
@@ -409,7 +409,7 @@ function selectProd(el, openDrawer = true) {
 }
 
 function renderTiers(tiers) {
-    const cont = document.getElementById('tier-rows');
+    var cont = document.getElementById('tier-rows');
     cont.innerHTML = tiers.map((t, i) => `
         <div class="grid grid-cols-[1fr_1fr_40px] gap-3">
             <input type="number" value="${t.q}" placeholder="Min Qty" class="px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand shadow-sm">
@@ -422,7 +422,7 @@ function renderTiers(tiers) {
 }
 
 function addTier() {
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.className = 'grid grid-cols-[1fr_1fr_40px] gap-3';
     div.innerHTML = `
         <input type="number" placeholder="Min Qty" class="px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand shadow-sm">
@@ -471,8 +471,8 @@ function showNew() {
     document.getElementById('btn-prod-delete').classList.add('hidden');
     
     // Open drawer
-    const pane = document.getElementById('product-form-pane');
-    const backdrop = document.getElementById('product-form-backdrop');
+    var pane = document.getElementById('product-form-pane');
+    var backdrop = document.getElementById('product-form-backdrop');
     if (pane) pane.classList.remove('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('hidden');
@@ -499,15 +499,15 @@ function toggleSizeChip(btn, size) {
 }
 
 function updateHiddenField(containerId, inputId) {
-    const container = document.getElementById(containerId);
-    const activeBtns = container.querySelectorAll('button.bg-brand');
-    const values = Array.from(activeBtns).map(b => b.textContent.trim());
+    var container = document.getElementById(containerId);
+    var activeBtns = container.querySelectorAll('button.bg-brand');
+    var values = Array.from(activeBtns).map(b => b.textContent.trim());
     document.getElementById(inputId).value = values.join(',');
 }
 
 function closeProductFormPane() {
-    const pane = document.getElementById('product-form-pane');
-    const backdrop = document.getElementById('product-form-backdrop');
+    var pane = document.getElementById('product-form-pane');
+    var backdrop = document.getElementById('product-form-backdrop');
     if (pane) pane.classList.add('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('opacity-100');
@@ -518,13 +518,13 @@ function closeProductFormPane() {
 }
 
 function previewProductImage(input, index) {
-    const file = input.files[0];
+    var file = input.files[0];
     if (file) {
-        const reader = new FileReader();
+        var reader = new FileReader();
         reader.onload = function(e) {
-            const previewImg = document.getElementById('form-image-preview-' + index);
-            const placeholder = document.getElementById('upload-placeholder-' + index);
-            const actions = document.getElementById('preview-actions-' + index);
+            var previewImg = document.getElementById('form-image-preview-' + index);
+            var placeholder = document.getElementById('upload-placeholder-' + index);
+            var actions = document.getElementById('preview-actions-' + index);
             previewImg.src = e.target.result;
             previewImg.classList.remove('hidden');
             placeholder.classList.add('hidden');
@@ -536,9 +536,9 @@ function previewProductImage(input, index) {
 }
 
 function updateProductPreviewFromUrl(url, index) {
-    const previewImg = document.getElementById('form-image-preview-' + index);
-    const placeholder = document.getElementById('upload-placeholder-' + index);
-    const actions = document.getElementById('preview-actions-' + index);
+    var previewImg = document.getElementById('form-image-preview-' + index);
+    var placeholder = document.getElementById('upload-placeholder-' + index);
+    var actions = document.getElementById('preview-actions-' + index);
     if (url.trim()) {
         previewImg.src = url;
         previewImg.classList.remove('hidden');
@@ -560,23 +560,23 @@ function clearProductImage(index) {
 }
 
 function saveProduct() {
-    const id = document.getElementById('f-id').value;
-    const name = document.getElementById('f-name').value;
-    const sku = document.getElementById('f-sku').value;
-    const category_name = document.getElementById('f-cat').value;
-    const description = document.getElementById('f-desc').value;
-    const discount = document.getElementById('f-discount').value;
-    const gsm = document.getElementById('f-gsm').value;
-    const waistband = document.getElementById('f-waistband').value;
+    var id = document.getElementById('f-id').value;
+    var name = document.getElementById('f-name').value;
+    var sku = document.getElementById('f-sku').value;
+    var category_name = document.getElementById('f-cat').value;
+    var description = document.getElementById('f-desc').value;
+    var discount = document.getElementById('f-discount').value;
+    var gsm = document.getElementById('f-gsm').value;
+    var waistband = document.getElementById('f-waistband').value;
 
     // Get pricing tiers from inputs
-    const tiers = [];
-    const tierRows = document.getElementById('tier-rows').children;
+    var tiers = [];
+    var tierRows = document.getElementById('tier-rows').children;
     for (let row of tierRows) {
-        const inputs = row.getElementsByTagName('input');
+        var inputs = row.getElementsByTagName('input');
         if (inputs.length >= 2) {
-            const qty = parseInt(inputs[0].value);
-            const price = parseFloat(inputs[1].value);
+            var qty = parseInt(inputs[0].value);
+            var price = parseFloat(inputs[1].value);
             if (!isNaN(qty) && !isNaN(price)) {
                 tiers.push({ q: qty, p: price });
             }
@@ -588,7 +588,7 @@ function saveProduct() {
         return;
     }
 
-    const formData = new FormData();
+    var formData = new FormData();
     formData.append('id', id ? parseInt(id) : 0);
     formData.append('name', name);
     formData.append('sku', sku);
@@ -606,10 +606,10 @@ function saveProduct() {
 
     // Append 6 slots
     for (let i = 0; i < 6; i++) {
-        const urlVal = document.getElementById('f-image-url-' + i).value;
+        var urlVal = document.getElementById('f-image-url-' + i).value;
         formData.append('image_url_' + i, urlVal);
         
-        const fileInput = document.getElementById('f-image-file-' + i);
+        var fileInput = document.getElementById('f-image-file-' + i);
         if (fileInput.files[0]) {
             formData.append('product_image_file_' + i, fileInput.files[0]);
         }
@@ -637,12 +637,12 @@ function saveProduct() {
 }
 
 function deleteProduct() {
-    const id = document.getElementById('f-id').value;
+    var id = document.getElementById('f-id').value;
     if (!id) return;
 
     // Show custom modal instead of alert
-    const modal = document.getElementById('delete-confirm-modal');
-    const content = document.getElementById('delete-confirm-content');
+    var modal = document.getElementById('delete-confirm-modal');
+    var content = document.getElementById('delete-confirm-content');
     modal.style.display = 'flex';
     setTimeout(() => {
         content.classList.remove('scale-95', 'opacity-0');
@@ -651,8 +651,8 @@ function deleteProduct() {
 }
 
 function closeDeleteModal() {
-    const modal = document.getElementById('delete-confirm-modal');
-    const content = document.getElementById('delete-confirm-content');
+    var modal = document.getElementById('delete-confirm-modal');
+    var content = document.getElementById('delete-confirm-content');
     content.classList.remove('scale-100', 'opacity-100');
     content.classList.add('scale-95', 'opacity-0');
     setTimeout(() => {
@@ -661,7 +661,7 @@ function closeDeleteModal() {
 }
 
 function confirmDeleteProduct() {
-    const id = document.getElementById('f-id').value;
+    var id = document.getElementById('f-id').value;
     if (!id) return;
 
         fetch('/api/products.php?action=delete', {
@@ -690,16 +690,16 @@ function confirmDeleteProduct() {
 
 // Filters
 function applyFilters() {
-    const q = (document.getElementById('prod-search')?.value || '').toLowerCase().trim();
-    const cat = (document.getElementById('prod-cat-filter')?.value || '').toLowerCase();
+    var q = (document.getElementById('prod-search')?.value || '').toLowerCase().trim();
+    var cat = (document.getElementById('prod-cat-filter')?.value || '').toLowerCase();
     
     document.querySelectorAll('.prod-card').forEach(row => {
-        const rName = row.dataset.name || '';
-        const rSku = row.dataset.sku || '';
-        const rCat = row.dataset.cat || '';
+        var rName = row.dataset.name || '';
+        var rSku = row.dataset.sku || '';
+        var rCat = row.dataset.cat || '';
         
-        const matchQ = !q || rName.includes(q) || rSku.includes(q);
-        const matchCat = !cat || cat === 'all' || rCat === cat;
+        var matchQ = !q || rName.includes(q) || rSku.includes(q);
+        var matchCat = !cat || cat === 'all' || rCat === cat;
         
         row.hidden = !(matchQ && matchCat);
     });
@@ -709,7 +709,7 @@ document.getElementById('prod-search')?.addEventListener('input', applyFilters);
 document.getElementById('prod-cat-filter')?.addEventListener('change', applyFilters);
 
 // Initial render logic
-const firstRow = document.querySelector('.prod-card');
+var firstRow = document.querySelector('.prod-card');
 if (firstRow) {
     selectProd(firstRow, false);
 }

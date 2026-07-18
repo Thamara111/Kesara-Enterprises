@@ -169,7 +169,7 @@ require_once __DIR__."/layouts/header.php";
       </aside>
 
       <!-- MAIN -->
-      <div class="space-y-6">
+      <div class="flex flex-col gap-6 h-full">
 
         <!-- TOP BAR -->
         <form id="topbar-form" method="GET" action="">
@@ -243,7 +243,7 @@ require_once __DIR__."/layouts/header.php";
 
         <!-- PRODUCT GRID -->
         <?php if (empty($paged_products)): ?>
-        <div class="bg-white border border-gray-100 rounded-2xl p-16 flex flex-col items-center gap-4 text-center shadow-sm">
+        <div class="bg-white border border-gray-100 rounded-2xl p-16 flex flex-col items-center gap-4 text-center shadow-sm flex-1 justify-center">
           <i class="ti ti-mood-empty text-5xl text-gray-200"></i>
           <p class="text-gray-400 font-medium">No products match your filters.</p>
           <a href="?" class="px-5 py-2.5 bg-brand text-white text-sm font-bold rounded-xl hover:opacity-90 transition-opacity">Clear Filters</a>

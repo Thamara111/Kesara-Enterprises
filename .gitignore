@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 dist/
+vendor/
 
 # Editor files
 .vscode/
@@ -19,3 +20,10 @@ Desktop.ini
 # Local environment/secrets
 .env
 2111977-dissatation.pdf
+
+# Temp/scratch files
+temp_*.html
+temp_*.js
+extract.js
+migrate_*.php
+_tmp_*.php

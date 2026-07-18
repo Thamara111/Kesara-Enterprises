@@ -62,7 +62,7 @@ if (!$can_see_prices) {
         <!-- Left: Payment Form -->
         <div>
             <h1 class="text-3xl font-bold text-gray-900 tracking-tight mb-2">Payment Verification</h1>
-            <p class="text-sm text-gray-500 mb-8">Please transfer the total amount to our bank account and upload your payment receipt below.</p>
+            <p class="text-sm text-gray-500 mb-8">Review your order and click 'Place Order' below to submit it directly.</p>
             
             <form id="payment-form" onsubmit="processPayment(event)">
                 <input type="hidden" id="payment_method" name="payment_method" value="bank">
@@ -95,38 +95,6 @@ if (!$can_see_prices) {
                         </div>
                     </div>
 
-                    <!-- Upload Panel -->
-                    <div class="space-y-3">
-                        <label class="text-xs font-bold text-gray-400 uppercase tracking-widest block">Upload Payment Receipt</label>
-                        <div id="drop-zone" class="border-2 border-dashed border-gray-200 hover:border-brand/40 rounded-3xl p-10 text-center cursor-pointer transition-all bg-gray-50/50 flex flex-col items-center justify-center gap-3 group">
-                            <input type="file" id="receipt_file" name="receipt_file" accept=".jpg,.jpeg,.png,.pdf" class="hidden" onchange="handleFileSelect(this)">
-                            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-400 group-hover:text-brand shadow-sm transition-all border border-gray-100">
-                                <i class="ti ti-upload text-2xl"></i>
-                            </div>
-                            <div>
-                                <p class="text-xs font-bold text-gray-700">Click to upload or drag and drop</p>
-                                <p class="text-[10px] text-gray-400 mt-1">JPEG, PNG or PDF (Max 5MB)</p>
-                            </div>
-                        </div>
-                        <p id="file-error" class="text-xs text-red-500 font-bold hidden">Payment receipt is required.</p>
-                        
-                        <!-- Selected File Preview Container -->
-                        <div id="file-preview-container" class="hidden bg-brand-light/20 border border-brand/10 rounded-2xl p-4 flex items-center justify-between">
-                            <div class="flex items-center gap-3 min-w-0">
-                                <div class="w-10 h-10 bg-white rounded-xl border border-brand/10 flex items-center justify-center text-brand">
-                                    <i class="ti ti-file-description text-xl" id="file-icon"></i>
-                                </div>
-                                <div class="min-w-0">
-                                    <p class="text-xs font-bold text-gray-800 truncate" id="preview-filename">receipt.pdf</p>
-                                    <p class="text-[10px] text-gray-400 mt-0.5" id="preview-filesize">2.4 MB</p>
-                                </div>
-                            </div>
-                            <button type="button" onclick="clearSelectedFile()" class="p-1 text-gray-400 hover:text-red-500 transition-colors">
-                                <i class="ti ti-trash text-lg"></i>
-                            </button>
-                        </div>
-                    </div>
-
                 </div>
 
                 <div class="mt-8">
@@ -135,7 +103,7 @@ if (!$can_see_prices) {
                         Place Order (LKR <span id="btn-total">0.00</span>)
                     </button>
                     <div id="processing-loader" class="hidden justify-center items-center gap-3 mt-4 text-sm font-bold text-gray-500 uppercase tracking-widest">
-                        <i class="ti ti-loader animate-spin text-brand text-lg"></i> Submitting order & uploading receipt...
+                        <i class="ti ti-loader animate-spin text-brand text-lg"></i> Submitting order...
                     </div>
                 </div>
             </form>
@@ -171,7 +139,7 @@ if (!$can_see_prices) {
     </main>
 
 <script>
-// Mock Payment Logic & DB Cart integration
+// Checkout & DB Cart integration
 
 let cartItems = [];
 let dbProducts = {};
@@ -218,7 +186,7 @@ async function initializeCheckout() {
         }
     } catch (e) {
         console.error("Failed to load cart items:", e);
-        alert("Failed to load checkout details.");
+        uiAlert("Failed to load checkout details.");
     }
 }
 
@@ -310,7 +278,7 @@ function handleFileSelect(input) {
         
         // Size validation
         if (file.size > 5 * 1024 * 1024) {
-            alert("File is too large. Max size is 5MB.");
+            uiAlert("File is too large. Max size is 5MB.");
             input.value = '';
             return;
         }
@@ -318,7 +286,7 @@ function handleFileSelect(input) {
         // Extension validation
         const ext = file.name.split('.').pop().toLowerCase();
         if (!['jpg', 'jpeg', 'png', 'pdf'].includes(ext)) {
-            alert("Invalid file format. Allowed types: JPG, PNG, PDF.");
+            uiAlert("Invalid file format. Allowed types: JPG, PNG, PDF.");
             input.value = '';
             return;
         }
@@ -353,11 +321,7 @@ function clearSelectedFile() {
 async function processPayment(e) {
     e.preventDefault();
     
-    const fileInput = document.getElementById('receipt_file');
-    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-        document.getElementById('file-error').classList.remove('hidden');
-        return;
-    }
+    // No file validation needed anymore
     
     const payBtn = document.getElementById('pay-btn');
     const loader = document.getElementById('processing-loader');
@@ -372,7 +336,6 @@ async function processPayment(e) {
     formData.append('payment_method', 'bank');
     formData.append('total_amount', finalTotalAmount);
     formData.append('items', JSON.stringify(finalItemsPayload));
-    formData.append('receipt_file', fileInput.files[0]);
 
     // Submit Order to API
     try {
@@ -387,7 +350,7 @@ async function processPayment(e) {
             localStorage.removeItem('kesara_cart');
             window.location.href = `/order-success?order_id=${data.order_id}`;
         } else {
-            alert(data.message || 'Error processing order.');
+            uiAlert(data.message || 'Error processing order.');
             payBtn.disabled = false;
             payBtn.innerHTML = `<i class="ti ti-check text-xl"></i> Place Order (LKR <span id="btn-total">${finalTotalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>)`;
             loader.classList.add('hidden');
@@ -395,7 +358,7 @@ async function processPayment(e) {
         }
     } catch (err) {
         console.error(err);
-        alert('Network error occurred.');
+        uiAlert('Network error occurred.');
         payBtn.disabled = false;
         payBtn.innerHTML = `<i class="ti ti-check text-xl"></i> Place Order (LKR <span id="btn-total">${finalTotalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>)`;
         loader.classList.add('hidden');

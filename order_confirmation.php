@@ -49,56 +49,10 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
-// Fallback to mock data if database is offline or order is not found
+// Redirect to account if order is not found or database is offline
 if (!$order) {
-    $order = [
-        'id' => 1,
-        'email' => 'kamal@abcgarments.lk',
-        'first_name' => 'Kamal',
-        'last_name' => 'Perera',
-        'phone' => '+94 77 123 4567',
-        'business_name' => 'ABC Garments (Pvt) Ltd',
-        'address' => "No. 45, Factory Road\nKatunayake, Western Province",
-        'total_amount' => 71933.00
-    ];
-    
-    $order_items = [
-        [
-            'product_name' => 'Classic Cotton Brief',
-            'colour' => 'Black',
-            'size' => 'M',
-            'sku' => 'KB-001',
-            'quantity' => 120,
-            'unit_price' => 108.00
-        ],
-        [
-            'product_name' => 'Ladies Hipster',
-            'colour' => 'White',
-            'size' => 'S',
-            'sku' => 'KL-003',
-            'quantity' => 100,
-            'unit_price' => 130.00
-        ],
-        [
-            'product_name' => 'Stretch Boxer',
-            'colour' => 'Navy',
-            'size' => 'L',
-            'sku' => 'KB-008',
-            'quantity' => 200,
-            'unit_price' => 175.00
-        ]
-    ];
-    $subtotal = 60960.00;
-    $vat = 10973.00;
-    $total = 71933.00;
-    $total_units = 420;
-    $status_logs = [
-        [
-            'status' => 'pending',
-            'note' => 'Order placed from public website.',
-            'changed_at' => date('Y-m-d H:i:s', time() - 3600)
-        ]
-    ];
+    header("Location: /account");
+    exit;
 }
 
 $page_meta = [

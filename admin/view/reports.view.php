@@ -331,11 +331,11 @@ if (empty($top_customers)) {
 
 <script src="/assets/chart.umd.js"></script>
 <script>
-const grid = 'rgba(0,0,0,0.04)';
-const lbl = '#9ca3af';
+var grid = 'rgba(0,0,0,0.04)';
+var lbl = '#9ca3af';
 
 // Shared Chart Options
-const commonOptions = {
+var commonOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -410,7 +410,7 @@ function switchTab(el, tab) {
     document.querySelectorAll('.chip').forEach(t => t.classList.remove('on'));
     el.classList.add('on');
     ['sales', 'products', 'customers'].forEach(t => {
-        const pane = document.getElementById('tab-' + t);
+        var pane = document.getElementById('tab-' + t);
         if (t === tab) {
             pane.classList.remove('hidden');
             pane.classList.add('block');
@@ -422,7 +422,7 @@ function switchTab(el, tab) {
 }
 
 function exportActiveReport() {
-    let activeTab = 'sales';
+    var activeTab = 'sales';
     document.querySelectorAll('.chip').forEach(t => {
         if(t.classList.contains('on')) {
             if(t.innerText.includes('Sales')) activeTab = 'sales';
@@ -430,8 +430,8 @@ function exportActiveReport() {
             else if(t.innerText.includes('Customers')) activeTab = 'customers';
         }
     });
-    const id = 'tab-' + activeTab;
-    const name = activeTab.charAt(0).toUpperCase() + activeTab.slice(1) + "_Report";
+    var id = 'tab-' + activeTab;
+    var name = activeTab.charAt(0).toUpperCase() + activeTab.slice(1) + "_Report";
     downloadPDF(id, name);
 }
 </script>

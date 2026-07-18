@@ -395,7 +395,7 @@ function submitOrder() {
 
 function downloadQuote() {
   if (cartItems.length === 0) {
-      alert("Your cart is empty. Add items to download a quote.");
+      uiAlert("Your cart is empty. Add items to download a quote.");
       return;
   }
   

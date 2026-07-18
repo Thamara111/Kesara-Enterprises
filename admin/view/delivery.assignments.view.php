@@ -425,13 +425,13 @@ foreach ($admin_assignments as $a) {
 </div>
 
 <script>
-const driverInfo = <?php echo json_encode($driver_info_map); ?>;
-let activeFilter = 'All';
+var driverInfo = <?php echo json_encode($driver_info_map); ?>;
+var activeFilter = 'All';
 
 function applyFilters() {
     document.querySelectorAll('.asgn-row').forEach(r => {
-        const status = r.dataset.badgeText;
-        let visible = true;
+        var status = r.dataset.badgeText;
+        var visible = true;
         if (activeFilter !== 'All' && status !== activeFilter) {
             if (activeFilter === 'In progress' && status !== 'Active') visible = false;
             else if (activeFilter !== 'In progress') visible = false;
@@ -451,8 +451,8 @@ function selectRow(el, openDrawer = true) {
   
   // Open drawer
   if (openDrawer) {
-    const pane = document.getElementById('asgn-detail-pane');
-    const backdrop = document.getElementById('asgn-detail-backdrop');
+    var pane = document.getElementById('asgn-detail-pane');
+    var backdrop = document.getElementById('asgn-detail-backdrop');
     if (pane) pane.classList.remove('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('hidden');
@@ -465,7 +465,7 @@ function selectRow(el, openDrawer = true) {
 
 function getStopsHTML(stops) {
   return stops.map(s => {
-    let statusClass = 'bg-gray-50 text-gray-500 border border-gray-100';
+    var statusClass = 'bg-gray-50 text-gray-500 border border-gray-100';
     if (s.status.startsWith('Delivered')) {
       statusClass = 'bg-emerald-50 text-emerald-700 border border-emerald-100';
     } else if (s.status === 'In progress') {
@@ -498,11 +498,11 @@ function showDetailView(el) {
   document.getElementById('d-id').textContent = el.dataset.id;
   document.getElementById('d-date').textContent = el.dataset.date;
   
-  const badge = document.getElementById('d-badge');
+  var badge = document.getElementById('d-badge');
   badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold uppercase border ' + el.dataset.badge;
   badge.textContent = el.dataset.badgeText;
   
-  const av = document.getElementById('d-av');
+  var av = document.getElementById('d-av');
   av.textContent = el.dataset.av;
   av.className = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs ' + el.dataset.avColor;
   
@@ -510,14 +510,14 @@ function showDetailView(el) {
   document.getElementById('d-vehicle').textContent = el.dataset.vehicle;
   
   // Render timeline drops
-  let stops = [];
+  var stops = [];
   try { stops = JSON.parse(el.dataset.stops || '[]'); } catch (e) {}
   document.getElementById('d-stops').innerHTML = getStopsHTML(stops);
   
-  const cancelBtn = document.getElementById('d-cancel-btn');
+  var cancelBtn = document.getElementById('d-cancel-btn');
   cancelBtn.style.display = el.dataset.canCancel === '1' ? 'block' : 'none';
   
-  const reassignBtn = document.getElementById('d-reassign-btn');
+  var reassignBtn = document.getElementById('d-reassign-btn');
   reassignBtn.style.display = el.dataset.badgeText === 'Completed' ? 'none' : 'block';
 }
 
@@ -530,8 +530,8 @@ function showNewForm() {
   document.getElementById('new-form').style.display = 'block';
   
   // Open drawer
-  const pane = document.getElementById('asgn-detail-pane');
-  const backdrop = document.getElementById('asgn-detail-backdrop');
+  var pane = document.getElementById('asgn-detail-pane');
+  var backdrop = document.getElementById('asgn-detail-backdrop');
   if (pane) pane.classList.remove('translate-x-full');
   if (backdrop) {
       backdrop.classList.remove('hidden');
@@ -540,8 +540,8 @@ function showNewForm() {
 }
 
 function updateDriverInfo() {
-  const val = document.getElementById('driver-select').value;
-  const info = document.getElementById('driver-info');
+  var val = document.getElementById('driver-select').value;
+  var info = document.getElementById('driver-info');
   if (val && driverInfo[val]) {
     info.style.display = 'block';
     document.getElementById('di-vehicle').textContent = driverInfo[val].vehicle;
@@ -573,14 +573,14 @@ function chipFilter(el) {
   closeAsgnDetailPane();
   applyFilters();
   
-  const firstVisible = Array.from(document.querySelectorAll('.asgn-row')).find(r => r.style.display !== 'none');
+  var firstVisible = Array.from(document.querySelectorAll('.asgn-row')).find(r => r.style.display !== 'none');
   if (firstVisible) {
       selectRow(firstVisible, false);
   }
 }
 
 function trackLiveRun() {
-  const currentId = document.getElementById('d-id').textContent;
+  var currentId = document.getElementById('d-id').textContent;
   if (currentId) {
     window.location.href = '/admin-tracking?id=' + currentId;
   } else {
@@ -589,34 +589,27 @@ function trackLiveRun() {
 }
 
 function dispatchNewAssignment() {
-  const driverSelect = document.getElementById('driver-select');
-  const driverVal = driverSelect.value;
+  var driverSelect = document.getElementById('driver-select');
+  var driverVal = driverSelect.value;
   if (!driverVal) {
     showToast('Please select an available driver.', 'error');
     return;
   }
   
-  const driverNameMap = {
-    SR: 'Saman Rajapaksa',
-    LW: 'Lalith Wickrama',
-    KP: 'Kasun Perera'
-  };
-  const driverName = driverNameMap[driverVal] || driverVal; // Fallback if numeric
+  var driverName = driverSelect.options[driverSelect.selectedIndex].text;
   
-  const selectedChips = document.querySelectorAll('.order-chip.sel');
+  var selectedChips = document.querySelectorAll('.order-chip.sel');
   if (selectedChips.length === 0) {
     showToast('Please select at least one order to include.', 'error');
     return;
   }
   
-  const selectedOrders = Array.from(selectedChips).map(chip => chip.textContent.trim());
-  const notes = document.querySelector('textarea') ? document.querySelector('textarea').value : '';
+  var selectedOrders = Array.from(selectedChips).map(chip => chip.textContent.trim());
+  var notes = document.querySelector('textarea') ? document.querySelector('textarea').value : '';
   
-  let driverId = parseInt(driverVal);
+  var driverId = parseInt(driverVal);
   if (isNaN(driverId)) {
-      // Mock driver fallback just for visual success if DB is empty
-      showToast(`Assigned ${selectedOrders.length} orders to ${driverName} and dispatched!`, 'success');
-      setTimeout(() => window.location.reload(), 1000);
+      showToast('Invalid driver selected.', 'error');
       return;
   }
   
@@ -641,8 +634,8 @@ function dispatchNewAssignment() {
 }
 
 function closeAsgnDetailPane() {
-  const pane = document.getElementById('asgn-detail-pane');
-  const backdrop = document.getElementById('asgn-detail-backdrop');
+  var pane = document.getElementById('asgn-detail-pane');
+  var backdrop = document.getElementById('asgn-detail-backdrop');
   if (pane) pane.classList.add('translate-x-full');
   if (backdrop) {
       backdrop.classList.remove('opacity-100');
@@ -656,7 +649,7 @@ function closeAsgnDetailPane() {
 
 // Initial Render
 applyFilters();
-const firstRow = document.querySelector('.asgn-row');
+var firstRow = document.querySelector('.asgn-row');
 if (firstRow) {
   setTimeout(() => {
     selectRow(firstRow, false);
@@ -701,9 +694,9 @@ if (firstRow) {
 <div id="toast-container"></div>
 <script>
 function showToast(message, variant = 'success', duration = 3500) {
-    const icons = { success: '<i class="ti ti-circle-check"></i>', error: '<i class="ti ti-circle-x"></i>', info: '<i class="ti ti-info-circle"></i>' };
-    const titles = { success: 'Success', error: 'Error', info: 'Info' };
-    const t = document.createElement('div');
+    var icons = { success: '<i class="ti ti-circle-check"></i>', error: '<i class="ti ti-circle-x"></i>', info: '<i class="ti ti-info-circle"></i>' };
+    var titles = { success: 'Success', error: 'Error', info: 'Info' };
+    var t = document.createElement('div');
     t.className = `toast toast-${variant}`;
     t.innerHTML = `
         <div class="toast-icon">${icons[variant]}</div>

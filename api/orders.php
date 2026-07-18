@@ -110,52 +110,8 @@ if ($method === 'POST') {
         $order_status = 'processing';
     }
 
-    // Handle Payment Receipt Upload (only for bank transfer)
+    // Handle Payment Receipt Upload (disabled for direct order flow)
     $receipt_path = null;
-    if ($payment_method === 'bank') {
-        if (isset($_FILES['receipt_file']) && $_FILES['receipt_file']['error'] === UPLOAD_ERR_OK) {
-            $fileTmpPath = $_FILES['receipt_file']['tmp_name'];
-            $fileName = $_FILES['receipt_file']['name'];
-            $fileSize = $_FILES['receipt_file']['size'];
-            
-            $fileNameCmps = explode(".", $fileName);
-            $fileExtension = strtolower(end($fileNameCmps));
-            
-            $allowedfileExtensions = array('jpg', 'gif', 'png', 'jpeg', 'pdf');
-            if (in_array($fileExtension, $allowedfileExtensions)) {
-                // Limit size to 5MB
-                if ($fileSize <= 5 * 1024 * 1024) {
-                    // Sanitize file name
-                    $newFileName = time() . '_' . preg_replace("/[^a-zA-Z0-9\._-]/", "", $fileName);
-                    $target_dir = __DIR__ . "/../uploads/receipts/";
-                    if (!file_exists($target_dir)) {
-                        mkdir($target_dir, 0755, true);
-                    }
-                    $dest_path = $target_dir . $newFileName;
-                    
-                    if (move_uploaded_file($fileTmpPath, $dest_path)) {
-                        $receipt_path = 'uploads/receipts/' . $newFileName;
-                    } else {
-                        http_response_code(500);
-                        echo json_encode(["status" => "error", "message" => "Error moving the uploaded receipt file."]);
-                        exit;
-                    }
-                } else {
-                    http_response_code(400);
-                    echo json_encode(["status" => "error", "message" => "Upload failed. File size exceeds 5MB limit."]);
-                    exit;
-                }
-            } else {
-                http_response_code(400);
-                echo json_encode(["status" => "error", "message" => "Upload failed. Allowed file types: " . implode(',', $allowedfileExtensions)]);
-                exit;
-            }
-        } else {
-            http_response_code(400);
-            echo json_encode(["status" => "error", "message" => "Payment receipt file is required for bank transfers."]);
-            exit;
-        }
-    }
 
     if (isset($pdo) && $pdo !== null) {
         try {

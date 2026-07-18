@@ -234,8 +234,8 @@ function selectCat(el, openDrawer = true) {
     document.getElementById('btn-delete').classList.remove('hidden');
 
     if (openDrawer) {
-        const pane = document.getElementById('cat-form-pane');
-        const backdrop = document.getElementById('cat-form-backdrop');
+        var pane = document.getElementById('cat-form-pane');
+        var backdrop = document.getElementById('cat-form-backdrop');
         if (pane) pane.classList.remove('translate-x-full');
         if (backdrop) {
             backdrop.classList.remove('hidden');
@@ -262,8 +262,8 @@ function showNew() {
     // Hide delete button for new category
     document.getElementById('btn-delete').classList.add('hidden');
     
-    const pane = document.getElementById('cat-form-pane');
-    const backdrop = document.getElementById('cat-form-backdrop');
+    var pane = document.getElementById('cat-form-pane');
+    var backdrop = document.getElementById('cat-form-backdrop');
     if (pane) pane.classList.remove('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('hidden');
@@ -272,13 +272,13 @@ function showNew() {
 }
 
 function previewSelectedImage(input) {
-    const file = input.files[0];
+    var file = input.files[0];
     if (file) {
-        const reader = new FileReader();
+        var reader = new FileReader();
         reader.onload = function(e) {
-            const previewImg = document.getElementById('form-image-preview');
-            const placeholder = document.getElementById('upload-placeholder');
-            const overlay = document.getElementById('preview-hover-overlay');
+            var previewImg = document.getElementById('form-image-preview');
+            var placeholder = document.getElementById('upload-placeholder');
+            var overlay = document.getElementById('preview-hover-overlay');
             previewImg.src = e.target.result;
             previewImg.classList.remove('hidden');
             placeholder.classList.add('hidden');
@@ -289,9 +289,9 @@ function previewSelectedImage(input) {
 }
 
 function updatePreviewFromUrl(url) {
-    const previewImg = document.getElementById('form-image-preview');
-    const placeholder = document.getElementById('upload-placeholder');
-    const overlay = document.getElementById('preview-hover-overlay');
+    var previewImg = document.getElementById('form-image-preview');
+    var placeholder = document.getElementById('upload-placeholder');
+    var overlay = document.getElementById('preview-hover-overlay');
     if (url.trim()) {
         previewImg.src = url;
         previewImg.classList.remove('hidden');
@@ -307,8 +307,8 @@ function updatePreviewFromUrl(url) {
 
 // Controls
 function closeCatFormPane() {
-    const pane = document.getElementById('cat-form-pane');
-    const backdrop = document.getElementById('cat-form-backdrop');
+    var pane = document.getElementById('cat-form-pane');
+    var backdrop = document.getElementById('cat-form-backdrop');
     if (pane) pane.classList.add('translate-x-full');
     if (backdrop) {
         backdrop.classList.remove('opacity-100');
@@ -323,9 +323,9 @@ function closeCatFormPane() {
 // Intercept form submissions and route through our REST API
 document.getElementById('cat-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const formData = new FormData(this);
-    const action = document.getElementById('f-action').value;
-    const url = '/api/categories.php' + (action === 'delete' ? '?action=delete' : '');
+    var formData = new FormData(this);
+    var action = document.getElementById('f-action').value;
+    var url = '/api/categories.php' + (action === 'delete' ? '?action=delete' : '');
 
     fetch(url, {
         method: 'POST',
@@ -349,9 +349,9 @@ document.getElementById('cat-form').addEventListener('submit', function(e) {
 });
 
 function submitDelete() {
-    if (confirm("Are you sure you want to delete this category?")) {
+    uiConfirm("Are you sure you want to delete this category?", () => {
         document.getElementById('f-action').value = 'delete';
-        const formData = new FormData();
+        var formData = new FormData();
         formData.append('action', 'delete');
         formData.append('id', document.getElementById('f-id').value);
 
@@ -374,7 +374,7 @@ function submitDelete() {
             console.error(err);
             showToast('Network error occurred.', 'error');
         });
-    }
+    });
 }
 
 

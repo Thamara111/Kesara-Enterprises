@@ -10,7 +10,7 @@ $po_id = isset($_POST['po_id']) ? (int)$_POST['po_id'] : (isset($_GET['po_id']) 
 
 // Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_grn' && isset($pdo)) {
-    $received_by = trim($_POST['received_by'] ?? 'Kamal Rathnayake');
+    $received_by = trim($_POST['received_by'] ?? '');
     $received_at = trim($_POST['received_date'] ?? date('Y-m-d'));
     $note = trim($_POST['note'] ?? '');
     $qtys_received = $_POST['qtys_received'] ?? []; // Map of item_id -> quantity_received
@@ -107,6 +107,19 @@ if ($po_id === 0 && isset($pdo) && $pdo !== null) {
         if ($po_row) {
             $po_id = (int)$po_row['id'];
         }
+    } catch (\Exception $e) {}
+}
+
+// Fetch ALL open POs for the selector dropdown
+$open_pos_list = [];
+if (isset($pdo) && $pdo !== null) {
+    try {
+        $open_stmt = $pdo->query("SELECT po.id, po.status, po.expected_at, s.name AS supplier_name
+                                  FROM purchase_orders po
+                                  JOIN suppliers s ON po.supplier_id = s.id
+                                  WHERE po.status IN ('sent', 'partial', 'overdue')
+                                  ORDER BY po.ordered_at DESC");
+        $open_pos_list = $open_stmt->fetchAll();
     } catch (\Exception $e) {}
 }
 
@@ -214,6 +227,29 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
             </div>
             <?php endif; ?>
 
+            <!-- PO Selector -->
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-3">Purchase Order</h3>
+                <?php if (empty($open_pos_list)): ?>
+                    <p class="text-sm text-gray-400 font-medium">No open purchase orders found.</p>
+                <?php else: ?>
+                <select onchange="window.location.href='/admin-goods-received?po_id='+this.value"
+                        class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-gray-800 outline-none focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all cursor-pointer">
+                    <?php foreach ($open_pos_list as $op): ?>
+                        <?php
+                            $op_ref = 'PO-2025-' . str_pad($op['id'], 4, '0', STR_PAD_LEFT);
+                            $op_status_labels = ['sent' => '● Sent', 'partial' => '◑ Partial', 'overdue' => '⚠ Overdue'];
+                            $op_label = $op_status_labels[$op['status']] ?? ucfirst($op['status']);
+                            $op_date = date('d M Y', strtotime($op['expected_at']));
+                        ?>
+                        <option value="<?= $op['id'] ?>" <?= $op['id'] == $po_id ? 'selected' : '' ?>>
+                            <?= $op_ref ?> — <?= htmlspecialchars($op['supplier_name']) ?> · Expected <?= $op_date ?> [<?= $op_label ?>]
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php endif; ?>
+            </div>
+
             <!-- Delivery Details Form -->
             <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-5">
                 <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Delivery details</h3>
@@ -225,7 +261,7 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                     </div>
                     <div class="space-y-1.5">
                         <label class="text-xs font-bold text-gray-500">Received By <span class="text-red-500">*</span></label>
-                        <input type="text" name="received_by" value="Kamal Rathnayake" required class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
+                        <input type="text" name="received_by" value="" required class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
                     </div>
                 </div>
                 
@@ -276,7 +312,7 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                 <?php endforeach; ?>
 
                 <!-- Shortage Warning banner -->
-                <div id="shortage-warn" class="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3 text-xs text-amber-700">
+                <div id="shortage-warn" class="mt-4 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3 text-xs text-amber-700" style="display:none">
                     <i class="ti ti-alert-triangle text-amber-600 text-lg flex-shrink-0 mt-0.5" aria-hidden="true"></i>
                     <span id="shortage-text" class="leading-relaxed font-semibold">Shortage detected. PO will remain open for the remaining quantity.</span>
                 </div>
@@ -352,9 +388,9 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
 
 <script>
 function updateLine(idx) {
-  const lineEl = document.getElementById('grn-line-'+idx);
+  var lineEl = document.getElementById('grn-line-'+idx);
   if (!lineEl) return;
-  const line = {
+  var line = {
       remaining: parseInt(lineEl.dataset.remaining),
       prev: parseInt(lineEl.dataset.prev),
       ordered: parseInt(lineEl.dataset.ordered),
@@ -363,13 +399,13 @@ function updateLine(idx) {
       unit: lineEl.dataset.unit,
       name: lineEl.dataset.name
   };
-  const input = document.getElementById('qty-'+idx);
-  const qty = Math.min(parseInt(input.value)||0, line.remaining);
+  var input = document.getElementById('qty-'+idx);
+  var qty = Math.min(parseInt(input.value)||0, line.remaining);
   input.value = qty;
-  const totalRcvd = line.prev + qty;
-  const remaining = line.ordered - totalRcvd;
-  const statusEl = document.getElementById('status-'+idx);
-  const labelEl = document.getElementById('total-label-'+idx);
+  var totalRcvd = line.prev + qty;
+  var remaining = line.ordered - totalRcvd;
+  var statusEl = document.getElementById('status-'+idx);
+  var labelEl = document.getElementById('total-label-'+idx);
   
   if (remaining <= 0) {
     statusEl.querySelector('.badge').className = 'badge px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-[10px] font-bold';
@@ -388,17 +424,17 @@ function updateLine(idx) {
     labelEl.textContent = totalRcvd + ' / ' + line.ordered;
   }
   
-  const newInv = line.invBefore + qty;
-  const pct = Math.min(100, Math.round(newInv / line.threshold * 100));
+  var newInv = line.invBefore + qty;
+  var pct = Math.min(100, Math.round(newInv / line.threshold * 100));
   
-  const barEl = document.getElementById('inv-'+idx+'-bar');
+  var barEl = document.getElementById('inv-'+idx+'-bar');
   barEl.style.width = pct + '%';
   barEl.className = 'h-full rounded-full transition-all duration-500 ' + (pct >= 80 ? 'bg-emerald-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500');
 
   document.getElementById('inv-'+idx+'-after').textContent = line.invBefore + ' → ' + newInv;
   
-  const aboveThresh = newInv >= line.threshold;
-  const labelTextEl = document.getElementById('inv-'+idx+'-label');
+  var aboveThresh = newInv >= line.threshold;
+  var labelTextEl = document.getElementById('inv-'+idx+'-label');
   labelTextEl.textContent = '+' + qty + ' ' + line.unit + ' · ' + (aboveThresh ? 'above threshold' : 'still below threshold');
   labelTextEl.className = 'text-[10px] font-bold mt-2 ' + (aboveThresh ? 'text-emerald-600' : 'text-amber-600');
   
@@ -406,18 +442,18 @@ function updateLine(idx) {
 }
 
 function updateShortageWarn() {
-  const shortages = [];
+  var shortages = [];
   document.querySelectorAll('.grn-line-item').forEach(lineEl => {
-    const i = lineEl.dataset.idx;
-    const ordered = parseInt(lineEl.dataset.ordered);
-    const prev = parseInt(lineEl.dataset.prev);
-    const name = lineEl.dataset.name;
-    const unit = lineEl.dataset.unit;
-    const qty = parseInt(document.getElementById('qty-'+i).value)||0;
-    const rem = ordered - prev - qty;
+    var i = lineEl.dataset.idx;
+    var ordered = parseInt(lineEl.dataset.ordered);
+    var prev = parseInt(lineEl.dataset.prev);
+    var name = lineEl.dataset.name;
+    var unit = lineEl.dataset.unit;
+    var qty = parseInt(document.getElementById('qty-'+i).value)||0;
+    var rem = ordered - prev - qty;
     if (rem > 0) shortages.push(name + ': ' + rem + ' ' + unit + ' short');
   });
-  const warn = document.getElementById('shortage-warn');
+  var warn = document.getElementById('shortage-warn');
   if (shortages.length) {
     warn.style.display = 'flex';
     document.getElementById('shortage-text').textContent = shortages.join('. ') + '. PO will remain open for the remaining quantity.';
@@ -427,8 +463,8 @@ function updateShortageWarn() {
 }
 
 function closeGRNRefPane() {
-  const pane = document.getElementById('grn-ref-pane');
-  const backdrop = document.getElementById('grn-ref-backdrop');
+  var pane = document.getElementById('grn-ref-pane');
+  var backdrop = document.getElementById('grn-ref-backdrop');
   if (pane) pane.classList.add('translate-x-full');
   if (backdrop) {
       backdrop.classList.remove('opacity-100');
@@ -437,8 +473,8 @@ function closeGRNRefPane() {
 }
 
 function openGRNRefPane() {
-  const pane = document.getElementById('grn-ref-pane');
-  const backdrop = document.getElementById('grn-ref-backdrop');
+  var pane = document.getElementById('grn-ref-pane');
+  var backdrop = document.getElementById('grn-ref-backdrop');
   if (pane) pane.classList.remove('translate-x-full');
   if (backdrop) {
       backdrop.classList.remove('hidden');
