@@ -64,6 +64,58 @@ foreach ($rows as $r) {
         $low_stock_count++;
     }
 }
+
+// ── Auto-send inventory pressure warning email ────────────────────────────────
+// Fires automatically whenever any pressure items exist, with a 1-hour
+// session-based cooldown to prevent duplicate emails on every page refresh.
+$auto_alert_sent   = false;
+$auto_alert_time   = null;
+$auto_alert_error  = null;
+$pressure_count    = $critical_count + $low_stock_count + $out_of_stock_count;
+
+if ($pressure_count > 0) {
+    $cooldown_key  = 'inv_warn_last_sent';
+    $cooldown_secs = 3600; // 1 hour
+    $last_sent     = $_SESSION[$cooldown_key] ?? 0;
+
+    if ((time() - $last_sent) >= $cooldown_secs) {
+        // Trigger the warning API internally via HTTP POST
+        $ctx = stream_context_create([
+            'http' => [
+                'method'  => 'POST',
+                'header'  => "Content-Type: application/json\r\n",
+                'content' => '{}',
+                'timeout' => 8,
+            ]
+        ]);
+
+        // Build absolute URL using current host
+        $scheme   = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $api_url  = $scheme . '://' . $host . '/api/inventory_warning.php';
+
+        try {
+            $response = @file_get_contents($api_url, false, $ctx);
+            if ($response !== false) {
+                $result = json_decode($response, true);
+                if (isset($result['status']) && in_array($result['status'], ['success', 'partial'])) {
+                    $_SESSION[$cooldown_key] = time();
+                    $auto_alert_sent = true;
+                    $auto_alert_time = date('d M Y, H:i');
+                } else {
+                    $auto_alert_error = $result['message'] ?? 'Unknown error';
+                }
+            } else {
+                $auto_alert_error = 'Could not reach warning API';
+            }
+        } catch (\Exception $e) {
+            $auto_alert_error = $e->getMessage();
+        }
+    } else {
+        // Within cooldown — show when last alert was sent
+        $auto_alert_time = date('d M Y, H:i', $last_sent);
+    }
+}
 ?>
 
 <div class="flex-1 flex overflow-hidden">
@@ -75,9 +127,38 @@ foreach ($rows as $r) {
                 <h1 class="text-2xl font-bold text-gray-900">Inventory</h1>
                 <p class="text-sm text-gray-500 mt-1">Manage stock levels and warehouse replenishment.</p>
             </div>
-            <button class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all" onclick="downloadPDF('inventory-container', 'Inventory_Report')">
-                <i class="ti ti-download"></i> Export PDF
-            </button>
+            <div class="flex items-center gap-3">
+                <?php if ($pressure_count > 0): ?>
+                    <?php if ($auto_alert_sent): ?>
+                        <!-- Alert fired this page load -->
+                        <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-700" title="Warning email sent automatically">
+                            <i class="ti ti-circle-check text-base"></i>
+                            <span>Alert sent &middot; <?= htmlspecialchars($auto_alert_time) ?></span>
+                        </div>
+                    <?php elseif ($auto_alert_error): ?>
+                        <!-- API returned an error -->
+                        <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600" title="<?= htmlspecialchars($auto_alert_error) ?>">
+                            <i class="ti ti-alert-circle text-base"></i>
+                            <span>Alert failed</span>
+                        </div>
+                    <?php else: ?>
+                        <!-- Within cooldown window -->
+                        <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-xs font-bold text-amber-700" title="Next alert after 1 hour cooldown">
+                            <i class="ti ti-clock text-base"></i>
+                            <span>Last alert &middot; <?= htmlspecialchars($auto_alert_time ?? '—') ?></span>
+                        </div>
+                    <?php endif; ?>
+                <?php else: ?>
+                    <!-- All stock healthy — no alert needed -->
+                    <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold text-gray-400">
+                        <i class="ti ti-circle-check text-base"></i>
+                        <span>Stock healthy</span>
+                    </div>
+                <?php endif; ?>
+                <button class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all" onclick="downloadPDF('inventory-container', 'Inventory_Report')">
+                    <i class="ti ti-download"></i> Export PDF
+                </button>
+            </div>
         </div>
 
         <!-- Stats -->
@@ -506,4 +587,5 @@ if (firstRow) {
   selectRow(firstRow, false);
 }
 closeAdjPane();
+
 </script>

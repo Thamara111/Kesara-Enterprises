@@ -53,10 +53,10 @@ if ($method === 'POST') {
                     
                     // Create log
                     $note = "Status updated to " . ucfirst($status) . ".";
-                    if ($status === 'processing') $note = "Payment accepted \u2014 order is now processing.";
-                    if ($status === 'shipped') $note = "Order dispatched and marked as shipped.";
-                    if ($status === 'delivered') $note = "Delivery confirmed successfully.";
-                    if ($status === 'cancelled') $note = "Order has been cancelled.";
+                    if ($status === 'processing') $note = "Payment accepted — order is now processing.";
+                    if ($status === 'shipped')    $note = "Order dispatched and marked as shipped.";
+                    if ($status === 'delivered')  $note = "Delivery confirmed successfully.";
+                    if ($status === 'cancelled')  $note = "Order has been cancelled.";
                     
                     $log_stmt = $pdo->prepare("INSERT INTO order_status_log (order_id, status, note, changed_by) VALUES (?, ?, ?, ?)");
                     $log_stmt->execute([$order_id, $status, $note, $user_id]);
@@ -146,20 +146,20 @@ if ($method === 'POST') {
             $order_id = $pdo->lastInsertId();
 
             // 2. Insert order items and decrement inventory
-            $stmt_item = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, color, size) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt_item      = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, color, size) VALUES (?, ?, ?, ?, ?, ?)");
             $stmt_inv_check = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? AND size = ? AND colour = ? LIMIT 1");
-            $stmt_inv_dec = $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE id = ?");
+            $stmt_inv_dec   = $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE id = ?");
 
             foreach ($validated_items as $item) {
-                $pid = $item['product_id'];
-                $qty = $item['quantity'];
+                $pid   = $item['product_id'];
+                $qty   = $item['quantity'];
                 $price = $item['unit_price'];
                 $color = trim($item['color']);
-                $size = trim($item['size']);
+                $size  = trim($item['size']);
 
                 $stmt_item->execute([$order_id, $pid, $qty, $price, $color, $size]);
 
-                // Find matching variant or fallback to any variant for the product
+                // Decrement inventory immediately on order placement
                 $inv_id = null;
                 if (!empty($size) && !empty($color)) {
                     $stmt_inv_check->execute([$pid, $size, $color]);
@@ -168,7 +168,6 @@ if ($method === 'POST') {
                         $inv_id = $inv_row['id'];
                     }
                 }
-                
                 if (!$inv_id) {
                     $stmt_inv_any = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? LIMIT 1");
                     $stmt_inv_any->execute([$pid]);
@@ -177,7 +176,6 @@ if ($method === 'POST') {
                         $inv_id = $inv_row_any['id'];
                     }
                 }
-
                 if ($inv_id) {
                     $stmt_inv_dec->execute([$qty, $inv_id]);
                 }
