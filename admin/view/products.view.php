@@ -13,6 +13,10 @@ if (isset($pdo) && $pdo !== null) {
         if (!$checkGsm->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN gsm VARCHAR(100) DEFAULT NULL");
         $checkWaistband = $pdo->query("SHOW COLUMNS FROM products LIKE 'waistband'");
         if (!$checkWaistband->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN waistband VARCHAR(150) DEFAULT NULL");
+        $checkDeleted = $pdo->query("SHOW COLUMNS FROM products LIKE 'deleted_at'");
+        if (!$checkDeleted->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+        $checkImages = $pdo->query("SHOW COLUMNS FROM products LIKE 'images'");
+        if (!$checkImages->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN images VARCHAR(255) DEFAULT NULL");
 
         $cat_stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
         $all_categories = $cat_stmt->fetchAll();

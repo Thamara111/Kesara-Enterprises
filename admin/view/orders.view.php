@@ -2,11 +2,16 @@
 $admin_orders = [];
 if (isset($pdo) && $pdo !== null) {
     try {
+        // Self-heal: ensure deleted_at column exists
+        $chk = $pdo->query("SHOW COLUMNS FROM orders LIKE 'deleted_at'");
+        if (!$chk->fetch()) $pdo->exec("ALTER TABLE orders ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+
         $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, o.payment_receipt, u.business_name AS company, u.first_name, u.last_name, u.email 
                              FROM orders o 
                              JOIN users u ON o.user_id = u.id 
                              WHERE o.deleted_at IS NULL");
         $orders_db = $stmt->fetchAll();
+
 
         foreach ($orders_db as $ord) {
             $order_id_formatted = 'KE-2025-' . str_pad($ord['id'], 5, '0', STR_PAD_LEFT);

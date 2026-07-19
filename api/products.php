@@ -36,6 +36,10 @@ if (isset($pdo) && $pdo !== null) {
         if (!$checkWaistband->fetch()) {
             $pdo->exec("ALTER TABLE products ADD COLUMN waistband VARCHAR(150) DEFAULT NULL");
         }
+        $checkDeleted = $pdo->query("SHOW COLUMNS FROM products LIKE 'deleted_at'");
+        if (!$checkDeleted->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+        }
     } catch (\Exception $e) {
         // Ignored
     }

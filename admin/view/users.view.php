@@ -44,6 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 $staff_users = [];
 if (isset($pdo) && $pdo !== null) {
     try {
+        // Self-heal: ensure deleted_at column exists on admins
+        $chk = $pdo->query("SHOW COLUMNS FROM admins LIKE 'deleted_at'");
+        if (!$chk->fetch()) $pdo->exec("ALTER TABLE admins ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+
         $stmt = $pdo->query("SELECT id, username, email, role, created_at FROM admins WHERE deleted_at IS NULL ORDER BY created_at DESC");
         $staff_users = $stmt->fetchAll();
     } catch (\Exception $e) {

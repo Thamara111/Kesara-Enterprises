@@ -9,12 +9,16 @@ header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers
 
 require_once __DIR__ . "/../database/connection.php";
 
-// Self-healing database check
+// Self-healing database check — add missing columns if they don't exist
 if (isset($pdo) && $pdo !== null) {
     try {
-        $check = $pdo->query("SHOW COLUMNS FROM categories LIKE 'image'");
-        if (!$check->fetch()) {
+        $check_image = $pdo->query("SHOW COLUMNS FROM categories LIKE 'image'");
+        if (!$check_image->fetch()) {
             $pdo->exec("ALTER TABLE categories ADD COLUMN image VARCHAR(255) DEFAULT NULL");
+        }
+        $check_deleted = $pdo->query("SHOW COLUMNS FROM categories LIKE 'deleted_at'");
+        if (!$check_deleted->fetch()) {
+            $pdo->exec("ALTER TABLE categories ADD COLUMN deleted_at DATETIME DEFAULT NULL");
         }
     } catch (\Exception $e) {
         // Ignored
@@ -113,31 +117,37 @@ if ($method === 'POST') {
     // Process image file upload if provided
     if (isset($_FILES['category_image_file']) && $_FILES['category_image_file']['error'] !== UPLOAD_ERR_NO_FILE) {
         if ($_FILES['category_image_file']['error'] !== UPLOAD_ERR_OK) {
-            throw new \Exception("File upload failed with error code: " . $_FILES['category_image_file']['error']);
+            http_response_code(400);
+            echo json_encode(["status" => "error", "message" => "File upload failed with error code: " . $_FILES['category_image_file']['error']]);
+            exit;
         }
-        
+
         $fileTmpPath = $_FILES['category_image_file']['tmp_name'];
-        $fileName = $_FILES['category_image_file']['name'];
+        $fileName    = $_FILES['category_image_file']['name'];
         $fileExtension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-        if (in_array($fileExtension, $allowedExtensions)) {
-            $newFileName = md5(time() . $fileName) . '.' . $fileExtension;
-            $uploadDir = __DIR__ . '/../assets/uploads/';
-            if (!is_dir($uploadDir)) {
-                if (!mkdir($uploadDir, 0755, true)) {
-                    throw new \Exception("Failed to create uploads directory: " . $uploadDir);
-                }
-            }
-            
-            $destPath = $uploadDir . $newFileName;
-            if (move_uploaded_file($fileTmpPath, $destPath)) {
-                $image = '/assets/uploads/' . $newFileName;
-            } else {
-                throw new \Exception("Failed to move uploaded file. Check directory permissions.");
-            }
+        if (!in_array($fileExtension, $allowedExtensions)) {
+            http_response_code(400);
+            echo json_encode(["status" => "error", "message" => "Unsupported image format. Allowed: JPG, JPEG, PNG, GIF, WEBP."]);
+            exit;
+        }
+
+        $newFileName = md5(time() . $fileName) . '.' . $fileExtension;
+        $uploadDir   = __DIR__ . '/../assets/uploads/';
+        if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true)) {
+            http_response_code(500);
+            echo json_encode(["status" => "error", "message" => "Failed to create uploads directory."]);
+            exit;
+        }
+
+        $destPath = $uploadDir . $newFileName;
+        if (move_uploaded_file($fileTmpPath, $destPath)) {
+            $image = '/assets/uploads/' . $newFileName;
         } else {
-            throw new \Exception("Unsupported image format. Allowed: JPG, JPEG, PNG, GIF, WEBP.");
+            http_response_code(500);
+            echo json_encode(["status" => "error", "message" => "Failed to move uploaded file. Check directory permissions."]);
+            exit;
         }
     }
 

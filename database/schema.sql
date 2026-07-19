@@ -32,6 +32,8 @@ CREATE TABLE categories (
   slug VARCHAR(50) NOT NULL UNIQUE,
   icon VARCHAR(50) DEFAULT 'ti-shirt',
   description TEXT,
+  image VARCHAR(255) DEFAULT NULL,
+  deleted_at DATETIME DEFAULT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -45,6 +47,8 @@ CREATE TABLE products (
   moq INT NOT NULL DEFAULT 50,
   base_price DECIMAL(10,2) NOT NULL,
   status VARCHAR(20) DEFAULT 'In Stock',
+  images VARCHAR(255) DEFAULT NULL,
+  deleted_at DATETIME DEFAULT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -58,6 +62,7 @@ CREATE TABLE admins (
   role ENUM('admin', 'finance_manager', 'supplier_manager', 'delivery_manager') DEFAULT 'admin',
   failed_attempts INT DEFAULT 0,
   locked_until DATETIME NULL,
+  deleted_at DATETIME DEFAULT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -123,6 +128,7 @@ CREATE TABLE orders (
   user_id INT NOT NULL,
   status ENUM('pending','processing','shipped','delivered','cancelled') DEFAULT 'pending',
   total_amount DECIMAL(10,2) NOT NULL,
+  deleted_at DATETIME DEFAULT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
