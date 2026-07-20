@@ -1,4 +1,5 @@
 <!-- Delivery Tracking View -->
+<!-- Provides a real-time map interface (via Leaflet.js) for tracking active deliveries and dispatch routes. -->
 <h2 class="sr-only">Delivery tracking and live status monitoring page for Kesara Enterprises wholesale admin platform</h2>
 
 <!-- Leaflet.js Map Assets -->

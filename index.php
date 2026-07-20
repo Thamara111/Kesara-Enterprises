@@ -1,4 +1,8 @@
 <?php
+/**
+ * Frontend Homepage
+ * Displays featured products, categories, and promotional sections.
+ */
 require_once __DIR__ . "/database/connection.php";
 
 $categories = [];

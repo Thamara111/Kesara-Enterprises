@@ -1,6 +1,7 @@
 <?php
 /**
  * Goods Received Note View - Database Integration & Form Processing
+ * Handles the creation of GRNs when a purchase order is fulfilled by a supplier.
  */
 
 $success_msg = "";

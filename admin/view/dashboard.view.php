@@ -1,12 +1,18 @@
 <?php
 /**
- * Admin Dashboard View - Database Integration
+ * Admin Dashboard View
+ * Fetches real-time system metrics (Revenue, Orders, Inventory, etc.) and
+ * prepares data for the charts and status widgets. Supports date filtering (AJAX).
  */
+
+// Determine the active date filter for dashboard metrics
 $filter_month = $_GET['filter_month'] ?? 'this_month';
 
+// Default: Current Month
 $date_where = "MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())";
 $month_label = date('F');
 
+// Adjust date clause based on selected filter
 if ($filter_month === 'last_month') {
     $date_where = "MONTH(created_at) = MONTH(CURRENT_DATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURRENT_DATE() - INTERVAL 1 MONTH)";
     $month_label = date('F', strtotime('first day of -1 month'));
@@ -15,6 +21,7 @@ if ($filter_month === 'last_month') {
     $month_label = 'Last Quarter';
 }
 
+// Initialize default metric variables
 $current_month_revenue = 0;
 $current_month_orders = 0;
 $pending_payment_count = 0;
@@ -32,23 +39,23 @@ $status_counts = ['Pending' => 0, 'Processing' => 0, 'Shipped' => 0, 'Delivered'
 
 if (isset($pdo) && $pdo !== null) {
     try {
-        // Current month revenue
+        // Calculate total revenue for the filtered date range (excluding cancelled orders)
         $stmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'cancelled' AND $date_where");
         $current_month_revenue = (float)$stmt->fetchColumn();
         
-        // Current month orders count
+        // Count total orders placed in the filtered date range
         $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE $date_where");
         $current_month_orders = (int)$stmt->fetchColumn();
         
-        // Pending payment (orders with status = 'pending')
+        // Count orders that are awaiting payment verification
         $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'");
         $pending_payment_count = (int)$stmt->fetchColumn();
         
-        // New registrations (users with status = 'pending')
+        // Count wholesale user accounts awaiting admin approval
         $stmt = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'pending'");
         $pending_registration_count = (int)$stmt->fetchColumn();
         
-        // Critical stock items
+        // Fetch top 3 items critically low on stock (<= 15% of minimum restock level)
         $stmt = $pdo->query("SELECT p.name, i.size, i.colour, i.quantity, i.restock_min 
                              FROM inventory i 
                              JOIN products p ON i.product_id = p.id 
@@ -56,15 +63,15 @@ if (isset($pdo) && $pdo !== null) {
                              LIMIT 3");
         $critical_stock_items = $stmt->fetchAll();
         
-        // Pending followup orders
+        // Fetch the oldest pending order as a follow-up reminder
         $stmt = $pdo->query("SELECT o.id, u.business_name FROM orders o JOIN users u ON o.user_id = u.id WHERE o.status = 'pending' ORDER BY o.created_at ASC LIMIT 1");
         $pending_followup_orders = $stmt->fetchAll();
         
-        // Live orders
+        // Fetch the 5 most recent live orders
         $stmt = $pdo->query("SELECT o.id, o.status, u.business_name FROM orders o JOIN users u ON o.user_id = u.id ORDER BY o.created_at DESC LIMIT 5");
         $live_orders = $stmt->fetchAll();
         
-        // Inventory Pressure
+        // Calculate inventory pressure (items closest to running out relative to their restock thresholds)
         $stmt = $pdo->query("SELECT p.name, i.size, i.colour, i.quantity, i.restock_min 
                              FROM inventory i 
                              JOIN products p ON i.product_id = p.id 
@@ -72,7 +79,7 @@ if (isset($pdo) && $pdo !== null) {
                              LIMIT 3");
         $inventory_pressure = $stmt->fetchAll();
         
-        // Pending registrations
+        // Fetch up to 3 recent pending wholesale registrations for quick approval/rejection
         $stmt = $pdo->query("SELECT id, business_name, first_name, last_name, email, business_type, br_number, created_at FROM users WHERE status = 'pending' ORDER BY created_at DESC LIMIT 3");
         $pending_registrations = $stmt->fetchAll();
         

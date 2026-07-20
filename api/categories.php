@@ -1,12 +1,15 @@
 <?php
 /**
  * REST API - Categories
+ * Handles CRUD operations for product categories.
+ * Supports fetching (GET), creating/updating (POST), and deleting (POST with action=delete).
  */
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
+// Include the database connection
 require_once __DIR__ . "/../database/connection.php";
 
 // Self-healing database check — add missing columns if they don't exist
@@ -27,12 +30,13 @@ if (isset($pdo) && $pdo !== null) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Handle OPTIONS for preflight requests
+// Handle OPTIONS for preflight CORS requests
 if ($method === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
+// Handle GET requests to fetch all active categories along with their product count
 if ($method === 'GET') {
     $categories = [];
     if (isset($pdo) && $pdo !== null) {
@@ -59,7 +63,9 @@ if ($method === 'GET') {
     exit;
 }
 
+// Handle POST requests for creating, updating, or soft-deleting categories
 if ($method === 'POST') {
+    // Determine the specific action from GET, POST, or default to 'save'
     $action = $_GET['action'] ?? $_POST['action'] ?? 'save';
 
     if ($action === 'delete') {
@@ -76,6 +82,7 @@ if ($method === 'POST') {
             exit;
         }
 
+        // If the database connection is available, perform a soft delete by setting deleted_at
         if (isset($pdo) && $pdo !== null) {
             try {
                 $stmt = $pdo->prepare("UPDATE categories SET deleted_at = NOW() WHERE id = ?");
@@ -91,12 +98,14 @@ if ($method === 'POST') {
         exit;
     }
 
-    // Default: Save
+    // Default Action: Save (Create or Update a category)
+    // Decode JSON payload if provided in the body
     $input = json_decode(file_get_contents("php://input"), true);
     if (!$input) {
         $input = $_POST;
     }
 
+    // Extract fields, falling back to empty defaults
     $id = isset($input['id']) ? (int)$input['id'] : 0;
     $name = trim($input['name'] ?? '');
     $slug = trim($input['slug'] ?? '');
@@ -104,12 +113,14 @@ if ($method === 'POST') {
     $description = trim($input['description'] ?? '');
     $image = trim($input['image'] ?? '');
 
+    // Validate that the category name is provided
     if (empty($name)) {
         http_response_code(400);
         echo json_encode(["status" => "error", "message" => "Category Name is required."]);
         exit;
     }
 
+    // Generate a URL-friendly slug from the category name if one isn't explicitly provided
     if (empty($slug)) {
         $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-', $name)));
     }

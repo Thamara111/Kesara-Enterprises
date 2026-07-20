@@ -2,6 +2,7 @@
 /**
  * Analytics & Reports View
  * Converted to Tailwind CSS for Kesara Enterprises Admin Panel
+ * Generates and displays business performance metrics based on dynamic date filtering.
  */
 $filter_month = $_GET['filter_month'] ?? 'this_month';
 

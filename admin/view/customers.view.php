@@ -2,6 +2,8 @@
 /**
  * Customer Management View
  * Converted to Tailwind CSS for Kesara Enterprises Admin Panel
+ * Handles listing, filtering, and displaying detailed information about registered customers.
+ * It also computes customer-specific metrics such as total spent and recent orders.
  */
 $admin_customers = [];
 $total_count = 0;
@@ -11,6 +13,7 @@ $suspended_count = 0;
 
 if (isset($pdo) && $pdo !== null) {
     try {
+        // Fetch all users to display in the customer list
         $stmt = $pdo->query("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.phone AS whatsapp_number, u.business_name AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
                              FROM users u");
         $users_db = $stmt->fetchAll();

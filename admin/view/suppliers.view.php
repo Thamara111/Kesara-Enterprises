@@ -1,4 +1,9 @@
 <?php
+/**
+ * Suppliers Management View
+ * Handles the display and management of vendor/supplier profiles.
+ * Includes status tracking (Active, On Hold) and contact details.
+ */
 $admin_suppliers = [];
 if (isset($pdo) && $pdo !== null) {
     try {

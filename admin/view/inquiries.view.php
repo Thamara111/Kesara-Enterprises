@@ -1,6 +1,8 @@
 <?php
 /**
  * Inquiries View
+ * Manages customer inquiries (e.g., from the Contact Us page).
+ * Allows admins and finance managers to view, assign, and respond to messages.
  */
 
 $role = $_SESSION['admin_role'] ?? 'guest';

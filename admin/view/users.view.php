@@ -1,6 +1,8 @@
 <?php
 /**
  * Staff User Management View (Admin Only)
+ * Allows System Admins to register new staff managers (Finance, Delivery, Supplier, etc.)
+ * and view the directory of active staff.
  */
 
 $success_message = "";
@@ -8,11 +10,13 @@ $error_message = "";
 
 // Handle POST form submission to register a new user/manager
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register_user') {
+    // Sanitize and read input fields
     $username = trim($_POST['username'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
     $role = trim($_POST['role'] ?? '');
 
+    // Basic required fields validation
     if (empty($username) || empty($email) || empty($password) || empty($role)) {
         $error_message = "All fields are required.";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -20,13 +24,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } else {
         if (isset($pdo) && $pdo !== null) {
             try {
-                // Check if email or username already exists
+                // Check if the provided email or username already exists to prevent duplicates
                 $check_stmt = $pdo->prepare("SELECT id FROM admins WHERE email = ? OR username = ?");
                 $check_stmt->execute([$email, $username]);
                 if ($check_stmt->fetch()) {
                     $error_message = "A user with this email or username already exists.";
                 } else {
+                    // Hash the password securely using bcrypt before storing it
                     $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+                    // Insert the new manager into the admins table
                     $insert_stmt = $pdo->prepare("INSERT INTO admins (username, password, email, role) VALUES (?, ?, ?, ?)");
                     $insert_stmt->execute([$username, $hashed_password, $email, $role]);
                     $success_message = "Staff user registered successfully!";
@@ -40,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Fetch all staff users from the database
+// Fetch all staff users from the database for the directory table
 $staff_users = [];
 if (isset($pdo) && $pdo !== null) {
     try {

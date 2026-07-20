@@ -2,6 +2,7 @@
 /**
  * Inventory Management View
  * Converted to Tailwind CSS for Kesara Enterprises Admin Panel
+ * Fetches and displays current stock levels, restocking thresholds, and inventory logs.
  */
 
 $rows = [];

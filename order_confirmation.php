@@ -1,4 +1,9 @@
 <?php
+/**
+ * Order Confirmation Page
+ * Displays the details and status of a successfully placed order.
+ * Fetches order items and tracking logs for the given order ID.
+ */
 require_once __DIR__ . "/database/connection.php";
 
 $order_id = $_GET['id'] ?? ($_GET['order_id'] ?? 1);

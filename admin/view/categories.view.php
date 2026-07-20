@@ -1,6 +1,8 @@
 <?php
 /**
  * Admin Categories View
+ * Handles displaying and filtering product categories.
+ * API integration is used for adding, editing, and deleting categories.
  */
 
 $error_msg = '';

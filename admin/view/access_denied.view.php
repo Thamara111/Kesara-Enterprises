@@ -1,4 +1,5 @@
 <!-- Access Denied Page -->
+<!-- Displayed when a staff member attempts to access a page they do not have permissions for based on their role. -->
 <div class="flex-1 bg-gray-50 flex items-center justify-center p-8">
     <div class="max-w-md w-full bg-white border border-gray-100 rounded-[2.5rem] p-10 md:p-12 shadow-2xl text-center space-y-8 relative overflow-hidden group">
         <!-- Abstract top glow -->

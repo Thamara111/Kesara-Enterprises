@@ -1,4 +1,8 @@
 <?php
+/**
+ * About Us Page
+ * Static page presenting the company's mission, values, and history.
+ */
 require_once __DIR__ . "/database/connection.php";
 
 $page_meta = [

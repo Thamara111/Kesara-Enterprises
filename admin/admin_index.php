@@ -2,11 +2,13 @@
 /**
  * Admin Index Controller
  * Handles routing and layout assembly for the Kesara Enterprises administrative panel.
+ * All admin-related views (e.g. dashboard, products, orders) are routed through this single entry point.
  */
 
 session_start();
 
 // Handle Logout
+// Destroys the admin session and redirects to the login screen
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     session_destroy();
     header("Location: /admin-login");
@@ -16,6 +18,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 require_once __DIR__ . "/../database/connection.php";
 
 // Define the current view based on the GET parameter, defaulting to 'dashboard'
+// This maps to the respective view file in the /admin/view/ directory
 $view = $_GET['view'] ?? 'dashboard';
 
 // If already logged in and requesting login page, redirect to dashboard
@@ -24,22 +27,25 @@ if (isset($_SESSION['admin_id']) && $view === 'login') {
     exit;
 }
 
-// Check if user is logged in
+// Check if user is logged in. If not, forcefully redirect to the login page.
+// The only exception is if they are currently trying to access the login page itself.
 if (!isset($_SESSION['admin_id']) && $view !== 'login') {
     header("Location: /admin-login");
     exit;
 }
 
 // Handle login POST request immediately before any HTML headers/output are sent
+// This allows the login controller to handle HTTP redirects or set session cookies seamlessly.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $view === 'login') {
     require_once __DIR__ . "/view/login.view.php";
     exit;
 }
 
-// Check role permissions if logged in
+// Check role permissions if logged in (Role-Based Access Control - RBAC)
 if (isset($_SESSION['admin_id'])) {
     $role = $_SESSION['admin_role'] ?? 'guest';
 
+    // Matrix defining which views each administrative role is allowed to access
     $role_access = [
         'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp'],
         'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries'],
@@ -48,6 +54,8 @@ if (isset($_SESSION['admin_id'])) {
     ];
 
     $allowed_views = $role_access[$role] ?? [];
+    
+    // If the requested view is not in the allowed list for the user's role, show the access_denied view instead
     if (!in_array($view, $allowed_views)) {
         $view = 'access_denied';
     }
@@ -157,7 +165,7 @@ $view_config = [
     ]
 ];
 
-// Fallback to dashboard if the requested view doesn't exist
+// Fallback to dashboard if the requested view doesn't exist in the configuration map
 if (!isset($view_config[$view])) {
     $view = 'dashboard';
 }
@@ -165,14 +173,16 @@ if (!isset($view_config[$view])) {
 $current_config = $view_config[$view];
 
 // Set metadata for layouts/head.php
+// This populates the <title> and <meta name="description"> tags
 $page_meta = [
     'title' => $current_config['title'],
     'description' => $current_config['description'],
 ];
 
-// Path adjustment for head.php since we are in /admin/
+// Path adjustment for head.php since we are in /admin/ instead of the root folder
 require_once __DIR__ . "/../layouts/head.php";
 
+// Mapping dictionary for view names that don't exactly match their underlying filename
 $view_file_mappings = [
     'purchase_orders' => 'suppliers.purchase_orders',
     'goods_received' => 'suppliers.goods_received_note',
@@ -183,6 +193,7 @@ $view_file_mappings = [
 $view_file_name = $view_file_mappings[$view] ?? $view;
 $view_file = __DIR__ . "/view/{$view_file_name}.view.php";
 
+// Standard Admin Panel Template (with Sidebar and Top Nav)
 if ($current_config['show_sidebar']): ?>
 <div class="h-screen bg-gray-50 overflow-hidden font-sans">
     <?php require_once __DIR__ . "/layouts/sidebar.php"; ?>

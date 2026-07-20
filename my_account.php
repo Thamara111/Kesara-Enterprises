@@ -1,4 +1,9 @@
 <?php
+/**
+ * User Account Dashboard
+ * Displays the logged-in user's profile, recent orders, and account status.
+ * Also handles user logout logic.
+ */
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }

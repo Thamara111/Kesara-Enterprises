@@ -1,4 +1,8 @@
 <?php
+/**
+ * Shopping Cart Page
+ * Displays items added to the cart, calculates totals (including MOQ logic and pricing tiers), and prepares for checkout.
+ */
 ob_start();
 $page_meta = [
     'title' => 'Your Cart | Kesara Enterprises',

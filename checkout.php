@@ -1,4 +1,9 @@
 <?php
+/**
+ * Checkout Page
+ * Handles the final step of the purchasing process.
+ * Verifies buyer approval status, calculates totals, and processes order submission.
+ */
 // Mock Checkout Page for Kesara Enterprises
 require_once __DIR__ . "/database/connection.php";
 if (session_status() === PHP_SESSION_NONE) {

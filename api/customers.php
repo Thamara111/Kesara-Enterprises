@@ -1,13 +1,15 @@
 <?php
 /**
  * REST API - Customers Management
- * Handles: status updates, admin comment saving
+ * Handles POST/PUT requests to update customer statuses (e.g., approving wholesale access).
+ * Also handles fetching and saving admin comments on a specific customer profile.
  */
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
+// Include the centralized database connection
 require_once __DIR__ . "/../database/connection.php";
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -34,17 +36,20 @@ if (!$input) {
     $input = $_POST;
 }
 
+// Determine the action to perform (defaults to updating status)
 $action = trim($input['action'] ?? 'update_status');
 $id = isset($input['id']) ? (int)$input['id'] : 0;
 
+// Validate that a valid customer ID was provided
 if ($id <= 0) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Invalid customer ID."]);
     exit;
 }
 
+// Handle requests to save private admin comments on a customer
 if ($method === 'POST' && $action === 'save_comment') {
-    // Save admin comment
+    // Extract the comment from the request payload
     $comment = trim($input['comment'] ?? '');
 
     if (isset($pdo) && $pdo !== null) {
@@ -80,15 +85,17 @@ if ($method === 'GET') {
     exit;
 }
 
-// Default: POST - update status
+// Default Flow: POST - Update customer account status (e.g., approve or suspend)
 $status = trim($input['status'] ?? '');
 
+// Validate that a status was actually provided
 if (empty($status)) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Status is required."]);
     exit;
 }
 
+// Enforce that the provided status is one of the allowed enumerated values
 $allowed_statuses = ['pending', 'approved', 'suspended', 'rejected'];
 if (!in_array($status, $allowed_statuses)) {
     http_response_code(400);
@@ -96,8 +103,10 @@ if (!in_array($status, $allowed_statuses)) {
     exit;
 }
 
+// Proceed with database update if connection is active
 if (isset($pdo) && $pdo !== null) {
     try {
+        // Update the customer's status in the users table
         $stmt = $pdo->prepare("UPDATE users SET status = ? WHERE id = ?");
         $stmt->execute([$status, $id]);
         

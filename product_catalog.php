@@ -1,4 +1,9 @@
 <?php
+/**
+ * Product Catalog Page
+ * Lists all available wholesale products with filtering and sorting capabilities.
+ * Allows customers to browse by category, size, stock status, and MOQ.
+ */
 require_once __DIR__ . "/database/connection.php";
 
 $filter_search   = trim($_GET['search']   ?? '');

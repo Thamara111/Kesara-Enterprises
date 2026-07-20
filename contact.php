@@ -1,4 +1,9 @@
 <?php
+/**
+ * Contact Us Page
+ * Processes and validates customer inquiry form submissions.
+ * Saves messages to the database for admin review.
+ */
 require_once __DIR__ . "/database/connection.php";
 
 $errors = [];

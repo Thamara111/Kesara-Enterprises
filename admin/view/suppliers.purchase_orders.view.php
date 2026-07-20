@@ -1,6 +1,7 @@
 <?php
 /**
  * Purchase Orders View - Database Integration & Interaction
+ * Manages purchase orders sent to suppliers for restocking inventory.
  */
 
 $success_msg = "";

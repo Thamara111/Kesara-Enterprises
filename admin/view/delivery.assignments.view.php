@@ -1,6 +1,8 @@
 <?php
 /**
  * Delivery Assignments View - Database Integration
+ * Manages assigning pending orders to delivery drivers.
+ * Fetches order assignments and lists available drivers.
  */
 $admin_assignments = [];
 $available_drivers = [];

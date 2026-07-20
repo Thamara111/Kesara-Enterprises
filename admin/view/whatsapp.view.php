@@ -1,6 +1,7 @@
 <?php
 /**
  * WhatsApp Simulator View
+ * Provides a mock interface to simulate WhatsApp messaging with customers.
  */
 
 $role = $_SESSION['admin_role'] ?? 'guest';

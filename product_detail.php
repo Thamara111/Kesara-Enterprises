@@ -1,4 +1,9 @@
 <?php
+/**
+ * Product Detail Page
+ * Displays comprehensive details for a specific product including images, attributes, and pricing tiers.
+ * Integrates 'Add to Cart' functionality gated by user approval status.
+ */
 require_once __DIR__ . "/database/connection.php";
 
 if (session_status() === PHP_SESSION_NONE) {

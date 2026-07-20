@@ -1,4 +1,9 @@
 <?php
+/**
+ * Admin Login View
+ * Handles admin authentication and session initialization.
+ * Verifies credentials via AJAX POST requests.
+ */
 // Handle AJAX POST requests to verify credentials
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');

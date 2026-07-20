@@ -1,8 +1,16 @@
 <?php
+/**
+ * Admin Sidebar Layout
+ * Renders the navigation sidebar dynamically based on the user's role.
+ * Includes badge notifications for pending approvals and orders.
+ */
+
+// Determine the current page for active state highlighting
 $current_page = $view ?? 'dashboard';
+// Retrieve the authenticated user's role
 $role = $_SESSION['admin_role'] ?? 'guest';
 
-// Role helper flags
+// Role helper flags to toggle the visibility of specific navigation sections
 $is_admin = ($role === 'admin');
 $has_finance = in_array($role, ['admin', 'finance_manager']);
 $has_supplier = in_array($role, ['admin', 'supplier_manager']);
@@ -10,11 +18,15 @@ $has_delivery = in_array($role, ['admin', 'delivery_manager']);
 
 $pending_approvals_count = 0;
 $pending_verification_count = 0;
+
+// Fetch notification badge counts if the database connection is available
 if (isset($pdo)) {
     try {
+        // Count wholesale user accounts waiting for admin approval
         $stmt_pending = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'pending'");
         $pending_approvals_count = (int)$stmt_pending->fetchColumn();
 
+        // Count customer orders waiting for payment verification (bank transfers)
         $stmt_pending_orders = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending' AND deleted_at IS NULL");
         $pending_verification_count = (int)$stmt_pending_orders->fetchColumn();
     } catch (\Exception $e) {

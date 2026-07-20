@@ -61,6 +61,8 @@ function validateOrderItems(PDO $pdo, array $items): array {
     $validated_items = [];
 
     // 1. Group quantities by product_id
+    // This aggregates multiple cart lines for the same product (e.g. different colors/sizes)
+    // so that the MOQ validation checks the TOTAL quantity ordered for that product, not just per line.
     $product_totals = [];
     foreach ($items as $item) {
         $pid = (int)($item['product_id'] ?? 0);
@@ -72,6 +74,7 @@ function validateOrderItems(PDO $pdo, array $items): array {
     // 2. Validate MOQ and resolve tier price per product_id
     $product_metadata = [];
     foreach ($product_totals as $pid => $total_qty) {
+        // Fetch the product's base information from the database
         $stmt = $pdo->prepare("SELECT name, moq FROM products WHERE id = ?");
         $stmt->execute([$pid]);
         $product = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -81,15 +84,18 @@ function validateOrderItems(PDO $pdo, array $items): array {
             continue;
         }
 
+        // Compare the total aggregated quantity against the database Minimum Order Quantity
         $moq = (int)$product['moq'];
         if ($total_qty < $moq) {
             $errors[] = "{$product['name']} (ID: {$pid}) failed MOQ validation: ordered {$total_qty} total, but minimum is {$moq}.";
         }
         
+        // Retrieve the authoritative tier price from the server based on the aggregated quantity
         $product_metadata[$pid] = resolveTierPrice($pdo, $pid, $total_qty);
     }
 
     // 3. Assemble final validated items using the correct volume tier price
+    // If there were no validation errors, rebuild the items array with the server-verified prices
     if (empty($errors)) {
         foreach ($items as $index => $item) {
             $product_id = (int)($item['product_id'] ?? 0);
@@ -99,18 +105,19 @@ function validateOrderItems(PDO $pdo, array $items): array {
             
             $resolved_price = $product_metadata[$product_id];
             $item_subtotal = $resolved_price * $qty;
-            $calculated_total += $item_subtotal;
+            $calculated_total += $item_subtotal; // Accumulate grand total securely
 
             $validated_items[] = [
                 'product_id' => $product_id,
                 'quantity' => $qty,
-                'unit_price' => $resolved_price,
+                'unit_price' => $resolved_price, // Use the server-side resolved price, ignoring any client price
                 'color' => $item['color'] ?? '',
                 'size' => $item['size'] ?? ''
             ];
         }
     }
 
+    // Return the tuple of results
     return [
         'errors' => $errors,
         'calculated_total' => $calculated_total,

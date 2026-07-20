@@ -1,4 +1,9 @@
 <?php 
+/**
+ * Driver Portal
+ * Standalone interface for delivery personnel.
+ * Handles driver authentication, viewing assigned deliveries, updating delivery statuses, and GPS location tracking.
+ */
 require_once __DIR__ . "/../database/connection.php"; 
 
 if (session_status() === PHP_SESSION_NONE) {

@@ -1,4 +1,8 @@
 <?php
+/**
+ * Supplier Form View
+ * Handles adding new suppliers or editing existing supplier details.
+ */
 $mode = $_GET['mode'] ?? 'add';
 $is_edit = ($mode === 'edit');
 $title = $is_edit ? 'Edit Supplier' : 'Add New Supplier';

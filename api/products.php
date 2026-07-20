@@ -1,15 +1,18 @@
 <?php
 /**
  * REST API - Products
+ * Manages fetching, creating, updating, and soft-deleting products.
+ * Includes dynamic pricing tiers and multiple image uploads logic.
  */
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
+// Connect to database
 require_once __DIR__ . "/../database/connection.php";
 
-// Self-healing database check
+// Self-healing database check: Ensure all necessary columns exist on the products table
 if (isset($pdo) && $pdo !== null) {
     try {
         $check = $pdo->query("SHOW COLUMNS FROM products LIKE 'images'");
@@ -47,26 +50,32 @@ if (isset($pdo) && $pdo !== null) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+// Handle OPTIONS requests (CORS preflight)
 if ($method === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
+// Handle GET requests to fetch all available products
 if ($method === 'GET') {
     $products = [];
     if (isset($pdo) && $pdo !== null) {
         try {
+            // Join products with their respective category names
             $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.gsm, p.waistband 
                                  FROM products p 
                                  LEFT JOIN categories c ON p.category_id = c.id
                                  ORDER BY p.name ASC");
             $prods = $stmt->fetchAll();
 
+            // Iterate over each product to attach its pricing tiers
             foreach ($prods as $pr) {
+                // Fetch dynamic pricing tiers for the current product
                 $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ?");
                 $t_stmt->execute([$pr['id']]);
                 $tiers = $t_stmt->fetchAll();
 
+                // Format the tiers for the frontend
                 $formatted_tiers = [];
                 foreach ($tiers as $t) {
                     $formatted_tiers[] = [
@@ -75,6 +84,7 @@ if ($method === 'GET') {
                     ];
                 }
 
+                // Construct the structured response array for this specific product
                 $products[] = [
                     'id' => (int)$pr['id'],
                     'name' => $pr['name'],
@@ -107,11 +117,15 @@ if ($method === 'GET') {
     exit;
 }
 
+// Handle POST requests for creating, updating, or deleting products
 if ($method === 'POST') {
+    // Determine the action (default is 'save' for create/update)
     $action = $_GET['action'] ?? $_POST['action'] ?? 'save';
 
+    // Flow for soft-deleting a product
     if ($action === 'delete') {
         $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+        // Fallback to JSON payload if $_POST is empty
         if (!$id) {
             $input = json_decode(file_get_contents("php://input"), true);
             $id = isset($input['id']) ? (int)$input['id'] : 0;
@@ -126,7 +140,7 @@ if ($method === 'POST') {
         if (isset($pdo) && $pdo !== null) {
             try {
                 $pdo->beginTransaction();
-                // Soft delete product
+                // Soft delete product by setting the deleted_at timestamp
                 $stmt2 = $pdo->prepare("UPDATE products SET deleted_at = NOW() WHERE id = ?");
                 $stmt2->execute([$id]);
                 
@@ -143,12 +157,13 @@ if ($method === 'POST') {
         exit;
     }
 
-    // Default: Save
+    // Default Flow: Save (Create or Update a product)
     $input = json_decode(file_get_contents("php://input"), true);
     if (!$input) {
         $input = $_POST;
     }
 
+    // Extract all product fields, enforcing correct data types
     $id = isset($input['id']) ? (int)$input['id'] : 0;
     $name = trim($input['name'] ?? '');
     $sku = trim($input['sku'] ?? '');
@@ -163,11 +178,13 @@ if ($method === 'POST') {
     $gsm = trim($input['gsm'] ?? '');
     $waistband = trim($input['waistband'] ?? '');
     
+    // Parse dynamic pricing tiers array (could come as a JSON string from FormData)
     $tiers = $input['tiers'] ?? []; 
     if (is_string($tiers)) {
         $tiers = json_decode($tiers, true) ?: [];
     }
 
+    // Basic required fields validation
     if (empty($name) || empty($sku)) {
         http_response_code(400);
         echo json_encode(["status" => "error", "message" => "Product Name and SKU are required."]);
@@ -227,7 +244,7 @@ if ($method === 'POST') {
         }
     }
 
-    // Clean and compact to standard array
+    // Clean and compact the images array to remove empty slots before converting to JSON
     $final_images = [];
     for ($i = 0; $i < 6; $i++) {
         if (!empty($images[$i])) {
@@ -236,6 +253,7 @@ if ($method === 'POST') {
     }
     $images_json = json_encode($final_images);
 
+    // Proceed with inserting or updating the product in the database
     if (isset($pdo) && $pdo !== null) {
         try {
             $pdo->beginTransaction();
@@ -252,12 +270,12 @@ if ($method === 'POST') {
             }
 
             if ($id > 0) {
-                // Update product
+                // Update an existing product record
                 $stmt = $pdo->prepare("UPDATE products SET name = ?, sku = ?, category_id = ?, description = ?, moq = ?, base_price = ?, status = ?, images = ?, colors = ?, sizes = ?, discount = ?, gsm = ?, waistband = ? WHERE id = ?");
                 $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $gsm, $waistband, $id]);
                 $product_id = $id;
             } else {
-                // Insert product
+                // Insert a brand new product record
                 $stmt = $pdo->prepare("INSERT INTO products (name, sku, category_id, description, moq, base_price, status, images, colors, sizes, discount, gsm, waistband) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $gsm, $waistband]);
                 $product_id = $pdo->lastInsertId();

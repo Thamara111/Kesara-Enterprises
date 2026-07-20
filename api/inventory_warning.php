@@ -3,6 +3,7 @@
  * Inventory Pressure Warning Email
  * Sends a warning email to all admins and supplier managers
  * with a summary of critical / low-stock / out-of-stock items.
+ * Intended to be triggered via cron or an external scheduler.
  */
 
 require_once __DIR__ . '/../database/connection.php';
@@ -10,6 +11,7 @@ require_once __DIR__ . '/../src/Mailer.php';
 
 header('Content-Type: application/json');
 
+// Only allow POST to trigger the email, acting as a webhook
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['status' => 'error', 'message' => 'Method not allowed.']);
@@ -23,6 +25,7 @@ if (!$pdo) {
 }
 
 // ── 1. Fetch all warning-level inventory items ────────────────────────────────
+// Join inventory with products, fetching anything where quantity is at or below the restock_min
 try {
     $stmt = $pdo->query("
         SELECT i.id, p.name AS product_name, p.sku,
@@ -39,12 +42,14 @@ try {
     exit;
 }
 
+// Exit early if the inventory is healthy and no items are under their thresholds
 if (empty($items)) {
     echo json_encode(['status' => 'ok', 'message' => 'No inventory pressure items found. No email sent.']);
     exit;
 }
 
 // ── 2. Fetch recipients: admin + supplier_manager roles ───────────────────────
+// Get the contact details of the staff responsible for inventory management
 try {
     $recipientStmt = $pdo->prepare("
         SELECT username, email, role
@@ -66,19 +71,22 @@ if (empty($recipients)) {
 }
 
 // ── 3. Categorise items ───────────────────────────────────────────────────────
+// Sort items into three buckets for the email summary: Out of Stock, Critical, Low Stock
 $out_of_stock = [];
 $critical     = [];
 $low_stock    = [];
 
 foreach ($items as $item) {
+    // Calculate percentage remaining vs the restock threshold
     $pct = $item['thresh'] > 0 ? round(($item['stock'] / $item['thresh']) * 100) : 0;
     $item['pct'] = $pct;
+    // Format a readable product label including its variant data (color, size)
     $label = $item['product_name'] . ' · ' . $item['colour'] . ' · ' . $item['size'];
     $item['label'] = $label;
 
     if ($item['stock'] == 0) {
         $out_of_stock[] = $item;
-    } elseif ($pct <= 15) {
+    } elseif ($pct <= 15) { // If stock is 15% or less of the threshold, it's critical
         $critical[] = $item;
     } else {
         $low_stock[] = $item;

@@ -1,6 +1,8 @@
 <?php
 /**
  * Trash / Deleted Items View
+ * Displays soft-deleted records across products, categories, orders, and admins.
+ * Allows restoring or permanently deleting these records.
  */
 
 $deleted_products = [];

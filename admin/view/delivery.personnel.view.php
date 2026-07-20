@@ -1,6 +1,8 @@
 <?php
 /**
  * Delivery Personnel Management View
+ * Handles adding, editing, and viewing details of delivery drivers.
+ * Also processes POST actions for driver operations directly in the view.
  */
 
 $success_msg = "";

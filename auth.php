@@ -1,4 +1,8 @@
 <?php
+/**
+ * Authentication and Registration Page
+ * Handles customer login, registration (with BR number verification), and session management.
+ */
 require_once __DIR__ . "/database/connection.php";
 
 $page_mode = isset($_GET['mode']) ? $_GET['mode'] : 'login';

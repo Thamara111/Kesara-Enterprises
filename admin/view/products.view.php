@@ -1,8 +1,15 @@
 <?php
+/**
+ * Admin Products Management View
+ * Manages the product catalog, pricing tiers, stock attributes (GSM, waistband), and image assets.
+ * Fetches product list and dynamic pricing data.
+ */
+
 $admin_products = [];
 $all_categories = [];
 if (isset($pdo) && $pdo !== null) {
     try {
+        // Self-heal: Ensure all necessary columns exist for the product attributes and soft-delete features
         $checkColors = $pdo->query("SHOW COLUMNS FROM products LIKE 'colors'");
         if (!$checkColors->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN colors VARCHAR(255) DEFAULT NULL");
         $checkSizes = $pdo->query("SHOW COLUMNS FROM products LIKE 'sizes'");
@@ -18,9 +25,11 @@ if (isset($pdo) && $pdo !== null) {
         $checkImages = $pdo->query("SHOW COLUMNS FROM products LIKE 'images'");
         if (!$checkImages->fetch()) $pdo->exec("ALTER TABLE products ADD COLUMN images VARCHAR(255) DEFAULT NULL");
 
+        // Fetch all categories for the filter dropdown
         $cat_stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
         $all_categories = $cat_stmt->fetchAll();
 
+        // Fetch all active products, joined with their category names
         $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.gsm, p.waistband 
                              FROM products p 
                              LEFT JOIN categories c ON p.category_id = c.id 
