@@ -175,7 +175,7 @@ function updateStatus(id, status) {
     .then(data => {
         if (data.status === 'success') {
             showToast('Status updated!');
-            setTimeout(() => window.location.reload(), 500); // Reload to update badge colors
+            setTimeout(() => window.location.reload(), 3000); // Reload to update badge colors
         } else {
             showToast(data.message, 'error');
         }

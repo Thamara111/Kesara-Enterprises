@@ -60,41 +60,55 @@ function validateOrderItems(PDO $pdo, array $items): array {
     $calculated_total = 0.0;
     $validated_items = [];
 
-    foreach ($items as $index => $item) {
-        $product_id = (int)($item['product_id'] ?? 0);
+    // 1. Group quantities by product_id
+    $product_totals = [];
+    foreach ($items as $item) {
+        $pid = (int)($item['product_id'] ?? 0);
         $qty = (int)($item['quantity'] ?? 0);
-        
-        // 1. Fetch Product metadata and MOQ
+        if (!isset($product_totals[$pid])) $product_totals[$pid] = 0;
+        $product_totals[$pid] += $qty;
+    }
+
+    // 2. Validate MOQ and resolve tier price per product_id
+    $product_metadata = [];
+    foreach ($product_totals as $pid => $total_qty) {
         $stmt = $pdo->prepare("SELECT name, moq FROM products WHERE id = ?");
-        $stmt->execute([$product_id]);
+        $stmt->execute([$pid]);
         $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$product) {
-            $errors[] = "Item #{$index}: Product ID {$product_id} does not exist.";
+            $errors[] = "Product ID {$pid} does not exist.";
             continue;
         }
 
         $moq = (int)$product['moq'];
-        $name = $product['name'];
-
-        // 2. Server-side MOQ Validation
-        if ($qty < $moq) {
-            $errors[] = "{$name} (ID: {$product_id}) failed MOQ validation: ordered {$qty}, but minimum is {$moq}.";
-            continue;
+        if ($total_qty < $moq) {
+            $errors[] = "{$product['name']} (ID: {$pid}) failed MOQ validation: ordered {$total_qty} total, but minimum is {$moq}.";
         }
+        
+        $product_metadata[$pid] = resolveTierPrice($pdo, $pid, $total_qty);
+    }
 
-        // 3. Server-side Tier Price Resolution
-        $resolved_price = resolveTierPrice($pdo, $product_id, $qty);
-        $item_subtotal = $resolved_price * $qty;
-        $calculated_total += $item_subtotal;
+    // 3. Assemble final validated items using the correct volume tier price
+    if (empty($errors)) {
+        foreach ($items as $index => $item) {
+            $product_id = (int)($item['product_id'] ?? 0);
+            $qty = (int)($item['quantity'] ?? 0);
+            
+            if (!isset($product_metadata[$product_id])) continue;
+            
+            $resolved_price = $product_metadata[$product_id];
+            $item_subtotal = $resolved_price * $qty;
+            $calculated_total += $item_subtotal;
 
-        $validated_items[] = [
-            'product_id' => $product_id,
-            'quantity' => $qty,
-            'unit_price' => $resolved_price,
-            'color' => $item['color'] ?? '',
-            'size' => $item['size'] ?? ''
-        ];
+            $validated_items[] = [
+                'product_id' => $product_id,
+                'quantity' => $qty,
+                'unit_price' => $resolved_price,
+                'color' => $item['color'] ?? '',
+                'size' => $item['size'] ?? ''
+            ];
+        }
     }
 
     return [

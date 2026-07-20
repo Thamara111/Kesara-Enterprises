@@ -258,11 +258,21 @@ foreach ($admin_drivers as $d) {
             <div class="m-6 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-xs font-semibold text-emerald-700">
                 <?= htmlspecialchars($success_msg) ?>
             </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    showToast(<?= json_encode($success_msg) ?>, 'success');
+                });
+            </script>
         <?php endif; ?>
         <?php if (!empty($error_msg)): ?>
             <div class="m-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-xs font-semibold text-red-700">
                 <?= htmlspecialchars($error_msg) ?>
             </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    showToast(<?= json_encode($error_msg) ?>, 'error');
+                });
+            </script>
         <?php endif; ?>
 
         <!-- Stats Grid -->

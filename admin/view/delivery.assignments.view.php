@@ -622,7 +622,7 @@ function dispatchNewAssignment() {
   .then(data => {
       if (data.status === 'success') {
           showToast(`Assigned ${selectedOrders.length} orders to ${driverName} and dispatched!`, 'success');
-          setTimeout(() => window.location.reload(), 1000);
+          setTimeout(() => window.location.reload(), 3000);
       } else {
           showToast(data.message || 'Error creating assignment', 'error');
       }

@@ -629,7 +629,7 @@ function saveProduct() {
             showToast(data.message || 'Product saved successfully.', 'success');
             setTimeout(() => {
                 window.location.reload();
-            }, 1000);
+            }, 3000);
         } else {
             showToast(data.message || 'Error saving product.', 'error');
         }
@@ -681,7 +681,7 @@ function confirmDeleteProduct() {
                 showToast('Product deleted successfully.', 'success');
                 setTimeout(() => {
                     window.location.reload();
-                }, 1000);
+                }, 3000);
             } else {
                 showToast(data.message || 'Error deleting product.', 'error');
             }

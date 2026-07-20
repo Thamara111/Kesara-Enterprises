@@ -33,7 +33,10 @@ require_once __DIR__ . "/layouts/header.php";
                     </div>
 
                     <!-- Cart Header -->
-                    <div class="hidden md:grid grid-cols-[80px_1fr_120px_120px_40px] gap-6 px-4 mb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                    <div class="hidden md:grid gap-6 px-4 mb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest items-center" style="grid-template-columns: 40px 80px 1fr 120px 120px 40px;">
+                        <div class="flex items-center">
+                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="w-5 h-5 text-brand bg-gray-50 border-gray-200 rounded focus:ring-brand focus:ring-2 cursor-pointer">
+                        </div>
                         <span>Product</span>
                         <span></span>
                         <span>Quantity</span>
@@ -171,8 +174,8 @@ function loadCartFromStorage() {
 }
 
 function saveCartToStorage() {
-    // Only save id and qty
-    const toSave = cartItems.map(item => ({id: item.id, qty: item.qty, color: item.color, size: item.size}));
+    // Only save id and qty and selection state
+    const toSave = cartItems.map(item => ({id: item.id, qty: item.qty, color: item.color, size: item.size, selected: item.selected}));
     localStorage.setItem('kesara_cart', JSON.stringify(toSave));
     if (typeof window.updateCartBadges === 'function') {
         window.updateCartBadges();
@@ -222,7 +225,8 @@ async function initializeCart() {
                     tiers: dbP.tiers,
                     qty: finalQty,
                     color: item.color,
-                    size: item.size
+                    size: item.size,
+                    selected: item.selected !== false
                 };
             }).filter(i => i !== null);
             saveCartToStorage(); // Save validated quantities
@@ -241,12 +245,20 @@ async function initializeCart() {
 // Call on load
 document.addEventListener('DOMContentLoaded', initializeCart);
 
-// Helper to calculate price based on tiers
+// Helper to calculate price based on total selected qty of the same product
+function getProductTotalQty(productId) {
+    return cartItems.filter(i => i.id === productId && i.selected).reduce((sum, i) => sum + i.qty, 0);
+}
+
 function getPrice(item) {
   if (!item.tiers || item.tiers.length === 0) return 0;
+  let totalQty = getProductTotalQty(item.id);
+  // If item is unselected, we still show a price based on its own qty just for display
+  if (!item.selected) totalQty = item.qty;
+
   for (let t of item.tiers) {
     const max = t.max === null ? Infinity : t.max;
-    if (item.qty >= t.min && item.qty <= max) {
+    if (totalQty >= t.min && totalQty <= max) {
       return t.price;
     }
   }
@@ -255,7 +267,8 @@ function getPrice(item) {
 }
 
 function getTierLabel(item) {
-  const t = item.tiers.find(t=>item.qty>=t.min&&(t.max===null||item.qty<=t.max))||item.tiers[0];
+  let totalQty = item.selected ? getProductTotalQty(item.id) : item.qty;
+  const t = item.tiers.find(t=>totalQty>=t.min&&(t.max===null||totalQty<=t.max))||item.tiers[0];
   return t.max===null ? `500+ tier` : `${t.min}–${t.max} tier`;
 }
 
@@ -268,23 +281,37 @@ function render() {
   summaryContainer.innerHTML = '';
   cartCountBadge.textContent = `${cartItems.length} ITEMS`;
 
+  let allSelected = cartItems.length > 0 && cartItems.every(i => i.selected);
+  const selectAllCb = document.getElementById('selectAllCheckbox');
+  if (selectAllCb) selectAllCb.checked = allSelected;
+
   let subtotal = 0;
   let belowMoqCount = 0;
 
+
   cartItems.forEach((item, i) => {
-    const belowMoq = item.qty < item.moq;
+    // For MOQ check, we check the total qty of that product ID
+    const productTotalQty = getProductTotalQty(item.id);
+    const belowMoq = item.selected && productTotalQty < item.moq;
     if(belowMoq) belowMoqCount++;
     const price = getPrice(item);
     const sub = item.qty * price;
-    subtotal += sub;
+    
+    if (item.selected) {
+        subtotal += sub;
+    }
 
     const row = document.createElement('div');
-    row.className = 'py-8 flex flex-col md:grid md:grid-cols-[80px_1fr_120px_120px_40px] gap-6 items-center';
+    row.className = `py-8 flex flex-col md:grid gap-6 items-center ${item.selected ? '' : 'opacity-50'}`;
+    row.style.gridTemplateColumns = '40px 80px 1fr 120px 120px 40px';
     row.innerHTML = `
+      <div class="flex items-center">
+         <input type="checkbox" ${item.selected ? 'checked' : ''} onchange="toggleItemSelect(${i})" class="w-5 h-5 text-brand bg-gray-50 border-gray-200 rounded focus:ring-brand focus:ring-2 cursor-pointer">
+      </div>
       <div class="w-20 h-20 bg-gray-50 border border-gray-100 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden">
         ${item.image ? `<img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover">` : `<i class="ti ti-shirt text-3xl text-gray-200"></i>`}
       </div>
-      <div class="w-full text-center md:text-left">
+      <div class="w-full text-center md:text-left flex-1">
         <h3 class="text-[15px] font-bold text-gray-900 mb-1">${item.name}</h3>
         <p class="text-xs text-gray-400 font-medium mb-3">${item.meta}</p>
         <div class="flex flex-wrap justify-center md:justify-start items-center gap-2">
@@ -298,7 +325,7 @@ function render() {
           <span class="w-10 text-center text-sm font-bold text-gray-900">${item.qty}</span>
           <button onclick="changeQty(${i}, 10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all"><i class="ti ti-plus text-xs"></i></button>
       </div>
-      <div class="text-right w-full md:w-auto">
+      <div class="text-right w-full md:w-auto min-w-[120px]">
         <p class="text-sm font-bold ${belowMoq ? 'text-red-500' : 'text-gray-900'}">LKR ${sub.toLocaleString()}</p>
       </div>
       <button onclick="removeItem(${i})" class="text-gray-300 hover:text-red-500 transition-all p-2">
@@ -307,14 +334,16 @@ function render() {
     `;
     container.appendChild(row);
 
-    // Summary Line
-    const sLine = document.createElement('div');
-    sLine.className = 'flex justify-between items-start text-[13px]';
-    sLine.innerHTML = `
-        <span class="text-gray-500 font-medium leading-tight max-w-[200px]">${item.name} <span class="text-gray-300">× ${item.qty}</span></span>
-        <span class="text-gray-900 font-bold whitespace-nowrap">LKR ${sub.toLocaleString()}</span>
-    `;
-    summaryContainer.appendChild(sLine);
+    if (item.selected) {
+        // Summary Line
+        const sLine = document.createElement('div');
+        sLine.className = 'flex justify-between items-start text-[13px]';
+        sLine.innerHTML = `
+            <span class="text-gray-500 font-medium leading-tight max-w-[200px]">${item.name} <span class="text-gray-300">× ${item.qty}</span></span>
+            <span class="text-gray-900 font-bold whitespace-nowrap">LKR ${sub.toLocaleString()}</span>
+        `;
+        summaryContainer.appendChild(sLine);
+    }
   });
 
   const vat = Math.round(subtotal * 0.18);
@@ -334,15 +363,31 @@ function render() {
         <i class="ti ti-alert-triangle text-xl shrink-0 mt-0.5"></i>
         <div class="space-y-1">
             <p class="text-xs font-bold uppercase tracking-wide">Cannot Proceed</p>
-            <p class="text-[11px] leading-relaxed font-medium">Some items are below their minimum order quantity. Please adjust quantities to proceed.</p>
+            <p class="text-[11px] leading-relaxed font-medium">Some selected items belong to products below their minimum order quantity. Please adjust quantities to proceed.</p>
         </div>
       </div>
     `;
     checkoutBtn.disabled = true;
   } else {
     alerts.innerHTML = '';
-    checkoutBtn.disabled = false;
+    const hasSelected = cartItems.some(i => i.selected);
+    checkoutBtn.disabled = !hasSelected;
   }
+}
+
+function toggleItemSelect(index) {
+    if (cartItems[index]) {
+        cartItems[index].selected = !cartItems[index].selected;
+        saveCartToStorage();
+        render();
+    }
+}
+
+function toggleSelectAll(checkbox) {
+    const isChecked = checkbox.checked;
+    cartItems.forEach(item => item.selected = isChecked);
+    saveCartToStorage();
+    render();
 }
 
 function changeQty(index, delta) {
@@ -380,8 +425,9 @@ function confirmClearCart() {
 
 function submitOrder() {
   const checkoutBtn = document.getElementById('checkout-btn');
-  if (cartItems.length === 0) {
-      showToast('Your cart is empty', 'error');
+  const selectedItems = cartItems.filter(i => i.selected);
+  if (selectedItems.length === 0) {
+      showToast('Please select at least one item', 'error');
       return;
   }
   
@@ -394,13 +440,14 @@ function submitOrder() {
 }
 
 function downloadQuote() {
-  if (cartItems.length === 0) {
-      uiAlert("Your cart is empty. Add items to download a quote.");
+  const selectedItems = cartItems.filter(i => i.selected);
+  if (selectedItems.length === 0) {
+      uiAlert("Please select items to download a quote.");
       return;
   }
   
   let total = 0;
-  let itemsHtml = cartItems.map(item => {
+  let itemsHtml = selectedItems.map(item => {
       let price = getPrice(item);
       let subtotal = item.qty * price;
       total += subtotal;

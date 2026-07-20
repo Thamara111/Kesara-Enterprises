@@ -32,8 +32,8 @@ if ($method === 'POST') {
                     $pdo->beginTransaction();
 
                     $stmt_assign = $pdo->prepare("INSERT INTO delivery_assignments (order_id, personnel_id, status, notes) VALUES (?, ?, 'pending', ?)");
-                    $stmt_update_order = $pdo->prepare("UPDATE orders SET status = 'shipped' WHERE id = ?");
-                    $stmt_log = $pdo->prepare("INSERT INTO order_status_log (order_id, status, note, changed_by) VALUES (?, 'shipped', 'Order dispatched and marked as shipped.', ?)");
+                    $stmt_update_order = $pdo->prepare("UPDATE orders SET status = 'assigned' WHERE id = ?");
+                    $stmt_log = $pdo->prepare("INSERT INTO order_status_log (order_id, status, note, changed_by) VALUES (?, 'assigned', 'Order assigned to delivery personnel.', ?)");
 
                     foreach ($orders as $formatted_id) {
                         // Extract numeric ID

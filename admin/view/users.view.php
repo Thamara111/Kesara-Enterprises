@@ -99,12 +99,22 @@ function getRoleMeta($role) {
             <i class="ti ti-circle-check text-xl shrink-0"></i>
             <p class="text-xs font-bold"><?= htmlspecialchars($success_message) ?></p>
         </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                showToast(<?= json_encode($success_message) ?>, 'success');
+            });
+        </script>
     <?php endif; ?>
     <?php if (!empty($error_message)): ?>
         <div class="mb-8 flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-650">
             <i class="ti ti-alert-triangle text-xl shrink-0"></i>
             <p class="text-xs font-bold"><?= htmlspecialchars($error_message) ?></p>
         </div>
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                showToast(<?= json_encode($error_message) ?>, 'error');
+            });
+        </script>
     <?php endif; ?>
 
     <div class="grid lg:grid-cols-[380px_1fr] gap-10 items-start">

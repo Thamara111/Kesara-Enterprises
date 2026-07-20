@@ -110,8 +110,20 @@ if ($method === 'POST') {
         $order_status = 'processing';
     }
 
-    // Handle Payment Receipt Upload (disabled for direct order flow)
+    // Handle Payment Receipt Upload
     $receipt_path = null;
+    if (isset($_FILES['receipt_file']) && $_FILES['receipt_file']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = __DIR__ . '/../uploads/receipts/';
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
+        $ext = strtolower(pathinfo($_FILES['receipt_file']['name'], PATHINFO_EXTENSION));
+        $filename = time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+        $target_file = $upload_dir . $filename;
+        if (move_uploaded_file($_FILES['receipt_file']['tmp_name'], $target_file)) {
+            $receipt_path = '/uploads/receipts/' . $filename;
+        }
+    }
 
     if (isset($pdo) && $pdo !== null) {
         try {
@@ -136,6 +148,11 @@ if ($method === 'POST') {
             if (!$checkOrderColor->fetch()) {
                 $pdo->exec("ALTER TABLE order_items ADD COLUMN color VARCHAR(50) DEFAULT NULL");
                 $pdo->exec("ALTER TABLE order_items ADD COLUMN size VARCHAR(50) DEFAULT NULL");
+            }
+
+            $checkReceipt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_receipt'");
+            if (!$checkReceipt->fetch()) {
+                $pdo->exec("ALTER TABLE orders ADD COLUMN payment_receipt VARCHAR(255) DEFAULT NULL");
             }
 
             $pdo->beginTransaction();

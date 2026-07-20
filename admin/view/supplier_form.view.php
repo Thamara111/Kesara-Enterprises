@@ -97,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     }
                 }
 
-                echo "<script>window.location.href = '/admin-suppliers';</script>";
+                echo "<script>showToast('Supplier saved successfully.', 'success'); setTimeout(() => window.location.href = '/admin-suppliers', 3000);</script>";
                 exit;
             } catch (Exception $e) {
                 $error_msg = "Database error: " . $e->getMessage();
@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         try {
             $stmt = $pdo->prepare("DELETE FROM suppliers WHERE id = ?");
             $stmt->execute([$supplier_id]);
-            echo "<script>window.location.href = '/admin-suppliers';</script>";
+            echo "<script>showToast('Supplier deleted successfully.', 'success'); setTimeout(() => window.location.href = '/admin-suppliers', 3000);</script>";
             exit;
         } catch (Exception $e) {
             $error_msg = "Database error during deletion: " . $e->getMessage();
@@ -133,6 +133,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             <div class="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl text-xs font-semibold text-red-700">
                 <?php echo htmlspecialchars($error_msg); ?>
             </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    showToast(<?= json_encode($error_msg) ?>, 'error');
+                });
+            </script>
         <?php endif; ?>
 
         <div class="max-w-4xl">

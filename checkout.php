@@ -95,6 +95,31 @@ if (!$can_see_prices) {
                         </div>
                     </div>
 
+                    <!-- Receipt Upload -->
+                    <div class="space-y-4">
+                        <label class="block text-sm font-bold text-gray-900">Upload Transfer Receipt <span class="text-red-500">*</span></label>
+                        <div id="drop-zone" class="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center cursor-pointer hover:border-brand hover:bg-brand-light/10 transition-all">
+                            <i class="ti ti-cloud-upload text-3xl text-brand mb-2"></i>
+                            <p class="text-sm text-gray-500 font-medium">Click to browse or drag and drop</p>
+                            <p class="text-xs text-gray-400 mt-1">PNG, JPG or PDF (Max 5MB)</p>
+                        </div>
+                        <input type="file" id="receipt_file" name="receipt_file" class="hidden" accept="image/png, image/jpeg, application/pdf" onchange="handleFileSelect(this)">
+                        
+                        <div id="file-error" class="hidden text-red-500 text-xs font-bold mt-2"></div>
+                        <div id="file-preview-container" class="hidden flex items-center justify-between bg-brand-light/20 border border-brand/20 rounded-xl p-3 mt-2">
+                            <div class="flex items-center gap-3 overflow-hidden">
+                                <i id="file-icon" class="ti ti-file-text text-brand text-lg"></i>
+                                <div>
+                                    <span id="preview-filename" class="block text-sm font-bold text-gray-900 truncate"></span>
+                                    <span id="preview-filesize" class="block text-xs text-gray-500"></span>
+                                </div>
+                            </div>
+                            <button type="button" onclick="clearSelectedFile()" class="text-gray-400 hover:text-red-500 transition-colors p-2">
+                                <i class="ti ti-x text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
 
                 <div class="mt-8">
@@ -170,7 +195,7 @@ async function initializeCheckout() {
             const products = data.data;
             products.forEach(p => dbProducts[p.id] = p);
             
-            cartItems = storageCart.map(item => {
+            cartItems = storageCart.filter(item => item.selected !== false).map(item => {
                 const dbP = dbProducts[item.id];
                 if (!dbP) return null;
                 return {
@@ -186,15 +211,21 @@ async function initializeCheckout() {
         }
     } catch (e) {
         console.error("Failed to load cart items:", e);
-        uiAlert("Failed to load checkout details.");
+        alert("Failed to load checkout details.");
     }
+}
+
+function getProductTotalQty(productId) {
+    return cartItems.filter(i => i.id === productId).reduce((sum, i) => sum + i.qty, 0);
 }
 
 function getPrice(item) {
   if (!item.tiers || item.tiers.length === 0) return 0;
+  let totalQty = getProductTotalQty(item.id);
+
   for (let t of item.tiers) {
     const max = t.max === null ? Infinity : t.max;
-    if (item.qty >= t.min && item.qty <= max) {
+    if (totalQty >= t.min && totalQty <= max) {
       return t.price;
     }
   }
@@ -278,7 +309,7 @@ function handleFileSelect(input) {
         
         // Size validation
         if (file.size > 5 * 1024 * 1024) {
-            uiAlert("File is too large. Max size is 5MB.");
+            alert("File is too large. Max size is 5MB.");
             input.value = '';
             return;
         }
@@ -286,7 +317,7 @@ function handleFileSelect(input) {
         // Extension validation
         const ext = file.name.split('.').pop().toLowerCase();
         if (!['jpg', 'jpeg', 'png', 'pdf'].includes(ext)) {
-            uiAlert("Invalid file format. Allowed types: JPG, PNG, PDF.");
+            alert("Invalid file format. Allowed types: JPG, PNG, PDF.");
             input.value = '';
             return;
         }
@@ -320,9 +351,11 @@ function clearSelectedFile() {
 // Validation & Submission
 async function processPayment(e) {
     e.preventDefault();
-    
-    // No file validation needed anymore
-    
+    const fileInput = document.getElementById('receipt_file');
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('Please upload your transfer receipt to proceed.');
+        return;
+    }
     const payBtn = document.getElementById('pay-btn');
     const loader = document.getElementById('processing-loader');
     
@@ -331,11 +364,13 @@ async function processPayment(e) {
     loader.classList.remove('hidden');
     loader.classList.add('flex');
 
-    // Create FormData
     const formData = new FormData();
     formData.append('payment_method', 'bank');
     formData.append('total_amount', finalTotalAmount);
     formData.append('items', JSON.stringify(finalItemsPayload));
+    if (fileInput.files.length > 0) {
+        formData.append('receipt_file', fileInput.files[0]);
+    }
 
     // Submit Order to API
     try {
@@ -350,7 +385,7 @@ async function processPayment(e) {
             localStorage.removeItem('kesara_cart');
             window.location.href = `/order-success?order_id=${data.order_id}`;
         } else {
-            uiAlert(data.message || 'Error processing order.');
+            alert(data.message || 'Error processing order.');
             payBtn.disabled = false;
             payBtn.innerHTML = `<i class="ti ti-check text-xl"></i> Place Order (LKR <span id="btn-total">${finalTotalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>)`;
             loader.classList.add('hidden');
@@ -358,7 +393,7 @@ async function processPayment(e) {
         }
     } catch (err) {
         console.error(err);
-        uiAlert('Network error occurred.');
+        alert('Network error occurred.');
         payBtn.disabled = false;
         payBtn.innerHTML = `<i class="ti ti-check text-xl"></i> Place Order (LKR <span id="btn-total">${finalTotalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>)`;
         loader.classList.add('hidden');

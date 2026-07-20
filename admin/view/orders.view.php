@@ -23,6 +23,9 @@ if (isset($pdo) && $pdo !== null) {
                 $badgeText = 'VERIFICATION QUEUE';
             } elseif ($status_lower === 'processing') {
                 $badgeClass = 'bg-blue-50 text-blue-600 border-blue-100';
+            } elseif ($status_lower === 'assigned') {
+                $badgeClass = 'bg-purple-50 text-purple-600 border-purple-100';
+                $badgeText = 'ASSIGNED';
             } elseif ($status_lower === 'shipped') {
                 $badgeClass = 'bg-indigo-50 text-indigo-600 border-indigo-100';
             } elseif ($status_lower === 'delivered') {
@@ -51,7 +54,7 @@ if (isset($pdo) && $pdo !== null) {
             $raw_timeline = $timeline_stmt->fetchAll();
             $timeline = [];
             
-            $states = ['pending', 'processing', 'shipped', 'delivered'];
+            $states = ['pending', 'processing', 'assigned', 'shipped', 'delivered'];
             $currentStateIdx = array_search($status_lower, $states);
             if ($currentStateIdx === false) $currentStateIdx = -1;
 
@@ -63,6 +66,7 @@ if (isset($pdo) && $pdo !== null) {
             $step_titles = [
                 'pending' => 'Order Placed',
                 'processing' => 'Processing',
+                'assigned' => 'Assigned',
                 'shipped' => 'Shipped',
                 'delivered' => 'Delivered'
             ];
@@ -130,7 +134,7 @@ $shipped_orders = 0;
 foreach ($admin_orders as $o) {
     $status = strtolower($o['status']);
     if ($status === 'pending') $pending_orders++;
-    elseif ($status === 'processing') $processing_orders++;
+    elseif ($status === 'processing' || $status === 'assigned') $processing_orders++;
     elseif ($status === 'shipped') $shipped_orders++;
 }
 
@@ -497,7 +501,7 @@ function selectOrder(el, openDrawer = true) {
 
     if (receiptPath && receiptPath.trim() !== '') {
         receiptContainer.classList.remove('hidden');
-        var fullReceiptPath = '/' + receiptPath;
+        var fullReceiptPath = receiptPath.startsWith('/') ? receiptPath : '/' + receiptPath;
         receiptBtn.dataset.receiptPath = fullReceiptPath;
         
         var ext = receiptPath.split('.').pop().toLowerCase();
@@ -631,8 +635,15 @@ function renderOrderDetails(el) {
         actionContainer.innerHTML = `
             ${driverSelectHTML}
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="dispatchOrder(${oid})" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Dispatch Cargo</button>
-                <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-650 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
+                <button onclick="dispatchOrder(${oid})" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Assign Driver</button>
+                <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
+            </div>
+        `;
+    } else if (status_lower === 'assigned') {
+        actionContainer.innerHTML = `
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="updateStatus(${oid}, 'shipped')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Dispatch Cargo</button>
+                <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
             </div>
         `;
     } else if (status_lower === 'shipped') {
@@ -660,8 +671,13 @@ function applyFilters() {
     rows.forEach(r => {
         var visible = true;
         
-        if (activeStatus !== 'all' && r.dataset.status.toLowerCase() !== activeStatus) {
-            visible = false;
+        var rStatus = r.dataset.status.toLowerCase();
+        if (activeStatus !== 'all') {
+            if (activeStatus === 'processing' && (rStatus === 'processing' || rStatus === 'assigned')) {
+                // visible
+            } else if (rStatus !== activeStatus) {
+                visible = false;
+            }
         }
 
         if (q && !r.dataset.formattedId.toLowerCase().includes(q) &&
@@ -769,7 +785,7 @@ function updateStatus(id, status) {
         if (data.status === 'success') {
             var variant = status === 'cancelled' ? 'error' : 'success';
             showToast(labels[status] || `Status updated to ${status}.`, variant);
-            setTimeout(() => window.location.reload(), 1000);
+            setTimeout(() => window.location.reload(), 3000);
         } else {
             showToast(data.message || 'Error updating status', 'error');
         }
@@ -797,7 +813,7 @@ function dispatchOrder(oid) {
     .then(data => {
         if (data.status === 'success') {
             showToast('Order dispatched and delivery assignment created!', 'success');
-            setTimeout(() => window.location.reload(), 1000);
+            setTimeout(() => window.location.reload(), 3000);
         } else {
             showToast(data.message || 'Error creating assignment', 'error');
         }

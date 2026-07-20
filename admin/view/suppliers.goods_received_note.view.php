@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $success_msg = "Goods receipt confirmed and inventory updated successfully!";
         
         // Redirect to PO view
-        echo "<script>window.location.href = '/admin-purchase-orders';</script>";
+        echo "<script>showToast('Goods receipt confirmed and inventory updated successfully!', 'success'); setTimeout(() => window.location.href = '/admin-purchase-orders', 3000);</script>";
         exit;
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
@@ -186,6 +186,11 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
     <div class="m-8 p-4 bg-red-50 border border-red-100 rounded-2xl text-xs font-semibold text-red-700">
         <?= htmlspecialchars($error_msg) ?>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            showToast(<?= json_encode($error_msg) ?>, 'error');
+        });
+    </script>
 <?php endif; ?>
 
 <form method="POST" class="flex-1 flex overflow-hidden">

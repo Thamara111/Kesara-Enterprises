@@ -604,7 +604,7 @@ function updateStatus(id, newStatus) {
             }
             
             var labels = { approved: 'Customer account approved.', suspended: 'Customer account suspended.', rejected: 'Customer account rejected.' };
-            var variant = (newStatus === 'suspended' || newStatus === 'rejected') ? 'error' : 'success';
+            var variant = (newStatus === 'rejected') ? 'error' : 'success';
             showToast(labels[newStatus] || data.message || `Status updated to ${newStatus}.`, variant);
         } else {
             showToast(data.message || 'Failed to update customer status.', 'error');

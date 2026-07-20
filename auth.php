@@ -4,6 +4,8 @@ require_once __DIR__ . "/database/connection.php";
 $page_mode = isset($_GET['mode']) ? $_GET['mode'] : 'login';
 $success_message = isset($_GET['success']) && $_GET['success'] == 1 ? "Your wholesale account request has been submitted successfully! We will contact you within 24h." : "";
 $error_message = "";
+$email_error = false;
+$password_error = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($page_mode === 'register') {
@@ -49,6 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         if (empty($email) || empty($password)) {
             $error_message = "Email and password are required.";
+            if (empty($email)) $email_error = true;
+            if (empty($password)) $password_error = true;
         } else {
             if ($pdo) {
                 try {
@@ -72,6 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     } else {
                         $error_message = "Invalid email or password.";
+                        $email_error = true;
+                        $password_error = true;
                     }
                 } catch (\Exception $e) {
                     $error_message = "Database error: " . $e->getMessage();
@@ -175,9 +181,12 @@ require_once __DIR__ . "/layouts/head.php";
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">Email address <span class="text-red-500">*</span></label>
                         <div class="relative">
-                            <input type="email" name="email" required placeholder="you@company.com" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
+                            <input type="email" name="email" required placeholder="you@company.com" class="w-full px-4 py-3 bg-gray-50 border <?= $email_error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand' ?> rounded-lg focus:ring-2 outline-none transition-all text-sm" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
                             <i class="ti ti-mail absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
                         </div>
+                        <?php if ($email_error && !empty($error_message)): ?>
+                            <p class="text-red-500 text-xs mt-1"><?= htmlspecialchars($error_message) ?></p>
+                        <?php endif; ?>
                     </div>
 
                     <div>
@@ -186,9 +195,12 @@ require_once __DIR__ . "/layouts/head.php";
                             <a href="#" class="text-xs font-semibold text-brand hover:underline">Forgot password?</a>
                         </div>
                         <div class="relative">
-                            <input type="password" name="password" required placeholder="••••••••" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
+                            <input type="password" name="password" required placeholder="••••••••" class="w-full px-4 py-3 bg-gray-50 border <?= $password_error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand' ?> rounded-lg focus:ring-2 outline-none transition-all text-sm">
                             <i class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer"></i>
                         </div>
+                        <?php if ($password_error && !empty($error_message)): ?>
+                            <p class="text-red-500 text-xs mt-1"><?= htmlspecialchars($error_message) ?></p>
+                        <?php endif; ?>
                     </div>
 
                     <button type="submit" class="w-full bg-brand text-brand-light font-bold py-3.5 rounded-lg hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg">
@@ -270,12 +282,12 @@ require_once __DIR__ . "/layouts/head.php";
                         <div class="space-y-2">
                             <label class="block text-sm font-semibold text-gray-700">Password <span class="text-red-500">*</span></label>
                             <div class="relative">
-                                <input type="password" id="register-password" name="password" required maxlength="8" placeholder="Min. 8 characters" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm" oninput="checkPasswordStrength(this.value)">
+                                <input type="password" id="register-password" name="password" required minlength="8" placeholder="Min. 8 characters" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm" oninput="checkPasswordStrength(this.value)">
                                 <i class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer"></i>
                             </div>
                             <!-- Strength bar -->
                             <div class="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                                <div id="strengthBar" class="h-full rounded-full transition-all duration-400 w-0 bg-gray-300"></div>
+                                <div id="strengthBar" class="h-full rounded-full transition-all duration-300 w-0 bg-gray-300"></div>
                             </div>
                             <p id="strengthLabel" class="text-xs mt-1 text-gray-400"></p>
                         </div>
@@ -363,21 +375,22 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Password Visibility Toggle
-    document.querySelectorAll('.ti-eye, .ti-eye-off').forEach(eyeIcon => {
-        eyeIcon.addEventListener('click', function() {
-            const input = this.previousElementSibling;
-            if (input && (input.type === 'password' || input.type === 'text')) {
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('ti-eye') || e.target.classList.contains('ti-eye-off')) {
+            const icon = e.target;
+            const input = icon.previousElementSibling;
+            if (input && input.tagName === 'INPUT') {
                 if (input.type === 'password') {
                     input.type = 'text';
-                    this.classList.remove('ti-eye');
-                    this.classList.add('ti-eye-off');
+                    icon.classList.remove('ti-eye');
+                    icon.classList.add('ti-eye-off');
                 } else {
                     input.type = 'password';
-                    this.classList.remove('ti-eye-off');
-                    this.classList.add('ti-eye');
+                    icon.classList.remove('ti-eye-off');
+                    icon.classList.add('ti-eye');
                 }
             }
-        });
+        }
     });
 
     // Password Strength Checker
@@ -387,7 +400,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!bar || !label) return;
 
         if (!password) {
-            bar.className = "h-full rounded-full transition-all duration-400 w-0 bg-gray-300";
+            bar.className = "h-full rounded-full transition-all duration-300 w-0 bg-gray-300";
             bar.style.width = "0%";
             label.textContent = "";
             return;
@@ -425,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         bar.style.width = width;
-        bar.className = "h-full rounded-full transition-all duration-400 " + colorClass;
+        bar.className = "h-full rounded-full transition-all duration-300 " + colorClass;
         label.textContent = text;
         
         if (colorClass === 'bg-red-500') {

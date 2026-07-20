@@ -114,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             \App\Mailer::send($supp['email'], 'Purchase Order ' . $po_ref . ' from Kesara Enterprises', $email_body);
             
             // JS redirect — header() can't be used here as head.php has already sent HTML output
-            echo "<script>showToast('Purchase Order " . $po_ref . " raised and emailed to " . htmlspecialchars($supp['name'], ENT_QUOTES) . " successfully!', 'success'); setTimeout(() => window.location.href = '/admin-purchase-orders', 1500);</script>";
+            echo "<script>showToast('Purchase Order " . $po_ref . " raised and emailed to " . htmlspecialchars($supp['name'], ENT_QUOTES) . " successfully!', 'success'); setTimeout(() => window.location.href = '/admin-purchase-orders', 3000);</script>";
             exit;
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();

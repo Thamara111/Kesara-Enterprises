@@ -337,7 +337,7 @@ document.getElementById('cat-form').addEventListener('submit', function(e) {
             showToast(data.message || 'Category saved successfully.', 'success');
             setTimeout(() => {
                 window.location.href = '/admin-categories';
-            }, 1000);
+            }, 3000);
         } else {
             showToast(data.message || 'An error occurred.', 'error');
         }
@@ -365,7 +365,7 @@ function submitDelete() {
                 showToast(data.message || 'Category deleted successfully.', 'success');
                 setTimeout(() => {
                     window.location.href = '/admin-categories';
-                }, 1000);
+                }, 3000);
             } else {
                 showToast(data.message || 'An error occurred.', 'error');
             }

@@ -929,9 +929,7 @@ function openConfirmationModal(stopNum) {
     const stop = activeRun.stops.find(s => s.num === stopNum);
     document.getElementById('confirm-stop-name').textContent = stop ? stop.name : '';
     
-    // Clear signature
-    document.getElementById('sig-placeholder').style.display = 'block';
-    document.getElementById('sig-drawn').style.display = 'none';
+    // Signature pad not implemented yet
     
     const modal = document.getElementById('confirm-modal');
     modal.classList.remove('opacity-0', 'pointer-events-none');

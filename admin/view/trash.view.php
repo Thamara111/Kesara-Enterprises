@@ -189,7 +189,10 @@ function restoreItem(table, id) {
     })
     .then(res => res.json())
     .then(data => {
-        if(data.status === 'success') location.reload();
+        if(data.status === 'success') {
+            showToast('Item restored successfully.', 'success');
+            setTimeout(() => location.reload(), 3000);
+        }
         else showToast('Error: ' + data.message, 'error');
     });
 }
@@ -226,7 +229,10 @@ function executeHardDelete() {
     })
     .then(res => res.json())
     .then(data => {
-        if(data.status === 'success') location.reload();
+        if(data.status === 'success') {
+            showToast('Item permanently deleted.', 'success');
+            setTimeout(() => location.reload(), 3000);
+        }
         else showToast('Error: ' + data.message, 'error');
     });
 }

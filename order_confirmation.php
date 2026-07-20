@@ -166,13 +166,14 @@ require_once __DIR__ . "/layouts/header.php";
                             $log_map[strtolower($log['status'])] = $log;
                         }
 
-                        $states = ['pending', 'processing', 'shipped', 'delivered'];
+                        $states = ['pending', 'processing', 'assigned', 'shipped', 'delivered'];
                         $currentStateIdx = array_search($current_status, $states);
                         if ($currentStateIdx === false) $currentStateIdx = -1;
 
                         $step_titles = [
                             'pending' => 'Order Placed',
                             'processing' => 'Payment & Processing',
+                            'assigned' => 'Assigned to Driver',
                             'shipped' => 'Dispatched & Shipped',
                             'delivered' => 'Delivered'
                         ];
@@ -180,6 +181,7 @@ require_once __DIR__ . "/layouts/header.php";
                         $step_descriptions = [
                             'pending' => 'Our administration team is currently reviewing your uploaded payment receipt. We will verify the transaction and initialize order processing shortly, and notify you via email.',
                             'processing' => 'Payment confirmed. Our warehouse team is picking and packing your order.',
+                            'assigned' => 'Your order has been assigned to a delivery driver and is awaiting dispatch.',
                             'shipped' => 'Your order has been dispatched! It will be delivered in 1-2 business days.',
                             'delivered' => 'Order delivered. Thank you for shopping with Kesara Enterprises!'
                         ];
