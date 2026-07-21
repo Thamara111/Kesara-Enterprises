@@ -52,8 +52,10 @@ if (isset($pdo) && $pdo !== null) {
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-brand text-brand" onclick="switchTrashTab('products', this)">Products (<?= count($deleted_products) ?>)</button>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('categories', this)">Categories (<?= count($deleted_categories) ?>)</button>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('orders', this)">Orders (<?= count($deleted_orders) ?>)</button>
+        <?php if ($role === 'admin'): ?>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('users', this)">Staff (<?= count($deleted_admins) ?>)</button>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('customers', this)">Customers (<?= count($suspended_customers) ?>)</button>
+        <?php endif; ?>
     </div>
 
     <!-- Content Sections -->
@@ -114,6 +116,7 @@ if (isset($pdo) && $pdo !== null) {
         <?php endif; ?>
     </div>
 
+    <?php if ($role === 'admin'): ?>
     <div id="tab-users" class="trash-section hidden space-y-4">
         <?php if (empty($deleted_admins)): ?>
             <p class="text-gray-400 text-sm font-bold">No deleted staff found.</p>
@@ -151,6 +154,7 @@ if (isset($pdo) && $pdo !== null) {
             <?php endforeach; ?>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 </div>
 
 <!-- Hard Delete Confirm Modal -->

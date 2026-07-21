@@ -434,13 +434,18 @@ function downloadInvoice() {
             <script>
                 window.onload = function() {
                     window.print();
-                    window.close();
                 }
             <\/script>
         </body>
         </html>
     \`);
     printWindow.document.close();
+}
+
+if (new URLSearchParams(window.location.search).get('print') === '1') {
+    window.addEventListener('load', () => {
+        downloadInvoice();
+    });
 }
 </script>
 

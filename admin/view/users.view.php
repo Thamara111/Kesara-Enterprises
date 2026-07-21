@@ -148,7 +148,7 @@ function getRoleMeta($role) {
                     <label for="password" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block ml-1">Default Password</label>
                     <div class="relative">
                         <input type="password" id="password" name="password" required maxlength="8" placeholder="Min. 8 characters" class="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all" oninput="checkStaffPasswordStrength(this.value)">
-                        <i class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer toggle-password-btn" data-target="password"></i>
+                        <i class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer toggle-password-btn" onclick="toggleStaffPassword(this, 'password')"></i>
                     </div>
                     <!-- Strength bar -->
                     <div class="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
@@ -213,25 +213,21 @@ function getRoleMeta($role) {
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => {
     // Password Visibility Toggle
-    document.querySelectorAll('.toggle-password-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            var targetId = this.getAttribute('data-target');
-            var input = document.getElementById(targetId);
-            if (input) {
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    this.classList.remove('ti-eye');
-                    this.classList.add('ti-eye-off');
-                } else {
-                    input.type = 'password';
-                    this.classList.remove('ti-eye-off');
-                    this.classList.add('ti-eye');
-                }
+    function toggleStaffPassword(btn, targetId) {
+        var input = document.getElementById(targetId);
+        if (input) {
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.classList.remove('ti-eye');
+                btn.classList.add('ti-eye-off');
+            } else {
+                input.type = 'password';
+                btn.classList.remove('ti-eye-off');
+                btn.classList.add('ti-eye');
             }
-        });
-    });
+        }
+    }
 
     // Password Strength Checker
     window.checkStaffPasswordStrength = function(password) {
@@ -286,10 +282,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (colorClass === 'bg-orange-500') {
             label.className = "text-[10px] mt-1 text-orange-500 font-semibold";
         } else if (colorClass === 'bg-yellow-500') {
-            label.className = "text-[10px] mt-1 text-yellow-650 font-semibold";
+            label.className = "text-[10px] mt-1 text-yellow-600 font-semibold";
         } else if (colorClass === 'bg-green-500') {
             label.className = "text-[10px] mt-1 text-green-600 font-semibold";
         }
     };
-});
 </script>

@@ -374,7 +374,7 @@ if ($pressure_count > 0) {
                 <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Update Restock Threshold</h3>
                 <div class="flex gap-2">
                     <input type="number" id="thresh-input" value="200" class="flex-1 px-4 py-2 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all font-bold">
-                    <button class="px-6 py-2 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">
+                    <button onclick="saveThresh()" class="px-6 py-2 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all">
                         Save
                     </button>
                 </div>
@@ -503,35 +503,90 @@ function applyAdj(){
   var newStock = t==='add'?prev+q:t==='remove'?Math.max(0,prev-q):q;
   var diff = newStock - prev;
   var sign = diff>=0?'+':'';
-  
-  // Update dataset
-  selEl.dataset.stock = newStock;
-  
-  var logs = [];
-  try { logs = JSON.parse(selEl.dataset.logs || '[]'); } catch (e) {}
-  logs.unshift({
-      date: 'Now',
-      change: `${sign}${diff} (${note})`,
-      class: diff>=0?'text-emerald-600':'text-red-600',
-      by: 'Admin'
-  });
-  selEl.dataset.logs = JSON.stringify(logs);
+  fetch('/api/admin_inventory.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+          action: 'adjust_stock',
+          id: selEl.dataset.id,
+          type: t,
+          qty: q,
+          note: note,
+          newStock: newStock
+      })
+  }).then(r => r.json()).then(data => {
+      if (data.status === 'success') {
+          showToast('Stock adjusted successfully.', 'success');
+          
+          // Update dataset
+          selEl.dataset.stock = newStock;
+          
+          var logs = [];
+          try { logs = JSON.parse(selEl.dataset.logs || '[]'); } catch (e) {}
+          logs.unshift({
+              date: 'Now',
+              change: `${sign}${diff} (${note})`,
+              class: diff>=0?'text-emerald-600':'text-red-600',
+              by: 'Admin'
+          });
+          selEl.dataset.logs = JSON.stringify(logs);
 
-  // Update DOM inline
-  var thresh = parseInt(selEl.dataset.thresh);
-  var p = pct(newStock, thresh);
-  var bc = badgeClass(p);
-  var bt = badgeText(p);
+          // Update DOM inline
+          var thresh = parseInt(selEl.dataset.thresh);
+          var p = pct(newStock, thresh);
+          var bc = badgeClass(p);
+          var bt = badgeText(p);
 
-  selEl.querySelector('.stock-val').textContent = newStock;
-  selEl.querySelector('.stock-val').style.color = stockColor(p);
-  selEl.querySelector('.bar-val').style.width = p + '%';
-  selEl.querySelector('.bar-val').style.backgroundColor = barColor(p);
-  selEl.querySelector('.badge-val').className = `badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${bc} border border-transparent shadow-sm`;
-  selEl.querySelector('.badge-val').textContent = bt;
+          selEl.querySelector('.stock-val').textContent = newStock;
+          selEl.querySelector('.stock-val').style.color = stockColor(p);
+          selEl.querySelector('.bar-val').style.width = p + '%';
+          selEl.querySelector('.bar-val').style.backgroundColor = barColor(p);
+          selEl.querySelector('.badge-val').className = `badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${bc} border border-transparent shadow-sm`;
+          selEl.querySelector('.badge-val').textContent = bt;
+          
+          applyFilters();
+          renderDetail(selEl);
+          document.getElementById('adj-qty').value = '';
+          document.getElementById('adj-note').value = '';
+      } else {
+          showToast(data.message || 'Error updating stock.', 'error');
+      }
+  }).catch(() => showToast('Network error.', 'error'));
+}
+
+function saveThresh() {
+  if (!selEl) return;
+  var thresh = parseInt(document.getElementById('thresh-input').value) || 0;
   
-  applyFilters();
-  renderDetail(selEl);
+  fetch('/api/admin_inventory.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+          action: 'update_thresh',
+          id: selEl.dataset.id,
+          thresh: thresh
+      })
+  }).then(r => r.json()).then(data => {
+      if (data.status === 'success') {
+          showToast('Threshold updated successfully.', 'success');
+          selEl.dataset.thresh = thresh;
+          var stock = parseInt(selEl.dataset.stock);
+          var p = pct(stock, thresh);
+          var bc = badgeClass(p);
+          var bt = badgeText(p);
+
+          selEl.querySelector('.bar-val').style.width = p + '%';
+          selEl.querySelector('.bar-val').style.backgroundColor = barColor(p);
+          selEl.querySelector('.badge-val').className = `badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${bc} border border-transparent shadow-sm`;
+          selEl.querySelector('.badge-val').textContent = bt;
+          selEl.querySelector('.stock-val').style.color = stockColor(p);
+
+          applyFilters();
+          renderDetail(selEl);
+      } else {
+          showToast(data.message || 'Error updating threshold.', 'error');
+      }
+  }).catch(() => showToast('Network error.', 'error'));
 }
 
 function selectRow(el, openDrawer = true){

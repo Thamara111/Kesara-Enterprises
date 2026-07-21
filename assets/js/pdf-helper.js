@@ -20,5 +20,7 @@ function downloadPDF(elementId, reportName) {
     // Temporarily adjust some styles for better PDF output if needed
     const originalClasses = element.className;
     
-    html2pdf().set(opt).from(element).save();
+    html2pdf().set(opt).from(element).toPdf().get('pdf').then(function(pdf) {
+        window.open(pdf.output('bloburl'), '_blank');
+    });
 }

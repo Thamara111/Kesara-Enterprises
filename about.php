@@ -14,28 +14,21 @@ require_once __DIR__ . "/layouts/head.php";
 require_once __DIR__ . "/layouts/header.php";
 ?>
 
-<main class="bg-gray-50 min-h-screen">
-    <!-- HERO SECTION -->
-    <section
-        style="background-image: url('/assets/images/hero/hero.jpg'); background-size: cover; background-position: center;"
-        class="py-24 border-b border-gray-100 relative z-0">
+<main class="bg-gray-50 min-h-screen py-12">
 
-        <!-- Overlay to make text readable -->
-        <div class="absolute inset-0 z-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent"></div>
-
-        <div class="max-w-7xl mx-auto px-6 md:px-12 relative z-10 text-center md:text-left max-w-3xl">
-            <span class="text-[10px] font-bold tracking-[0.2em] text-brand-light/70 uppercase mb-3 block">Established 2012</span>
-            <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white mb-6 leading-tight tracking-tight">
-                Our Story &amp; Commitment
+     <!-- Hero text / Heading -->
+        <div class="text-center max-w-2xl mx-auto mb-16">
+            <span class="text-[10px] font-bold tracking-widest text-brand uppercase block mb-3">Established 2012</span>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-gray-900 leading-tight">
+               Our Story &amp; Commitment
             </h1>
-            <p class="text-lg md:text-xl text-gray-300 leading-relaxed font-light">
+            <p class="text-gray-500 mt-4 text-[15px] leading-relaxed">
                 Providing high-quality innerwear and exceptional wholesale service to local retailers, supermarkets, and distributors across Sri Lanka.
             </p>
         </div>
-    </section>
 
     <!-- OUR STORY SECTION -->
-    <section class="py-24 bg-white border-b border-gray-100 relative overflow-hidden">
+    <section class=" py-12 bg-white border-b border-gray-100 relative overflow-hidden">
         <div class="max-w-7xl mx-auto px-6 md:px-12">
             <div class="grid lg:grid-cols-12 gap-16 items-center">
                 <!-- Text Area -->
@@ -89,7 +82,7 @@ require_once __DIR__ . "/layouts/header.php";
     </section>
 
     <!-- MISSION & VISION -->
-    <section class="py-24 bg-gray-50 border-b border-gray-100">
+    <section class="py-12 bg-gray-50 border-b border-gray-100">
         <div class="max-w-7xl mx-auto px-6 md:px-12 text-center mb-16">
             <span class="text-xs font-bold tracking-widest text-brand uppercase block mb-3">Our Foundation</span>
             <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900">Mission, Vision &amp; Core Values</h2>
@@ -132,7 +125,7 @@ require_once __DIR__ . "/layouts/header.php";
     </section>
 
     <!-- MEET THE TEAM SECTION -->
-    <section class="py-24 bg-white">
+    <section class="py-12 bg-white">
         <div class="max-w-7xl mx-auto px-6 md:px-12 text-center mb-16">
             <span class="text-xs font-bold tracking-widest text-brand uppercase block mb-3">Our People</span>
             <h2 class="text-3xl md:text-4xl font-extrabold text-gray-900">Meet the Leadership Team</h2>

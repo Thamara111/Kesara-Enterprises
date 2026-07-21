@@ -268,7 +268,17 @@ require_once __DIR__."/layouts/header.php";
             <div class="p-5">
               <div class="flex justify-between items-start mb-2">
                 <h3 class="text-[15px] font-bold text-gray-900 group-hover:text-brand transition-colors"><?php echo htmlspecialchars($p['name']); ?></h3>
-                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full <?php echo strtolower($p['status'])==='in stock'?'bg-brand-light text-brand':'bg-amber-50 text-amber-600 border border-amber-100'; ?>">
+                <?php 
+                    $stat = strtolower($p['status'] ?? '');
+                    if ($stat === 'in stock') {
+                        $cls = 'bg-brand-light text-brand';
+                    } elseif ($stat === 'out of stock') {
+                        $cls = 'bg-red-50 text-red-600 border border-red-100';
+                    } else {
+                        $cls = 'bg-amber-50 text-amber-600 border border-amber-100';
+                    }
+                ?>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full <?= $cls ?>">
                   <?php echo htmlspecialchars($p['status']); ?>
                 </span>
               </div>

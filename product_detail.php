@@ -233,8 +233,25 @@ require_once __DIR__ . "/layouts/header.php";
                 
                 <div class="flex flex-wrap gap-2 mb-6">
                     <span class="px-3 py-1 bg-brand-light text-brand text-[10px] font-bold rounded-full border border-brand/10 uppercase"><?= htmlspecialchars($category_name) ?></span>
-                    <span class="px-3 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded-full border border-green-100 flex items-center gap-1.5 uppercase">
-                        <div class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                    <?php 
+                        $stat = strtolower($product['status'] ?? '');
+                        $is_out_of_stock = ($stat === 'out of stock');
+                        if ($stat === 'in stock') {
+                            $sc_bg = 'bg-green-50 border-green-100';
+                            $sc_tx = 'text-green-600';
+                            $sc_dot = 'bg-green-500';
+                        } elseif ($stat === 'out of stock') {
+                            $sc_bg = 'bg-red-50 border-red-100';
+                            $sc_tx = 'text-red-600';
+                            $sc_dot = 'bg-red-500';
+                        } else {
+                            $sc_bg = 'bg-amber-50 border-amber-100';
+                            $sc_tx = 'text-amber-600';
+                            $sc_dot = 'bg-amber-500';
+                        }
+                    ?>
+                    <span class="px-3 py-1 <?= $sc_bg ?> <?= $sc_tx ?> text-[10px] font-bold rounded-full border flex items-center gap-1.5 uppercase">
+                        <div class="w-1.5 h-1.5 rounded-full <?= $sc_dot ?> animate-pulse"></div>
                         <?= htmlspecialchars($product['status']) ?>
                     </span>
                 </div>
@@ -376,12 +393,12 @@ require_once __DIR__ . "/layouts/header.php";
                                     </span>
                                 </div>
                                 <div class="flex items-center bg-gray-100 border border-gray-200 rounded-xl overflow-hidden shadow-sm" onclick="event.stopPropagation()">
-                                    <button type="button" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', -10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all"><i class="ti ti-minus text-xs"></i></button>
-                                    <input type="number" id="size-qty-<?= htmlspecialchars($so) ?>" value="<?= $is_selected ? (int)$product['moq'] : 0 ?>" min="0" step="10" 
+                                    <button type="button" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', -10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-minus text-xs"></i></button>
+                                    <input type="number" id="size-qty-<?= htmlspecialchars($so) ?>" value="<?= $is_selected && !$is_out_of_stock ? (int)$product['moq'] : 0 ?>" min="0" step="10" 
                                            onfocus="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')"
                                            onchange="onSizeQtyChange('<?= htmlspecialchars($so) ?>')" 
-                                           class="w-12 text-center text-xs font-black text-gray-900 bg-transparent border-none outline-none focus:ring-0 transition-all duration-300 py-1">
-                                    <button type="button" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', 10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all"><i class="ti ti-plus text-xs"></i></button>
+                                           class="w-12 text-center text-xs font-black text-gray-900 bg-transparent border-none outline-none focus:ring-0 transition-all duration-300 py-1 disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>>
+                                    <button type="button" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', 10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-plus text-xs"></i></button>
                                 </div>
                             </div>
                             <?php endforeach; ?>
@@ -394,9 +411,9 @@ require_once __DIR__ . "/layouts/header.php";
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order Quantity <span class="text-gray-300 font-medium lowercase tracking-normal">(min. <?= htmlspecialchars($product['moq']) ?>)</span></label>
                     <div class="flex items-center gap-6">
                         <div class="flex items-center bg-gray-50 border border-gray-100 rounded-xl overflow-hidden group focus-within:ring-2 focus-within:ring-brand/20 transition-all">
-                            <button onclick="changeQty(-10)" class="w-12 h-12 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all"><i class="ti ti-minus text-sm"></i></button>
-                            <span id="qty-display" class="w-16 text-center text-sm font-bold text-gray-900"><?= (int) $product['moq'] ?></span>
-                            <button onclick="changeQty(10)" class="w-12 h-12 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all"><i class="ti ti-plus text-sm"></i></button>
+                            <button onclick="changeQty(-10)" class="w-12 h-12 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-minus text-sm"></i></button>
+                            <span id="qty-display" class="w-16 text-center text-sm font-bold <?= $is_out_of_stock ? 'text-gray-400' : 'text-gray-900' ?>"><?= $is_out_of_stock ? 0 : (int) $product['moq'] ?></span>
+                            <button onclick="changeQty(10)" class="w-12 h-12 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-plus text-sm"></i></button>
                         </div>
                         <span class="text-sm font-bold text-gray-400 uppercase tracking-widest">Units</span>
                     </div>
@@ -421,14 +438,14 @@ require_once __DIR__ . "/layouts/header.php";
                     </div>
                     <div class="flex justify-between text-xs font-bold text-gray-400 uppercase tracking-widest">
                         <span>Total Quantity</span>
-                        <span id="order-qty" class="text-gray-900"><?= (int) $product['moq'] ?> units</span>
+                        <span id="order-qty" class="text-gray-900"><?= $is_out_of_stock ? 0 : (int) $product['moq'] ?> units</span>
                     </div>
                     <div class="h-px bg-gray-200"></div>
                     <div class="flex justify-between items-center">
                         <span class="text-sm font-bold text-gray-900 uppercase tracking-widest">Subtotal</span>
                         <span id="subtotal" class="text-2xl font-extrabold text-brand font-sans">
                             <?php if ($can_see_prices): ?>
-                                    LKR <?= number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?>
+                                    LKR <span id="subtotal-val"><?= $is_out_of_stock ? 0 : number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?></span>
                             <?php else: ?>
                                     <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none">LKR <?= number_format($product['moq'] * (!empty($pricing_tiers) ? $pricing_tiers[0]['price'] : $product['base_price'])) ?></span>
                             <?php endif; ?>
@@ -440,12 +457,10 @@ require_once __DIR__ . "/layouts/header.php";
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <?php if ($buyer_approved): ?>
                             <!-- ✅ Approved buyer: show full action buttons -->
-                            <button onclick="addToCart()"
-                                class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark
-                                   transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20
-                                   active:scale-95 flex items-center justify-center gap-2">
+                            <button onclick="addToCart()" <?= $is_out_of_stock ? 'disabled' : '' ?>
+                                class="<?= $is_out_of_stock ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-brand text-brand-light hover:bg-brand-dark active:scale-95 hover:-translate-y-px shadow-lg shadow-brand/20' ?> font-bold py-4 rounded-2xl transition-all transform flex items-center justify-center gap-2">
                                 <i class="ti ti-shopping-cart-plus text-xl"></i>
-                                Add to Order
+                                <?= $is_out_of_stock ? 'Out of Stock' : 'Add to Order' ?>
                             </button>
                             <button onclick="requestQuote()"
                                 class="bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl
@@ -529,7 +544,7 @@ echo json_encode($js_tiers);
 const discount = <?= (float) $discount ?>;
 const moq = <?= (int) $product['moq'] ?>;
 const canSeePrices = <?= $can_see_prices ? 'true' : 'false' ?>;
-let qty = <?= (int) $product['moq'] ?>;
+let qty = <?= $is_out_of_stock ? 0 : (int) $product['moq'] ?>;
 const sizeOptions = <?php echo json_encode($size_options); ?>;
 const availableSizes = <?php echo json_encode($sizes); ?>;
 const defaultSize = '<?= htmlspecialchars($default_size) ?>';
@@ -554,7 +569,8 @@ function getTier(q) {
 
 function updateUI() {
   const tier = getTier(qty);
-  const belowMOQ = qty < moq;
+  const isOutOfStock = <?= $is_out_of_stock ? 'true' : 'false' ?>;
+  const belowMOQ = !isOutOfStock && qty < moq;
   
   let activePrice = tier.price;
   if (discount > 0) {

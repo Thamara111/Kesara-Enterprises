@@ -354,13 +354,18 @@ function clearSelectedFile() {
 }
 
 // Validation & Submission
+let isSubmittingOrder = false;
 async function processPayment(e) {
     e.preventDefault();
+    if (isSubmittingOrder) return;
+    
     const fileInput = document.getElementById('receipt_file');
     if (!fileInput.files || fileInput.files.length === 0) {
         alert('Please upload your transfer receipt to proceed.');
         return;
     }
+    
+    isSubmittingOrder = true;
     const payBtn = document.getElementById('pay-btn');
     const loader = document.getElementById('processing-loader');
     
@@ -391,6 +396,7 @@ async function processPayment(e) {
             window.location.href = `/order-success?order_id=${data.order_id}`;
         } else {
             alert(data.message || 'Error processing order.');
+            isSubmittingOrder = false;
             payBtn.disabled = false;
             payBtn.innerHTML = `<i class="ti ti-check text-xl"></i> Place Order (LKR <span id="btn-total">${finalTotalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>)`;
             loader.classList.add('hidden');
@@ -399,6 +405,7 @@ async function processPayment(e) {
     } catch (err) {
         console.error(err);
         alert('Network error occurred.');
+        isSubmittingOrder = false;
         payBtn.disabled = false;
         payBtn.innerHTML = `<i class="ti ti-check text-xl"></i> Place Order (LKR <span id="btn-total">${finalTotalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>)`;
         loader.classList.add('hidden');

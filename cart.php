@@ -427,7 +427,9 @@ function confirmClearCart() {
   closeClearCartModal();
 }
 
+let isSubmitting = false;
 function submitOrder() {
+  if (isSubmitting) return;
   const checkoutBtn = document.getElementById('checkout-btn');
   const selectedItems = cartItems.filter(i => i.selected);
   if (selectedItems.length === 0) {
@@ -435,6 +437,7 @@ function submitOrder() {
       return;
   }
   
+  isSubmitting = true;
   checkoutBtn.disabled = true;
   checkoutBtn.textContent = 'Redirecting to Checkout...';
 
@@ -520,7 +523,6 @@ function downloadQuote() {
           <script>
               window.onload = function() {
                   window.print();
-                  window.close();
               }
           <\/script>
       </body>

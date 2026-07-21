@@ -363,7 +363,7 @@ require_once __DIR__ . "/layouts/header.php";
                                 </div>
                                 <div class="flex items-center justify-between md:justify-end gap-10">
                                     <span class="text-sm font-bold text-gray-900">LKR <?= number_format($o['total_amount']) ?></span>
-                                    <button class="bg-gray-50 text-gray-900 hover:bg-brand hover:text-brand-light font-bold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-2 border border-gray-100 group-hover:border-brand/10">
+                                    <button onclick="window.open('/order-success?id=<?= htmlspecialchars($o['id']) ?>&print=1', '_blank')" class="bg-gray-50 text-gray-900 hover:bg-brand hover:text-brand-light font-bold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-2 border border-gray-100 group-hover:border-brand/10">
                                         <i class="ti ti-download"></i> PDF
                                     </button>
                                 </div>

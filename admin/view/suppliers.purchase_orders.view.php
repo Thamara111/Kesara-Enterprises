@@ -273,7 +273,7 @@ if (isset($pdo) && $pdo !== null) {
 
 <div class="flex-1 flex overflow-hidden">
     <!-- List Pane -->
-    <div class="flex-1 flex flex-col min-w-0 bg-white">
+    <div id="purchase-orders-list-container" class="flex-1 flex flex-col min-w-0 bg-white">
         <!-- Header -->
         <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
             <div>
@@ -281,7 +281,7 @@ if (isset($pdo) && $pdo !== null) {
                 <p class="text-sm text-gray-500 mt-1">Manage wholesale procurement and supplier shipments</p>
             </div>
             <div class="flex gap-3">
-                <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
+                <button onclick="downloadPDF('purchase-orders-list-container', 'Purchase_Orders_List')" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
                     <i class="ti ti-download text-lg"></i>
                     Export / Print List
                 </button>
@@ -771,7 +771,7 @@ function removePOItemRow(btn) {
 
 // Actions from Detail Pane
 function printPO() {
-    window.print();
+    downloadPDF('detail-print-area', 'Purchase_Order');
 }
 
 function resendPO() {

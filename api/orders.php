@@ -196,9 +196,17 @@ if ($method === 'POST') {
 
             // Step 2: Prepare statements for inserting items and updating inventory
             $stmt_item      = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, color, size) VALUES (?, ?, ?, ?, ?, ?)");
-            // Inventory lookups target exact size/color variants first
             $stmt_inv_check = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? AND size = ? AND colour = ? LIMIT 1");
             $stmt_inv_dec   = $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE id = ?");
+            $stmt_up_status = $pdo->prepare("
+                UPDATE products 
+                SET status = CASE 
+                    WHEN (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = products.id) = 0 THEN 'Out of Stock'
+                    WHEN (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = products.id) <= 50 THEN 'Low Stock'
+                    ELSE 'In Stock'
+                END
+                WHERE id = ?
+            ");
 
             // Loop through the validated items, inserting each into the database
             foreach ($validated_items as $item) {
@@ -236,6 +244,8 @@ if ($method === 'POST') {
                 // Reduce the found inventory stock by the ordered quantity
                 if ($inv_id) {
                     $stmt_inv_dec->execute([$qty, $inv_id]);
+                    // Dynamically update product status based on new total stock
+                    $stmt_up_status->execute([$pid]);
                 }
             }
 

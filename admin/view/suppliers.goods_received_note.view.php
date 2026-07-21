@@ -26,6 +26,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $grn_id = $pdo->lastInsertId();
 
         // 2. Update PO line item quantities and Inventory
+        $stmt_up_status = $pdo->prepare("
+            UPDATE products 
+            SET status = CASE 
+                WHEN (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = products.id) = 0 THEN 'Out of Stock'
+                WHEN (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = products.id) <= 50 THEN 'Low Stock'
+                ELSE 'In Stock'
+            END
+            WHERE id = ?
+        ");
         foreach ($qtys_received as $poi_id => $qty_rcvd) {
             $qty_rcvd = (int)$qty_rcvd;
             if ($qty_rcvd <= 0) continue;
@@ -66,6 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 // Log inventory change
                 $log_stmt = $pdo->prepare("INSERT INTO inventory_log (inventory_id, adj_type, qty_before, qty_after, note, admin_id) VALUES (?, 'add', ?, ?, ?, ?)");
                 $log_stmt->execute([$inv_id, $qty_before, $qty_after, "Received via GRN-2025-" . str_pad($grn_id, 4, '0', STR_PAD_LEFT) . " against PO-2025-" . str_pad($po_id, 4, '0', STR_PAD_LEFT), $admin_id]);
+                
+                // Dynamically update product status based on new total stock
+                $stmt_up_status->execute([$item['product_id']]);
             }
         }
 
