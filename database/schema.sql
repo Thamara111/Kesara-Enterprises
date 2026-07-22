@@ -46,7 +46,7 @@ CREATE TABLE products (
   description TEXT,
   moq INT NOT NULL DEFAULT 50,
   base_price DECIMAL(10,2) NOT NULL,
-  status VARCHAR(20) DEFAULT 'In Stock',
+  status ENUM('In Stock', 'Low Stock', 'Out of Stock', 'On Order', 'Discontinued') DEFAULT 'In Stock',
   images VARCHAR(255) DEFAULT NULL,
   deleted_at DATETIME DEFAULT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -95,6 +95,19 @@ CREATE TABLE delivery_personnel (
   status ENUM('available','on_run','day_off','inactive') DEFAULT 'available',
   joined_date DATE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Driver Leaves Table
+CREATE TABLE driver_leaves (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  personnel_id INT NOT NULL,
+  start_date DATE NOT NULL,
+  end_date DATE NOT NULL,
+  reason VARCHAR(255) NOT NULL,
+  status ENUM('pending','approved','rejected') DEFAULT 'pending',
+  notified BOOLEAN DEFAULT FALSE,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (personnel_id) REFERENCES delivery_personnel(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

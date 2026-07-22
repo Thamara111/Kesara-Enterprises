@@ -1,7 +1,7 @@
 <?php
 /**
  * Inventory Pressure Warning Email
- * Sends a warning email to all admins and supplier managers
+ * Sends a warning email to admins, supplier managers, and finance managers
  * with a summary of critical / low-stock / out-of-stock items.
  * Intended to be triggered via cron or an external scheduler.
  */
@@ -48,13 +48,13 @@ if (empty($items)) {
     exit;
 }
 
-// ── 2. Fetch recipients: admin + supplier_manager roles ───────────────────────
+// ── 2. Fetch recipients: admin, supplier_manager, and finance_manager roles ───
 // Get the contact details of the staff responsible for inventory management
 try {
     $recipientStmt = $pdo->prepare("
         SELECT username, email, role
         FROM admins
-        WHERE role IN ('admin', 'supplier_manager')
+        WHERE role IN ('admin', 'supplier_manager', 'finance_manager')
           AND email IS NOT NULL AND email <> ''
     ");
     $recipientStmt->execute();
@@ -66,7 +66,7 @@ try {
 }
 
 if (empty($recipients)) {
-    echo json_encode(['status' => 'error', 'message' => 'No admin or supplier manager email addresses found in the system.']);
+    echo json_encode(['status' => 'error', 'message' => 'No admin, supply manager, or finance manager email addresses found in the system.']);
     exit;
 }
 

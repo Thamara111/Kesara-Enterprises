@@ -280,10 +280,30 @@ if (isset($pdo) && $pdo !== null) {
                 <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Purchase Orders</h1>
                 <p class="text-sm text-gray-500 mt-1">Manage wholesale procurement and supplier shipments</p>
             </div>
+            
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-4 gap-4 p-6">
+            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total</p>
+                <p class="text-2xl font-bold text-gray-900"><?= $total_pos ?></p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-t-4 border-t-blue-500 text-center">
+                <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Sent / Pending</p>
+                <p class="text-2xl font-bold text-gray-900"><?= $sent_pending_count ?></p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-t-4 border-t-amber-500 text-center">
+                <p class="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">Partial Receipt</p>
+                <p class="text-2xl font-bold text-gray-900"><?= $partial_count ?></p>
+            </div>
+            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-t-4 border-t-red-500 text-center">
+                <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Overdue</p>
+                <p class="text-2xl font-bold text-gray-900"><?= $overdue_count ?></p>
+            </div>
+        </div>
             <div class="flex gap-3">
                 <button onclick="downloadPDF('purchase-orders-list-container', 'Purchase_Orders_List')" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
                     <i class="ti ti-download text-lg"></i>
-                    Export / Print List
+                    Export PDF
                 </button>
                 <button onclick="openRaisePOModal()" class="inline-flex items-center gap-2 px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-semibold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
                     <i class="ti ti-plus text-lg"></i>
@@ -303,25 +323,6 @@ if (isset($pdo) && $pdo !== null) {
             </div>
         <?php endif; ?>
 
-        <!-- Stats Grid -->
-        <div class="grid grid-cols-4 gap-4 p-6 bg-gray-50/50">
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total</p>
-                <p class="text-2xl font-bold text-gray-900"><?= $total_pos ?></p>
-            </div>
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-blue-500">
-                <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Sent / Pending</p>
-                <p class="text-2xl font-bold text-gray-900"><?= $sent_pending_count ?></p>
-            </div>
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-amber-500">
-                <p class="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">Partial Receipt</p>
-                <p class="text-2xl font-bold text-gray-900"><?= $partial_count ?></p>
-            </div>
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-l-4 border-l-red-500">
-                <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Overdue</p>
-                <p class="text-2xl font-bold text-gray-900"><?= $overdue_count ?></p>
-            </div>
-        </div>
 
         <!-- Filters Chips -->
         <div class="p-6 border-b border-gray-100 flex items-center gap-2 overflow-x-auto bg-white">
@@ -449,7 +450,7 @@ if (isset($pdo) && $pdo !== null) {
             <!-- Status Timeline Section -->
             <section>
                 <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Status Timeline</h3>
-                <div id="d-timeline" class="space-y-6 pl-4 relative before:absolute before:left-[5.5px] before:top-2 before:bottom-2 before:w-px before:bg-gray-100"></div>
+                <div id="d-timeline" class="space-y-6 pt-4 relative before:absolute before:left-[5.5px] before:top-2 before:bottom-2 before:w-px before:bg-gray-100"></div>
             </section>
         </div>
 

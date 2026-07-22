@@ -65,6 +65,11 @@ if ($method === 'POST') {
                     $stmt = $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?");
                     $stmt->execute([$status, $order_id]);
                     
+                    if ($status === 'delivered') {
+                        $stmt_assign = $pdo->prepare("UPDATE delivery_assignments SET status = 'completed' WHERE order_id = ?");
+                        $stmt_assign->execute([$order_id]);
+                    }
+                    
                     // Generate a human-readable log note based on the new status
                     $note = "Status updated to " . ucfirst($status) . ".";
                     if ($status === 'processing') $note = "Payment accepted — order is now processing.";

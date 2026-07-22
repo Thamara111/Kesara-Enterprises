@@ -86,6 +86,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $error_message = "No database connection.";
             }
         }
+    } elseif ($_POST['action'] === 'request_leave') {
+        $start_date = $_POST['start_date'] ?? '';
+        $end_date = $_POST['end_date'] ?? '';
+        $reason = trim($_POST['reason'] ?? '');
+        $driver_id = $_SESSION['driver_id'] ?? null;
+        
+        if ($driver_id && !empty($start_date) && !empty($end_date) && !empty($reason)) {
+            if ($pdo) {
+                try {
+                    $stmt = $pdo->prepare("INSERT INTO driver_leaves (personnel_id, start_date, end_date, reason, status) VALUES (?, ?, ?, ?, 'pending')");
+                    $stmt->execute([$driver_id, $start_date, $end_date, $reason]);
+                    $success_message = "Day off request submitted successfully.";
+                } catch (\Exception $e) {
+                    $error_message = "Database error: " . $e->getMessage();
+                }
+            } else {
+                $error_message = "No database connection.";
+            }
+        } else {
+            $error_message = "Both dates and reason are required.";
+        }
     }
 }
 
@@ -99,8 +120,22 @@ if (isset($_GET['logout'])) {
 
 $is_logged_in = isset($_SESSION['driver_id']);
 
+$leave_notifications = [];
 $php_assignments = [];
 if ($is_logged_in && isset($pdo) && $pdo !== null) {
+    try {
+        $n_stmt = $pdo->prepare("SELECT id, start_date, end_date, status FROM driver_leaves WHERE personnel_id = ? AND status IN ('approved', 'rejected') AND notified = FALSE");
+        $n_stmt->execute([$_SESSION['driver_id']]);
+        $leave_notifications = $n_stmt->fetchAll();
+        
+        if (!empty($leave_notifications)) {
+            $ids = array_column($leave_notifications, 'id');
+            $inQuery = implode(',', array_fill(0, count($ids), '?'));
+            $up_stmt = $pdo->prepare("UPDATE driver_leaves SET notified = TRUE WHERE id IN ($inQuery)");
+            $up_stmt->execute($ids);
+        }
+    } catch (\Exception $e) {}
+
     try {
         $stmt = $pdo->prepare("SELECT da.id, da.assigned_at, da.status, da.notes,
                                     dp.id AS driver_id, dp.name AS driver_name, dp.vehicle_type, dp.vehicle_number,
@@ -334,9 +369,14 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
                     <p id="driver-vehicle-title" class="text-[10px] text-gray-400 mt-1">Vehicle Info</p>
                 </div>
             </div>
-            <button onclick="logoutDriver()" class="text-gray-400 hover:text-red-400 transition-colors p-1.5" title="Change Profile">
-                <i class="ti ti-logout text-lg"></i>
-            </button>
+            <div class="flex items-center gap-2">
+                <button onclick="openDayOffModal()" class="px-2 py-1 bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold rounded-lg transition-colors border border-white/20">
+                    Day Off
+                </button>
+                <button onclick="logoutDriver()" class="text-gray-400 hover:text-red-400 transition-colors p-1.5" title="Logout">
+                    <i class="ti ti-logout text-lg"></i>
+                </button>
+            </div>
         </header>
 
         <!-- Main Body -->
@@ -430,10 +470,10 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
         <!-- Signature Area -->
         <div class="space-y-1.5">
             <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Customer Signature</label>
-            <div class="h-32 bg-gray-50 border border-gray-200 border-dashed rounded-2xl flex items-center justify-center text-xs text-gray-400 font-medium relative overflow-hidden select-none">
-                <div class="space-y-1 text-center">
+            <div id="signature-pad" class="h-32 bg-gray-50 border border-gray-200 border-dashed rounded-2xl flex items-center justify-center text-xs text-gray-400 font-medium relative overflow-hidden select-none cursor-pointer hover:bg-gray-100 transition-colors" onclick="addSignature()">
+                <div class="space-y-1 text-center" id="signature-placeholder">
                     <i class="ti ti-signature text-2xl text-gray-300"></i>
-                    <p>Signature Pad</p>
+                    <p>Signature Pad (Tap to sign)</p>
                 </div>
             </div>
         </div>
@@ -533,6 +573,43 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
                 <i class="ti ti-truck-delivery mr-1"></i>Depart Now
             </button>
         </div>
+    </div>
+</div>
+
+<!-- Day Off Request Modal -->
+<div id="day-off-modal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
+    <div class="bg-white w-full max-w-[380px] rounded-t-3xl p-6 space-y-5 transform translate-y-full transition-all duration-300">
+        <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto"></div>
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl bg-brand-light flex items-center justify-center flex-shrink-0">
+                <i class="ti ti-calendar-off text-xl text-brand"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-gray-900">Request Day Off</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Submit your leave application</p>
+            </div>
+        </div>
+
+        <form method="POST" class="space-y-4">
+            <input type="hidden" name="action" value="request_leave">
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Date Range</label>
+                <div class="flex items-center gap-2">
+                    <input type="date" name="start_date" required class="w-full px-3 py-2.5 bg-gray-50 border border-transparent rounded-xl text-[11px] font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <span class="text-gray-400 font-bold">-</span>
+                    <input type="date" name="end_date" required class="w-full px-3 py-2.5 bg-gray-50 border border-transparent rounded-xl text-[11px] font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Reason</label>
+                <textarea name="reason" required rows="3" placeholder="Enter reason for leave..." class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 resize-none transition-all"></textarea>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <button type="button" onclick="closeDayOffModal()" class="px-4 py-3 bg-gray-100 hover:bg-gray-150 rounded-xl text-xs font-bold text-gray-700 transition-all">Cancel</button>
+                <button type="submit" class="px-4 py-3 bg-brand text-brand-light hover:opacity-90 rounded-xl text-xs font-bold transition-all shadow-lg shadow-brand/10">Submit Request</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -881,6 +958,24 @@ function closePickupModal() {
     pendingDepartStopNum = null;
 }
 
+function openDayOffModal() {
+    const modal = document.getElementById('day-off-modal');
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    modal.classList.add('opacity-100');
+    const panel = modal.querySelector('div');
+    panel.classList.remove('translate-y-full');
+    panel.classList.add('translate-y-0');
+}
+
+function closeDayOffModal() {
+    const modal = document.getElementById('day-off-modal');
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    modal.classList.remove('opacity-100');
+    const panel = modal.querySelector('div');
+    panel.classList.add('translate-y-full');
+    panel.classList.remove('translate-y-0');
+}
+
 function confirmPickup() {
     const checked = document.getElementById('pickup-confirmed-check').checked;
     if (!checked) {
@@ -943,6 +1038,15 @@ function openConfirmationModal(stopNum) {
     const panel = modal.querySelector('div');
     panel.classList.remove('translate-y-full');
     panel.classList.add('translate-y-0');
+}
+
+function addSignature() {
+    const pad = document.getElementById('signature-pad');
+    if (pad) {
+        pad.innerHTML = '<div class="w-full h-full flex items-center justify-center bg-white"><span style="font-family: \'Brush Script MT\', \'Dancing Script\', cursive, sans-serif; font-size: 2.5rem; color: #1f2937; transform: rotate(-5deg); padding: 10px;">Kesara Ent.</span></div>';
+        pad.classList.remove('cursor-pointer', 'hover:bg-gray-100', 'border-dashed');
+        pad.onclick = null;
+    }
 }
 
 function closeConfirmation() {
@@ -1374,6 +1478,15 @@ window.checkDriverPasswordStrength = function(password) {
 // Init on Load
 document.addEventListener('DOMContentLoaded', () => {
     renderApp();
+<?php if (!empty($leave_notifications)): ?>
+        <?php foreach ($leave_notifications as $notif): ?>
+            <?php 
+            $msg = "Your leave request for {$notif['start_date']} to {$notif['end_date']} has been " . $notif['status'] . "."; 
+            $type = $notif['status'] === 'approved' ? 'success' : 'error';
+            ?>
+            setTimeout(() => showToast(<?= json_encode($msg) ?>, <?= json_encode($type) ?>), 1500);
+        <?php endforeach; ?>
+    <?php endif; ?>
 });
 </script>
 </body>

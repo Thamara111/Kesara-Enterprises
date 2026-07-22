@@ -82,13 +82,13 @@ function getStatusBadgeClass($status) {
             </div>
         <?php else: ?>
             <div class="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <table class="w-full text-left border-collapse">
+                <table class="w-full text-left border-collapse table-fixed">
                     <thead>
                         <tr class="bg-gray-50/50 border-b border-gray-100">
-                            <th class="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">Details</th>
-                            <th class="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">Customer Info</th>
-                            <th class="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">Status</th>
-                            <th class="px-6 py-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">Assigned To</th>
+                            <th class="px-6 py-4 text-[10px] w-5/12 font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">Details</th>
+                            <th class="px-6 py-4 text-[10px] w-3/12 font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">Customer Info</th>
+                            <th class="px-6 py-4 text-[10px] w-2/12 font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">Status</th>
+                            <th class="px-6 py-4 text-[10px] w-2/12 font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">Assigned To</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50">
