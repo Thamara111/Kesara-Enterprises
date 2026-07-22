@@ -8,6 +8,7 @@ require_once __DIR__ . "/database/connection.php";
 $page_mode = isset($_GET['mode']) ? $_GET['mode'] : 'login';
 $success_message = isset($_GET['success']) && $_GET['success'] == 1 ? "Your wholesale account request has been submitted successfully! We will contact you within 24h." : "";
 $error_message = "";
+$warning_message = "";
 $email_error = false;
 $password_error = false;
 
@@ -37,8 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $hashed_pass = password_hash($password, PASSWORD_BCRYPT);
                         $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, business_name, br_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
                         $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $business_type, $address]);
-                        
-                header("Location: ?mode=register&success=1", true, 303);
+
+                        header("Location: ?mode=register&success=1", true, 303);
                         exit;
                     }
                 } catch (\Exception $e) {
@@ -52,18 +53,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($page_mode === 'login') {
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
-        
+
         if (empty($email) || empty($password)) {
             $error_message = "Email and password are required.";
-            if (empty($email)) $email_error = true;
-            if (empty($password)) $password_error = true;
+            if (empty($email))
+                $email_error = true;
+            if (empty($password))
+                $password_error = true;
         } else {
             if ($pdo) {
                 try {
                     $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
                     $stmt->execute([$email]);
                     $user = $stmt->fetch();
-                    
+
                     if ($user && password_verify($password, $user['password'])) {
                         if ($user['status'] === 'approved') {
                             if (session_status() === PHP_SESSION_NONE) {
@@ -72,11 +75,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $_SESSION['user_id'] = $user['id'];
                             $_SESSION['user_email'] = $user['email'];
                             $_SESSION['user_name'] = $user['first_name'] . ' ' . $user['last_name'];
-                            
+
                             header("Location: /account");
                             exit;
                         } else {
-                            $error_message = "Your account is currently " . htmlspecialchars($user['status']) . ".";
+                            if ($user['status'] === 'pending') {
+                                $warning_message = "Your account approval is currently pending. We will notify you once approved.";
+                            } else {
+                                $error_message = "Your account is currently " . htmlspecialchars($user['status']) . ".";
+                            }
                         }
                     } else {
                         $error_message = "Invalid email or password.";
@@ -102,303 +109,341 @@ require_once __DIR__ . "/layouts/head.php";
 
 <main class="bg-gray-950 py-12 min-h-screen flex items-center justify-center">
     <div class="max-w-7xl w-full mx-auto px-6">
-        
+
         <?php if (!empty($success_message)): ?>
-        <!-- SUCCESS STATE -->
-        <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-10 max-w-xl mx-auto text-center space-y-6 animate-in fade-in zoom-in duration-500">
-            <div class="w-20 h-20 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto shadow-md border border-emerald-100">
-                <i class="ti ti-circle-check text-4xl"></i>
+            <!-- SUCCESS STATE -->
+            <div
+                class="bg-white border border-gray-100 rounded-2xl shadow-sm p-10 max-w-xl mx-auto text-center space-y-6 animate-in fade-in zoom-in duration-500">
+                <div
+                    class="w-20 h-20 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto shadow-md border border-emerald-100">
+                    <i class="ti ti-circle-check text-4xl"></i>
+                </div>
+                <div class="space-y-3">
+                    <h2 class="text-2xl font-bold text-gray-900">Application Submitted</h2>
+                    <p class="text-sm font-semibold text-gray-500 leading-relaxed">
+                        <?= htmlspecialchars($success_message) ?>
+                    </p>
+                </div>
+                <div class="pt-4">
+                    <a href="/"
+                        class="inline-block bg-brand text-brand-light font-bold px-8 py-3.5 rounded-xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 text-sm">
+                        Return to Home
+                    </a>
+                </div>
             </div>
-            <div class="space-y-3">
-                <h2 class="text-2xl font-bold text-gray-900">Application Submitted</h2>
-                <p class="text-sm font-semibold text-gray-500 leading-relaxed">
-                    <?= htmlspecialchars($success_message) ?>
-                </p>
-            </div>
-            <div class="pt-4">
-                <a href="/" class="inline-block bg-brand text-brand-light font-bold px-8 py-3.5 rounded-xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 text-sm">
-                    Return to Home
-                </a>
-            </div>
-        </div>
-        
+
         <?php elseif ($page_mode === 'login'): ?>
-        <!-- LOGIN FORM (Split Layout) -->
-        <div class="grid lg:grid-cols-12 gap-12 items-center max-w-6xl mx-auto py-12">
-            <!-- Left Side Welcome Message -->
-            <div class="lg:col-span-6 space-y-6 text-white text-left">
-                <a href="/" class="inline-flex items-center gap-3 mb-4">
-                    <div class="w-10 h-10 rounded-lg bg-brand-light flex items-center justify-center">
-                        <i class="ti ti-building-store text-brand text-xl"></i>
-                    </div>
-                    <span class="text-lg font-bold text-white">Kesara Enterprises</span>
-                </a>
-                <h1 class="text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight">
-                    Welcome to our Wholesale Portal
-                </h1>
-                <p class="text-gray-450 text-base leading-relaxed">
-                    Access premium quality, comfortable innerwear directly in bulk. We supply briefs, boxers, trunks, ladies wear, and children's essentials to local retailers, supermarkets, and distributors across Sri Lanka.
-                </p>
-                <div class="space-y-4 pt-6 border-t border-gray-800">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                            <i class="ti ti-check text-sm"></i>
+            <!-- LOGIN FORM (Split Layout) -->
+            <div class="grid lg:grid-cols-12 gap-12 items-center max-w-6xl mx-auto py-12">
+                <!-- Left Side Welcome Message -->
+                <div class="lg:col-span-6 space-y-6 text-white text-left">
+                    <a href="/" class="inline-flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-lg bg-brand-light flex items-center justify-center">
+                            <i class="ti ti-building-store text-brand text-xl"></i>
                         </div>
-                        <p class="text-sm text-gray-300">Minimum orders starting from 50 units</p>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                            <i class="ti ti-check text-sm"></i>
+                        <span class="text-lg font-bold text-white">Kesara Enterprises</span>
+                    </a>
+                    <h1 class="text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight">
+                        Welcome to our Wholesale Portal
+                    </h1>
+                    <p class="text-gray-450 text-base leading-relaxed">
+                        Access premium quality, comfortable innerwear directly in bulk. We supply briefs, boxers, trunks,
+                        ladies wear, and children's essentials to local retailers, supermarkets, and distributors across Sri
+                        Lanka.
+                    </p>
+                    <div class="space-y-4 pt-6 border-t border-gray-800">
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                                <i class="ti ti-check text-sm"></i>
+                            </div>
+                            <p class="text-sm text-gray-300">Minimum orders starting from 50 units</p>
                         </div>
-                        <p class="text-sm text-gray-300">Fast delivery island-wide across Sri Lanka</p>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
-                            <i class="ti ti-check text-sm"></i>
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                                <i class="ti ti-check text-sm"></i>
+                            </div>
+                            <p class="text-sm text-gray-300">Fast delivery island-wide across Sri Lanka</p>
                         </div>
-                        <p class="text-sm text-gray-300">Dedicated pricing and high margins for retailers</p>
+                        <div class="flex items-center gap-3">
+                            <div
+                                class="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                                <i class="ti ti-check text-sm"></i>
+                            </div>
+                            <p class="text-sm text-gray-300">Dedicated pricing and high margins for retailers</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Side Form -->
+                <div class="lg:col-span-6 bg-white border border-gray-100 rounded-2xl shadow-sm p-8 md:p-10 w-full">
+                    <!-- Branding shown only on smaller screens -->
+                    <a href="/" class="flex items-center gap-3 mb-8 lg:hidden">
+                        <div class="w-10 h-10 rounded-lg bg-brand-light flex items-center justify-center">
+                            <i class="ti ti-building-store text-brand text-xl"></i>
+                        </div>
+                        <span class="text-lg font-bold text-gray-900">Kesara Enterprises</span>
+                    </a>
+
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
+                    <p class="text-sm text-gray-500 mb-8">Sign in to your wholesale account</p>
+
+                    <?php if (!empty($error_message)): ?>
+                        <div
+                            class="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-650 text-xs font-bold flex items-center gap-3">
+                            <i class="ti ti-alert-circle text-lg"></i>
+                            <span><?= htmlspecialchars($error_message) ?></span>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($warning_message)): ?>
+                        <div
+                            class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-bold flex items-center gap-3">
+                            <i class="ti ti-alert-triangle text-lg"></i>
+                            <span><?= htmlspecialchars($warning_message) ?></span>
+                        </div>
+                    <?php endif; ?>
+
+                    <form action="" method="POST" class="space-y-6">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Email address <span
+                                    class="text-red-500">*</span></label>
+                            <div class="relative">
+                                <input type="email" name="email" required placeholder="you@company.com"
+                                    class="w-full px-4 py-3 bg-gray-50 border <?= $email_error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand' ?> rounded-lg focus:ring-2 outline-none transition-all text-sm"
+                                    value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+                                <i class="ti ti-mail absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
+                            </div>
+                            <?php if ($email_error && !empty($error_message)): ?>
+                                <p class="text-red-500 text-xs mt-1"><?= htmlspecialchars($error_message) ?></p>
+                            <?php endif; ?>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <label class="block text-sm font-semibold text-gray-700">Password <span
+                                        class="text-red-500">*</span></label>
+                                <a href="#" class="text-xs font-semibold text-brand hover:underline">Forgot password?</a>
+                            </div>
+                            <div class="relative">
+                                <input type="password" name="password" required placeholder="••••••••"
+                                    class="w-full px-4 py-3 bg-gray-50 border <?= $password_error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand' ?> rounded-lg focus:ring-2 outline-none transition-all text-sm">
+                                <i onclick="togglePasswordVisibility(this)"
+                                    class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer"></i>
+                            </div>
+                            <?php if ($password_error && !empty($error_message)): ?>
+                                <p class="text-red-500 text-xs mt-1"><?= htmlspecialchars($error_message) ?></p>
+                            <?php endif; ?>
+                        </div>
+
+                        <button type="submit"
+                            class="w-full bg-brand text-brand-light font-bold py-3.5 rounded-lg hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg">
+                            Sign in
+                        </button>
+                    </form>
+
+                    <div class="mt-8 pt-8 border-t border-gray-100 text-center">
+                        <p class="text-sm text-gray-500">
+                            New wholesale buyer? <a href="/register" class="text-brand font-bold hover:underline">Request an
+                                account</a>
+                        </p>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Side Form -->
-            <div class="lg:col-span-6 bg-white border border-gray-100 rounded-2xl shadow-sm p-8 md:p-10 w-full">
-                <!-- Branding shown only on smaller screens -->
-                <a href="/" class="flex items-center gap-3 mb-8 lg:hidden">
-                    <div class="w-10 h-10 rounded-lg bg-brand-light flex items-center justify-center">
-                        <i class="ti ti-building-store text-brand text-xl"></i>
-                    </div>
-                    <span class="text-lg font-bold text-gray-900">Kesara Enterprises</span>
-                </a>
-                
-                <h2 class="text-2xl font-bold text-gray-900 mb-2">Welcome back</h2>
-                <p class="text-sm text-gray-500 mb-8">Sign in to your wholesale account</p>
+        <?php else: ?>
+            <!-- REGISTER FORM -->
+            <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-8 md:p-10 max-w-6xl mx-auto">
+                <div class="flex items-center justify-between mb-8">
+                    <a href="/" class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-brand-light flex items-center justify-center">
+                            <i class="ti ti-building-store text-brand text-xl"></i>
+                        </div>
+                        <span class="text-lg font-bold text-gray-900">Kesara Enterprises</span>
+                    </a>
+                    <button class="text-brand font-bold hover:underline" onclick="window.location.href='/'">Back to Shop</button>
+                </div>
+
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">Request wholesale access</h2>
+                <p class="text-sm text-gray-500 mb-8">Your account will be reviewed before activation</p>
 
                 <?php if (!empty($error_message)): ?>
-                <div class="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-650 text-xs font-bold flex items-center gap-3">
-                    <i class="ti ti-alert-circle text-lg"></i>
-                    <span><?= htmlspecialchars($error_message) ?></span>
-                </div>
+                    <div
+                        class="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-650 text-xs font-bold flex items-center gap-3">
+                        <i class="ti ti-alert-circle text-lg"></i>
+                        <span><?= htmlspecialchars($error_message) ?></span>
+                    </div>
                 <?php endif; ?>
 
-                <form action="" method="POST" class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-semibold text-gray-700 mb-2">Email address <span class="text-red-500">*</span></label>
-                        <div class="relative">
-                            <input type="email" name="email" required placeholder="you@company.com" class="w-full px-4 py-3 bg-gray-50 border <?= $email_error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand' ?> rounded-lg focus:ring-2 outline-none transition-all text-sm" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
-                            <i class="ti ti-mail absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
+                <div class="bg-brand-light/50 border border-brand/20 rounded-xl p-4 flex gap-4 mb-8">
+                    <i class="ti ti-info-circle text-brand text-xl shrink-0 mt-0.5"></i>
+                    <p class="text-xs text-brand leading-relaxed">
+                        This platform is for registered businesses only. Personal orders are not accepted.
+                    </p>
+                </div>
+
+                <form id="register-form" action="" method="POST" class="space-y-8">
+                    <div class="grid md:grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                        <!-- Contact Details -->
+                        <div>
+                            <h3
+                                class="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-6 flex items-center gap-4">
+                                Contact Details
+                                <div class="h-px bg-gray-100 flex-1"></div>
+                            </h3>
+
+                            <div class="grid grid-cols-2 gap-4 mb-4">
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700">First name <span
+                                            class="text-red-500">*</span></label>
+                                    <input type="text" name="first_name" required placeholder="Kamal"
+                                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700">Last name <span
+                                            class="text-red-500">*</span></label>
+                                    <input type="text" name="last_name" required placeholder="Perera"
+                                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700">Email address <span
+                                            class="text-red-500">*</span></label>
+                                    <input type="email" name="email" required placeholder="you@company.com"
+                                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700">Phone number <span
+                                            class="text-red-500">*</span></label>
+                                    <input type="tel" id="register-phone" name="phone" required maxlength="13"
+                                        placeholder="+94 77 123 4567"
+                                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
+                                    <div id="phone-warning" class="hidden text-xs text-red-500 mt-1 font-medium">Letters are
+                                        not allowed. Please enter numbers only.</div>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700">WhatsApp number <span
+                                            class="text-red-500">*</span></label>
+                                    <div class="relative">
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-green-500"><i
+                                                class="ti ti-brand-whatsapp text-lg"></i></span>
+                                        <input type="tel" id="register-whatsapp" name="whatsapp_number" required
+                                            maxlength="13" placeholder="+94 77 123 4567"
+                                            class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 outline-none transition-all text-sm">
+                                    </div>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700">Password <span
+                                            class="text-red-500">*</span></label>
+                                    <div class="relative">
+                                        <input type="password" id="register-password" name="password" required minlength="8"
+                                            placeholder="Min. 8 characters"
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm"
+                                            oninput="checkPasswordStrength(this.value)">
+                                        <i onclick="togglePasswordVisibility(this)"
+                                            class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer"></i>
+                                    </div>
+                                    <!-- Strength bar -->
+                                    <div class="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                        <div id="strengthBar"
+                                            class="h-full rounded-full transition-all duration-300 w-0 bg-gray-300"></div>
+                                    </div>
+                                    <p id="strengthLabel" class="text-xs mt-1 text-gray-400"></p>
+                                </div>
+                            </div>
                         </div>
-                        <?php if ($email_error && !empty($error_message)): ?>
-                            <p class="text-red-500 text-xs mt-1"><?= htmlspecialchars($error_message) ?></p>
-                        <?php endif; ?>
+
+                        <!-- Business Info -->
+                        <div class="border-l-2 pl-6 border-gray-200">
+                            <h3
+                                class="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-6 flex items-center gap-4">
+                                Business Information
+                                <div class="h-px bg-gray-100 flex-1"></div>
+                            </h3>
+
+                            <div class="space-y-4">
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700">Business name <span
+                                            class="text-red-500">*</span></label>
+                                    <input type="text" name="business_name" required placeholder="ABC Garments (Pvt) Ltd"
+                                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="space-y-2">
+                                        <label class="block text-sm font-semibold text-gray-700">BR Number <span
+                                                class="text-red-500">*</span></label>
+                                        <input type="text" name="br_number" required placeholder="PV 12345"
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="block text-sm font-semibold text-gray-700">Business type <span
+                                                class="text-red-500">*</span></label>
+                                        <select name="business_type" required
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm appearance-none">
+                                            <option value="">Select type</option>
+                                            <option>Retailer</option>
+                                            <option>Distributor</option>
+                                            <option>Supermarket</option>
+                                            <option>Exporter</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="space-y-2">
+                                    <label class="block text-sm font-semibold text-gray-700">Address <span
+                                            class="text-red-500">*</span></label>
+                                    <textarea name="address" required rows="2" placeholder="No. 12, Main Street, Colombo 03"
+                                        class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm resize-none"></textarea>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div>
-                        <div class="flex justify-between mb-2">
-                            <label class="block text-sm font-semibold text-gray-700">Password <span class="text-red-500">*</span></label>
-                            <a href="#" class="text-xs font-semibold text-brand hover:underline">Forgot password?</a>
-                        </div>
-                        <div class="relative">
-                            <input type="password" name="password" required placeholder="••••••••" class="w-full px-4 py-3 bg-gray-50 border <?= $password_error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand' ?> rounded-lg focus:ring-2 outline-none transition-all text-sm">
-                            <i class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer"></i>
-                        </div>
-                        <?php if ($password_error && !empty($error_message)): ?>
-                            <p class="text-red-500 text-xs mt-1"><?= htmlspecialchars($error_message) ?></p>
-                        <?php endif; ?>
+                    <div class="flex items-start gap-3">
+                        <input type="checkbox" id="terms" required
+                            class="mt-1 rounded text-brand focus:ring-brand border-gray-300">
+                        <label for="terms" class="text-xs text-gray-500 leading-relaxed">
+                            I confirm this is a registered business and I agree to the <a href="#"
+                                class="text-brand font-semibold hover:underline">wholesale terms and conditions</a>.
+                        </label>
                     </div>
 
-                    <button type="submit" class="w-full bg-brand text-brand-light font-bold py-3.5 rounded-lg hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg">
-                        Sign in
+                    <button type="submit"
+                        class="w-full bg-brand text-brand-light font-bold py-3.5 rounded-lg hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg">
+                        Submit application
                     </button>
                 </form>
 
                 <div class="mt-8 pt-8 border-t border-gray-100 text-center">
                     <p class="text-sm text-gray-500">
-                        New wholesale buyer? <a href="/register" class="text-brand font-bold hover:underline">Request an account</a>
+                        Already have an account? <a href="/login" class="text-brand font-bold hover:underline">Sign in</a>
                     </p>
                 </div>
             </div>
-        </div>
-
-        <?php else: ?>
-        <!-- REGISTER FORM -->
-        <div class="bg-white border border-gray-100 rounded-2xl shadow-sm p-8 md:p-10 max-w-6xl mx-auto">
-            <a href="/" class="flex items-center gap-3 mb-8">
-                <div class="w-10 h-10 rounded-lg bg-brand-light flex items-center justify-center">
-                    <i class="ti ti-building-store text-brand text-xl"></i>
-                </div>
-                <span class="text-lg font-bold text-gray-900">Kesara Enterprises</span>
-            </a>
-            
-            <h2 class="text-2xl font-bold text-gray-900 mb-2">Request wholesale access</h2>
-            <p class="text-sm text-gray-500 mb-8">Your account will be reviewed before activation</p>
-
-            <?php if (!empty($error_message)): ?>
-            <div class="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-650 text-xs font-bold flex items-center gap-3">
-                <i class="ti ti-alert-circle text-lg"></i>
-                <span><?= htmlspecialchars($error_message) ?></span>
-            </div>
-            <?php endif; ?>
-
-            <div class="bg-brand-light/50 border border-brand/20 rounded-xl p-4 flex gap-4 mb-8">
-                <i class="ti ti-info-circle text-brand text-xl shrink-0 mt-0.5"></i>
-                <p class="text-xs text-brand leading-relaxed">
-                    This platform is for registered businesses only. Personal orders are not accepted.
-                </p>
-            </div>
-
-            <form id="register-form" action="" method="POST" class="space-y-8">
-                <!-- Contact Details -->
-                <div>
-                    <h3 class="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-6 flex items-center gap-4">
-                        Contact Details
-                        <div class="h-px bg-gray-100 flex-1"></div>
-                    </h3>
-                    
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div class="space-y-2">
-                            <label class="block text-sm font-semibold text-gray-700">First name <span class="text-red-500">*</span></label>
-                            <input type="text" name="first_name" required placeholder="Kamal" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="block text-sm font-semibold text-gray-700">Last name <span class="text-red-500">*</span></label>
-                            <input type="text" name="last_name" required placeholder="Perera" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div class="space-y-2">
-                            <label class="block text-sm font-semibold text-gray-700">Email address <span class="text-red-500">*</span></label>
-                            <input type="email" name="email" required placeholder="you@company.com" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="block text-sm font-semibold text-gray-700">Phone number <span class="text-red-500">*</span></label>
-                            <input type="tel" id="register-phone" name="phone" required maxlength="13" placeholder="+94 77 123 4567" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
-                            <div id="phone-warning" class="hidden text-xs text-red-500 mt-1 font-medium">Letters are not allowed. Please enter numbers only.</div>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="block text-sm font-semibold text-gray-700">WhatsApp number <span class="text-red-500">*</span></label>
-                            <div class="relative">
-                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-green-500"><i class="ti ti-brand-whatsapp text-lg"></i></span>
-                                <input type="tel" id="register-whatsapp" name="whatsapp_number" required maxlength="13" placeholder="+94 77 123 4567" class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 outline-none transition-all text-sm">
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="block text-sm font-semibold text-gray-700">Password <span class="text-red-500">*</span></label>
-                            <div class="relative">
-                                <input type="password" id="register-password" name="password" required minlength="8" placeholder="Min. 8 characters" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm" oninput="checkPasswordStrength(this.value)">
-                                <i class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer"></i>
-                            </div>
-                            <!-- Strength bar -->
-                            <div class="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                                <div id="strengthBar" class="h-full rounded-full transition-all duration-300 w-0 bg-gray-300"></div>
-                            </div>
-                            <p id="strengthLabel" class="text-xs mt-1 text-gray-400"></p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Business Info -->
-                <div>
-                    <h3 class="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-6 flex items-center gap-4">
-                        Business Information
-                        <div class="h-px bg-gray-100 flex-1"></div>
-                    </h3>
-
-                    <div class="space-y-6">
-                        <div class="space-y-2">
-                            <label class="block text-sm font-semibold text-gray-700">Business name <span class="text-red-500">*</span></label>
-                            <input type="text" name="business_name" required placeholder="ABC Garments (Pvt) Ltd" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="space-y-2">
-                                <label class="block text-sm font-semibold text-gray-700">BR Number <span class="text-red-500">*</span></label>
-                                <input type="text" name="br_number" required placeholder="PV 12345" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
-                            </div>
-                            <div class="space-y-2">
-                                <label class="block text-sm font-semibold text-gray-700">Business type <span class="text-red-500">*</span></label>
-                                <select name="business_type" required class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm appearance-none">
-                                    <option value="">Select type</option>
-                                    <option>Retailer</option>
-                                    <option>Distributor</option>
-                                    <option>Supermarket</option>
-                                    <option>Exporter</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="block text-sm font-semibold text-gray-700">Address <span class="text-red-500">*</span></label>
-                            <textarea name="address" required rows="2" placeholder="No. 12, Main Street, Colombo 03" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm resize-none"></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex items-start gap-3">
-                    <input type="checkbox" id="terms" required class="mt-1 rounded text-brand focus:ring-brand border-gray-300">
-                    <label for="terms" class="text-xs text-gray-500 leading-relaxed">
-                        I confirm this is a registered business and I agree to the <a href="#" class="text-brand font-semibold hover:underline">wholesale terms and conditions</a>.
-                    </label>
-                </div>
-
-                <button type="submit" class="w-full bg-brand text-brand-light font-bold py-3.5 rounded-lg hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg">
-                    Submit application
-                </button>
-            </form>
-
-            <div class="mt-8 pt-8 border-t border-gray-100 text-center">
-                <p class="text-sm text-gray-500">
-                    Already have an account? <a href="/login" class="text-brand font-bold hover:underline">Sign in</a>
-                </p>
-            </div>
-        </div>
         <?php endif; ?>
 
     </div>
 </main>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const phoneInput = document.getElementById('register-phone');
-    const phoneWarning = document.getElementById('phone-warning');
-
-    let phoneTimeout;
-    if (phoneInput && phoneWarning) {
-        phoneInput.addEventListener('input', function() {
-            const val = this.value;
-            // Allow numbers and optionally '+'
-            if (/[^0-9+]/.test(val)) {
-                phoneWarning.classList.remove('hidden');
-                this.value = val.replace(/[^0-9+]/g, '');
-                
-                clearTimeout(phoneTimeout);
-                phoneTimeout = setTimeout(() => {
-                    phoneWarning.classList.add('hidden');
-                }, 2000);
-            }
-        });
-    }
-
-    // Password Visibility Toggle
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('ti-eye') || e.target.classList.contains('ti-eye-off')) {
-            const icon = e.target;
-            const input = icon.previousElementSibling;
-            if (input && input.tagName === 'INPUT') {
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    icon.classList.remove('ti-eye');
-                    icon.classList.add('ti-eye-off');
-                } else {
-                    input.type = 'password';
-                    icon.classList.remove('ti-eye-off');
-                    icon.classList.add('ti-eye');
-                }
+    window.togglePasswordVisibility = function(icon) {
+        const input = icon.previousElementSibling;
+        if (input && input.tagName === 'INPUT') {
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('ti-eye');
+                icon.classList.add('ti-eye-off');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('ti-eye-off');
+                icon.classList.add('ti-eye');
             }
         }
-    });
+    };
 
-    // Password Strength Checker
-    window.checkPasswordStrength = function(password) {
+    window.checkPasswordStrength = function (password) {
         const bar = document.getElementById('strengthBar');
         const label = document.getElementById('strengthLabel');
         if (!bar || !label) return;
@@ -444,7 +489,7 @@ document.addEventListener('DOMContentLoaded', function() {
         bar.style.width = width;
         bar.className = "h-full rounded-full transition-all duration-300 " + colorClass;
         label.textContent = text;
-        
+
         if (colorClass === 'bg-red-500') {
             label.className = "text-xs mt-1 text-red-500 font-semibold";
         } else if (colorClass === 'bg-orange-500') {
@@ -456,38 +501,63 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // Hook AJAX Submit for Registration
-    const registerForm = document.getElementById('register-form');
-    if (registerForm) {
-        registerForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            const btn = this.querySelector('button[type="submit"]');
-            btn.disabled = true;
-            btn.textContent = 'Submitting Request...';
+    function initAuthForm() {
+        const phoneInput = document.getElementById('register-phone');
+        const phoneWarning = document.getElementById('phone-warning');
 
-            fetch('api/register.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    window.location.search = '?success=1';
-                } else {
-                    showToast(data.message || 'Error requesting account.', 'error');
-                    btn.disabled = false;
-                    btn.textContent = 'Submit Request';
+        let phoneTimeout;
+        if (phoneInput && phoneWarning && !phoneInput.dataset.initialized) {
+            phoneInput.dataset.initialized = 'true';
+            phoneInput.addEventListener('input', function () {
+                const val = this.value;
+                if (/[^0-9+]/.test(val)) {
+                    phoneWarning.classList.remove('hidden');
+                    this.value = val.replace(/[^0-9+]/g, '');
+
+                    clearTimeout(phoneTimeout);
+                    phoneTimeout = setTimeout(() => {
+                        phoneWarning.classList.add('hidden');
+                    }, 2000);
                 }
-            })
-            .catch(err => {
-                console.error(err);
-                showToast('Network error occurred.', 'error');
-                btn.disabled = false;
-                btn.textContent = 'Submit Request';
             });
-        });
-    }
-});
-</script>
+        }
 
+        const registerForm = document.getElementById('register-form');
+        if (registerForm && !registerForm.dataset.initialized) {
+            registerForm.dataset.initialized = 'true';
+            registerForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const formData = new FormData(this);
+                const btn = this.querySelector('button[type="submit"]');
+                btn.disabled = true;
+                btn.textContent = 'Submitting Request...';
+
+                fetch('api/register.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            window.location.search = '?success=1';
+                        } else {
+                            if(typeof showToast === 'function') showToast(data.message || 'Error requesting account.', 'error');
+                            btn.disabled = false;
+                            btn.textContent = 'Submit application';
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        if(typeof showToast === 'function') showToast('Network error occurred.', 'error');
+                        btn.disabled = false;
+                        btn.textContent = 'Submit application';
+                    });
+            });
+        }
+    }
+
+    initAuthForm();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAuthForm);
+    }
+</script>

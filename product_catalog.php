@@ -6,11 +6,32 @@
  */
 require_once __DIR__ . "/database/connection.php";
 
+$is_ajax = isset($_GET['ajax']) && $_GET['ajax'] == '1';
+$can_see_prices = false;
+
+if ($is_ajax) {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    $is_logged_in = isset($_SESSION['user_id']);
+    $buyer_approved = false;
+    if ($is_logged_in && isset($pdo)) {
+        try {
+            $auth_stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? LIMIT 1");
+            $auth_stmt->execute([$_SESSION['user_id']]);
+            $auth_user = $auth_stmt->fetch();
+            if ($auth_user && $auth_user['status'] === 'approved') {
+                $buyer_approved = true;
+            }
+        } catch (\Exception $e) {}
+    }
+    $can_see_prices = $is_logged_in && $buyer_approved;
+}
+
 $filter_search   = trim($_GET['search']   ?? '');
 $filter_category = trim($_GET['category'] ?? '');
 $filter_sizes    = isset($_GET['sizes']) && is_array($_GET['sizes']) ? array_map('trim', $_GET['sizes']) : [];
 $filter_stock    = isset($_GET['stock']) && is_array($_GET['stock'])  ? array_map('trim', $_GET['stock'])  : [];
-$filter_moq      = is_numeric($_GET['moq'] ?? '') ? (int)$_GET['moq'] : null;
 $filter_sort     = $_GET['sort'] ?? 'newest';
 
 $all_categories = [];
@@ -43,7 +64,6 @@ if ($pdo) {
                 $params2   = array_merge($params2, $status_vals);
             }
         }
-        if ($filter_moq !== null) { $where2[] = "p.moq >= ?"; $params2[] = $filter_moq; }
         $size_join2 = '';
         if (!empty($filter_sizes)) {
             $size_join2 = "INNER JOIN inventory inv ON inv.product_id = p.id";
@@ -52,7 +72,7 @@ if ($pdo) {
         }
         $order_map = ['newest'=>'p.created_at DESC','price_asc'=>'p.base_price ASC','price_desc'=>'p.base_price DESC','alpha'=>'p.name ASC'];
         $order = $order_map[$filter_sort] ?? 'p.created_at DESC';
-        $sql2 = "SELECT DISTINCT p.name, p.sku, p.moq, p.base_price AS price, p.status, p.images, c.name AS category_name, c.slug AS category_slug
+        $sql2 = "SELECT DISTINCT p.name, p.sku, p.base_price AS price, p.status, p.images, c.name AS category_name, c.slug AS category_slug
                  FROM products p LEFT JOIN categories c ON c.id = p.category_id $size_join2
                  WHERE " . implode(' AND ', $where2) . " ORDER BY $order";
         $stmt = $pdo->prepare($sql2);
@@ -80,9 +100,12 @@ function catalog_url(array $overrides=[], array $remove=[]): string {
 
 $all_sizes = ['XS','S','M','L','XL','XXL'];
 $page_meta = ['title'=>'Product Catalog | Kesara Enterprises','description'=>'Browse our extensive range of quality innerwear for wholesale orders.'];
-require_once __DIR__."/layouts/head.php";
-require_once __DIR__."/layouts/header.php";
-?><main class="bg-gray-50 py-12 min-h-screen">
+
+if (!$is_ajax) {
+    require_once __DIR__."/layouts/head.php";
+    require_once __DIR__."/layouts/header.php";
+?>
+<main class="bg-gray-50 py-12 min-h-screen">
   <div class="max-w-8xl mx-auto px-6 md:px-12">
     <div class="mb-10">
       <h1 class="text-3xl font-bold text-gray-900 mb-2">Product Catalog</h1>
@@ -159,16 +182,6 @@ require_once __DIR__."/layouts/header.php";
             </div>
           </div>
 
-          <!-- MOQ -->
-          <div class="pt-4">
-            <label class="block text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Min. Order Qty (MOQ)</label>
-            <div class="flex gap-2">
-              <input type="number" name="moq" placeholder="Min. units" min="0"
-                     value="<?php echo $filter_moq!==null?$filter_moq:''; ?>"
-                     class="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-lg text-sm outline-none focus:ring-1 focus:ring-brand">
-              <button type="submit" class="px-3 py-2.5 bg-brand text-white rounded-lg text-xs font-bold hover:opacity-90 transition-opacity shrink-0">Go</button>
-            </div>
-          </div>
         </div>
         </form>
       </aside>
@@ -181,7 +194,6 @@ require_once __DIR__."/layouts/header.php";
           <input type="hidden" name="category" value="<?php echo htmlspecialchars($filter_category); ?>">
           <?php foreach ($filter_sizes as $sz): ?><input type="hidden" name="sizes[]" value="<?php echo htmlspecialchars($sz); ?>"><?php endforeach; ?>
           <?php foreach ($filter_stock as $st): ?><input type="hidden" name="stock[]" value="<?php echo htmlspecialchars($st); ?>"><?php endforeach; ?>
-          <?php if ($filter_moq!==null): ?><input type="hidden" name="moq" value="<?php echo $filter_moq; ?>"><?php endif; ?>
           <div class="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
             <div class="flex items-center gap-3 w-full md:w-96">
               <button type="button" id="open-filters" class="lg:hidden px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold text-gray-600 flex items-center gap-2 hover:bg-gray-100 transition-all shrink-0">
@@ -208,9 +220,13 @@ require_once __DIR__."/layouts/header.php";
           </div>
         </form>
 
+<?php } // End of if (!$is_ajax) ?>
         <!-- ACTIVE FILTERS -->
+<?php if (!$is_ajax): ?>
+        <div id="product-list-container" class="flex flex-col gap-6">
+<?php endif; ?>
         <?php
-        $has_active = $filter_search!==''||$filter_category!==''||!empty($filter_sizes)||!empty($filter_stock)||$filter_moq!==null;
+        $has_active = $filter_search!==''||$filter_category!==''||!empty($filter_sizes)||!empty($filter_stock);
         if ($has_active):
         ?>
         <div class="flex items-center gap-3 flex-wrap">
@@ -235,11 +251,6 @@ require_once __DIR__."/layouts/header.php";
           <?php $slbl=['in_stock'=>'In Stock','low_stock'=>'Low Stock','on_order'=>'On Order']; ?>
           <a href="<?php echo catalog_url([],['stock']); ?>" class="px-3 py-1 bg-brand-light text-brand text-[11px] font-bold rounded-full flex items-center gap-2 border border-brand/10 shadow-sm hover:opacity-80 transition-opacity">
             Stock: <?php echo implode(', ',array_map(fn($k)=>$slbl[$k]??$k,$filter_stock)); ?> <i class="ti ti-x"></i>
-          </a>
-          <?php endif; ?>
-          <?php if ($filter_moq!==null): ?>
-          <a href="<?php echo catalog_url([],['moq']); ?>" class="px-3 py-1 bg-brand-light text-brand text-[11px] font-bold rounded-full flex items-center gap-2 border border-brand/10 shadow-sm hover:opacity-80 transition-opacity">
-            MOQ &ge; <?php echo $filter_moq; ?> pcs <i class="ti ti-x"></i>
           </a>
           <?php endif; ?>
           <a href="?" class="text-xs text-gray-400 hover:text-brand font-semibold underline transition-colors">Clear all</a>
@@ -294,10 +305,6 @@ require_once __DIR__."/layouts/header.php";
                     <?php endif; ?>
                   </p>
                 </div>
-                <div class="text-right">
-                  <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Min Order</p>
-                  <p class="text-[12px] font-bold text-gray-600"><?php echo htmlspecialchars($p['moq']); ?> pcs</p>
-                </div>
               </div>
             </div>
           </a>
@@ -313,35 +320,39 @@ require_once __DIR__."/layouts/header.php";
           $prev_disabled=$current_page<=1;
           ?>
           <a href="<?php echo $prev_disabled?'#':$purl($current_page-1); ?>"
-             class="w-10 h-10 rounded-xl flex items-center justify-center border border-gray-100 bg-white shadow-sm <?php echo $prev_disabled?'opacity-40 cursor-not-allowed pointer-events-none':'hover:bg-brand hover:text-white transition-all'; ?>"
+             class="page-link w-10 h-10 rounded-xl flex items-center justify-center border border-gray-100 bg-white shadow-sm <?php echo $prev_disabled?'opacity-40 cursor-not-allowed pointer-events-none':'hover:bg-brand hover:text-white transition-all'; ?>"
              <?php echo $prev_disabled?'aria-disabled="true"':''; ?>>
             <i class="ti ti-chevron-left"></i>
           </a>
           <?php
           $window=2; $ps=max(1,$current_page-$window); $pe=min($total_pages,$current_page+$window);
           if ($ps>1): ?>
-            <a href="<?php echo $purl(1); ?>" class="w-10 h-10 rounded-xl flex items-center justify-center bg-white border border-gray-100 hover:border-brand hover:text-brand font-bold transition-all shadow-sm">1</a>
+            <a href="<?php echo $purl(1); ?>" class="page-link w-10 h-10 rounded-xl flex items-center justify-center bg-white border border-gray-100 hover:border-brand hover:text-brand font-bold transition-all shadow-sm">1</a>
             <?php if ($ps>2): ?><span class="w-10 h-10 flex items-center justify-center text-gray-400 font-bold">&hellip;</span><?php endif; ?>
           <?php endif; ?>
           <?php for ($pg=$ps;$pg<=$pe;$pg++): ?>
             <?php if ($pg===$current_page): ?>
               <span class="w-10 h-10 rounded-xl flex items-center justify-center bg-brand text-white font-bold shadow-md"><?php echo $pg; ?></span>
             <?php else: ?>
-              <a href="<?php echo $purl($pg); ?>" class="w-10 h-10 rounded-xl flex items-center justify-center bg-white border border-gray-100 hover:border-brand hover:text-brand font-bold transition-all shadow-sm"><?php echo $pg; ?></a>
+              <a href="<?php echo $purl($pg); ?>" class="page-link w-10 h-10 rounded-xl flex items-center justify-center bg-white border border-gray-100 hover:border-brand hover:text-brand font-bold transition-all shadow-sm"><?php echo $pg; ?></a>
             <?php endif; ?>
           <?php endfor; ?>
           <?php if ($pe<$total_pages): ?>
             <?php if ($pe<$total_pages-1): ?><span class="w-10 h-10 flex items-center justify-center text-gray-400 font-bold">&hellip;</span><?php endif; ?>
-            <a href="<?php echo $purl($total_pages); ?>" class="w-10 h-10 rounded-xl flex items-center justify-center bg-white border border-gray-100 hover:border-brand hover:text-brand font-bold transition-all shadow-sm"><?php echo $total_pages; ?></a>
+            <a href="<?php echo $purl($total_pages); ?>" class="page-link w-10 h-10 rounded-xl flex items-center justify-center bg-white border border-gray-100 hover:border-brand hover:text-brand font-bold transition-all shadow-sm"><?php echo $total_pages; ?></a>
           <?php endif; ?>
           <?php $next_disabled=$current_page>=$total_pages; ?>
           <a href="<?php echo $next_disabled?'#':$purl($current_page+1); ?>"
-             class="w-10 h-10 rounded-xl flex items-center justify-center border border-gray-100 bg-white shadow-sm <?php echo $next_disabled?'opacity-40 cursor-not-allowed pointer-events-none':'hover:bg-brand hover:text-white transition-all'; ?>"
+             class="page-link w-10 h-10 rounded-xl flex items-center justify-center border border-gray-100 bg-white shadow-sm <?php echo $next_disabled?'opacity-40 cursor-not-allowed pointer-events-none':'hover:bg-brand hover:text-white transition-all'; ?>"
              <?php echo $next_disabled?'aria-disabled="true"':''; ?>>
             <i class="ti ti-chevron-right"></i>
           </a>
         </div>
         <?php endif; ?>
+<?php if (!$is_ajax): ?>
+        </div>
+<?php endif; ?>
+        <?php if ($is_ajax) exit; ?>
 
       </div>
     </div>
@@ -357,11 +368,137 @@ require_once __DIR__."/layouts/header.php";
   if(openFiltersBtn) openFiltersBtn.addEventListener('click',toggleFilters);
   if(closeFiltersBtn) closeFiltersBtn.addEventListener('click',toggleFilters);
   if(filtersBackdrop) filtersBackdrop.addEventListener('click',toggleFilters);
-  const searchInput=document.getElementById('search-input');
-  if(searchInput){searchInput.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();document.getElementById('topbar-form').submit();}});}
-  const sortSel=document.querySelector('#topbar-form select[name="sort"]');
-  const sortHidden=document.querySelector('#filter-form input[name="sort"]');
-  if(sortSel&&sortHidden){sortSel.addEventListener('change',function(){sortHidden.value=sortSel.value;});}
+
+  const searchInput = document.getElementById('search-input');
+  const sortSel = document.querySelector('#topbar-form select[name="sort"]');
+  const filterForm = document.getElementById('filter-form');
+  const topbarForm = document.getElementById('topbar-form');
+  const container = document.getElementById('product-list-container');
+
+  function updateProducts(url) {
+      if(container) container.style.opacity = '0.5';
+      const fetchUrl = url + (url.includes('?') ? '&' : '?') + 'ajax=1';
+      fetch(fetchUrl)
+          .then(res => res.text())
+          .then(html => {
+              if(container) {
+                  container.innerHTML = html;
+                  container.style.opacity = '1';
+              }
+              window.history.pushState({}, '', url);
+          })
+          .catch(err => {
+              console.error(err);
+              if(container) container.style.opacity = '1';
+          });
+  }
+
+  function getCurrentParams() {
+      const params = new URLSearchParams();
+      
+      const activeCatBtn = document.querySelector('#filter-form button[name="category"].bg-brand');
+      if (activeCatBtn && activeCatBtn.value) {
+          params.set('category', activeCatBtn.value);
+      }
+      
+      const sizeChecks = document.querySelectorAll('#filter-form input[name="sizes[]"]:checked');
+      sizeChecks.forEach(cb => params.append('sizes[]', cb.value));
+      
+      const stockChecks = document.querySelectorAll('#filter-form input[name="stock[]"]:checked');
+      stockChecks.forEach(cb => params.append('stock[]', cb.value));
+      
+      if (searchInput && searchInput.value) {
+          params.set('search', searchInput.value);
+      }
+      
+      if (sortSel && sortSel.value) {
+          params.set('sort', sortSel.value);
+      }
+      
+      return params;
+  }
+
+  const catBtns = document.querySelectorAll('#filter-form button[name="category"]');
+  catBtns.forEach(btn => {
+      btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          catBtns.forEach(b => {
+              b.className = "px-3 py-1.5 rounded-full text-xs font-semibold transition-colors bg-gray-50 text-gray-600 border border-gray-100 hover:border-brand hover:text-brand";
+          });
+          this.className = "px-3 py-1.5 rounded-full text-xs font-semibold transition-colors bg-brand text-white";
+          
+          let catHidden = topbarForm.querySelector('input[name="category"]');
+          if (catHidden) catHidden.value = this.value;
+          
+          const params = getCurrentParams();
+          updateProducts('?' + params.toString());
+      });
+  });
+
+  if(filterForm) {
+      filterForm.addEventListener('change', function(e) {
+          if(e.target.tagName === 'INPUT' && (e.target.type === 'checkbox' || e.target.type === 'number')) {
+              const params = getCurrentParams();
+              updateProducts('?' + params.toString());
+          }
+      });
+
+      filterForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          const params = getCurrentParams();
+          updateProducts('?' + params.toString());
+      });
+  }
+
+  let searchTimeout;
+  if(searchInput) {
+      searchInput.addEventListener('input', function(e) {
+          clearTimeout(searchTimeout);
+          searchTimeout = setTimeout(() => {
+              const params = getCurrentParams();
+              updateProducts('?' + params.toString());
+          }, 300);
+      });
+      searchInput.addEventListener('keydown', function(e) {
+          if(e.key === 'Enter') {
+              e.preventDefault();
+              clearTimeout(searchTimeout);
+              const params = getCurrentParams();
+              updateProducts('?' + params.toString());
+          }
+      });
+  }
+
+  if(sortSel) {
+      sortSel.addEventListener('change', function(e) {
+          const params = getCurrentParams();
+          updateProducts('?' + params.toString());
+      });
+  }
+  
+  if (topbarForm) {
+      topbarForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          const params = getCurrentParams();
+          updateProducts('?' + params.toString());
+      });
+  }
+
+  document.addEventListener('click', function(e) {
+      const link = e.target.closest('a.page-link');
+      if(link) {
+          e.preventDefault();
+          const url = link.getAttribute('href');
+          if(url && url !== '#') {
+              updateProducts(url);
+          }
+      }
+  });
+
+  window.addEventListener('popstate', function() {
+      // Allow browser back button to reload the page to restore filters state fully
+      window.location.reload();
+  });
 </script>
 
 <?php require_once __DIR__."/layouts/footer.php"; ?>

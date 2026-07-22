@@ -117,7 +117,7 @@ require_once __DIR__ . "/layouts/header.php";
                 <div>
                     <span class="text-[10px] font-medium tracking-wider text-gray-400 uppercase mb-1.5 block">Featured
                         products</span>
-                    <h2 class="text-2xl md:text-3xl font-bold text-gray-900">Best sellers this season</h2>
+                    <h2 class="text-2xl md:text-3xl font-bold text-gray-900">Best Selling Items</h2>
                 </div>
                 <a href="/catalog"
                     class="bg-transparent text-gray-900 border border-gray-300 py-2 px-6 rounded-md text-sm font-medium hover:bg-gray-50 hover:border-brand hover:text-brand transition-all transform hover:-translate-y-px">View
