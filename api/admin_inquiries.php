@@ -28,6 +28,9 @@ if ($method !== 'POST') {
 
 // Decode the JSON body containing the action and inquiry ID
 $input = json_decode(file_get_contents("php://input"), true);
+if (empty($input)) {
+    $input = $_POST;
+}
 $action = $input['action'] ?? '';
 $id = (int)($input['id'] ?? 0);
 
@@ -92,6 +95,61 @@ elseif ($action === 'update_status') {
         echo json_encode(["status" => "error", "message" => "Database error."]);
     }
 } 
+// Handle sending an email reply to the customer
+elseif ($action === 'send_reply') {
+    $to_email = $input['to_email'] ?? '';
+    $subject = $input['subject'] ?? '';
+    $message = $input['message'] ?? '';
+    $new_status = $input['new_status'] ?? '';
+    
+    if (empty($to_email) || empty($subject) || empty($message)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "All fields are required."]);
+        exit;
+    }
+    
+    // Determine the current user's role and ID to check permissions
+    $role = $_SESSION['admin_role'] ?? '';
+    $user_id = $_SESSION['admin_id'];
+    
+    if (!in_array($role, ['admin', 'finance_manager'])) {
+        $check = $pdo->prepare("SELECT id FROM inquiries WHERE id = ? AND assigned_to = ?");
+        $check->execute([$id, $user_id]);
+        if (!$check->fetch()) {
+            http_response_code(403);
+            echo json_encode(["status" => "error", "message" => "You don't have permission to reply to this inquiry."]);
+            exit;
+        }
+    }
+    
+    require_once __DIR__ . '/../src/Mailer.php';
+    
+    // Convert newlines to <br> for HTML email
+    $html_message = nl2br(htmlspecialchars($message));
+    
+    $attachment = null;
+    if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
+        $attachment = $_FILES['attachment'];
+    }
+    
+    $sent = \App\Mailer::send($to_email, $subject, $html_message, $attachment);
+    
+    if ($sent) {
+        // Update status if requested
+        if (in_array($new_status, ['in_progress', 'resolved'])) {
+            try {
+                $stmt = $pdo->prepare("UPDATE inquiries SET status = ? WHERE id = ?");
+                $stmt->execute([$new_status, $id]);
+            } catch (\Exception $e) {
+                // Ignore DB error for status if email sent successfully
+            }
+        }
+        echo json_encode(["status" => "success", "message" => "Reply sent successfully."]);
+    } else {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "Failed to send email."]);
+    }
+}
 // Invalid action provided
 else {
     http_response_code(400);

@@ -37,7 +37,8 @@ if (isset($pdo) && $pdo !== null) {
         $all_categories = $cat_stmt->fetchAll();
 
         // Fetch all active products, joined with their category names
-        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.gsm, p.waistband 
+        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.gsm, p.waistband,
+                                    COALESCE((SELECT SUM(quantity) FROM inventory WHERE product_id = p.id), 0) AS total_stock
                              FROM products p 
                              LEFT JOIN categories c ON p.category_id = c.id 
                              WHERE p.deleted_at IS NULL");
@@ -57,13 +58,13 @@ if (isset($pdo) && $pdo !== null) {
                 ];
             }
 
-            $status_lower = strtolower($pr['status']);
-            if ($status_lower === 'in stock') {
-                $badge = 'bg-green-50 text-green-600 border-green-100';
-            } elseif ($status_lower === 'low stock') {
-                $badge = 'bg-amber-50 text-amber-600 border-amber-100';
-            } else {
+            $total_stock = (int) $pr['total_stock'];
+            if ($total_stock <= 50) {
+                $status = 'Out of Stock';
                 $badge = 'bg-red-50 text-red-600 border-red-100';
+            } else {
+                $status = 'In Stock';
+                $badge = 'bg-green-50 text-green-600 border-green-100';
             }
 
             $admin_products[] = [
@@ -73,7 +74,7 @@ if (isset($pdo) && $pdo !== null) {
                 'cat' => $pr['cat'] ?? 'Uncategorized',
                 'moq' => (int) $pr['moq'],
                 'price' => (float) $pr['price'],
-                'status' => $pr['status'],
+                'status' => $status,
                 'badge' => $badge,
                 'desc' => $pr['desc'] ?? '',
                 'images' => json_decode($pr['images'] ?? '[]', true) ?: [],
@@ -173,6 +174,7 @@ if (empty($all_categories)) {
                                 data-discount="<?= htmlspecialchars($p['discount']) ?>"
                                 data-gsm="<?= htmlspecialchars($p['gsm']) ?>"
                                 data-waistband="<?= htmlspecialchars($p['waistband']) ?>"
+                                data-status="<?= htmlspecialchars($p['status']) ?>"
                                 data-tiers="<?= htmlspecialchars(json_encode($p['tiers'])) ?>" onclick="selectProd(this)">
                                 <div
                                     class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all overflow-hidden">
@@ -828,3 +830,28 @@ if (empty($all_categories)) {
         </div>
     </div>
 </div>
+
+<!-- Toast Notification -->
+<div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 z-50 pointer-events-none">
+    <div id="toast-content" class="bg-gray-900 text-white px-6 py-4 rounded-2xl shadow-2xl font-bold text-sm flex items-center gap-3">
+        <i id="toast-icon" class="ti ti-check text-green-400 text-xl"></i>
+        <span id="toast-message">Action successful</span>
+    </div>
+</div>
+
+<script>
+function showToast(message, type = 'success') {
+    var toast = document.getElementById('toast');
+    var msgEl = document.getElementById('toast-message');
+    var icon = document.getElementById('toast-icon');
+    
+    msgEl.textContent = message;
+    icon.className = type === 'success' ? 'ti ti-check text-green-400 text-xl' : 'ti ti-alert-triangle text-red-400 text-xl';
+    
+    toast.classList.remove('translate-y-20', 'opacity-0');
+    
+    setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+    }, 3000);
+}
+</script>

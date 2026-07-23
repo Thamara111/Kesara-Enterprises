@@ -18,7 +18,7 @@ class Mailer {
      * @param string $body HTML body of the email
      * @return bool True if email was sent, false otherwise
      */
-    public static function send($to, $subject, $body) {
+    public static function send($to, $subject, $body, $attachment = null) {
         $mail = new PHPMailer(true);
 
         try {
@@ -32,6 +32,17 @@ class Mailer {
             // Using a default sender for the system
             $mail->setFrom('noreply@kesara.lk', 'Kesara Enterprises');
             $mail->addAddress($to);
+
+            if ($attachment && is_array($attachment) && isset($attachment['tmp_name']) && is_uploaded_file($attachment['tmp_name'])) {
+                $mime = mime_content_type($attachment['tmp_name']);
+                if (strpos($mime, 'image/') === 0) {
+                    $cid = 'embedded_img_' . time();
+                    $mail->addEmbeddedImage($attachment['tmp_name'], $cid, $attachment['name']);
+                    $body .= '<br><br><img src="cid:' . $cid . '" alt="' . htmlspecialchars($attachment['name']) . '" style="max-width:100%;">';
+                } else {
+                    $mail->addAttachment($attachment['tmp_name'], $attachment['name']);
+                }
+            }
 
             // Content
             $mail->isHTML(true);                                  

@@ -96,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Admin Email</label>
             <div class="relative group">
               <i class="ti ti-mail absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand transition-colors"></i>
-              <input type="email" id="email-input" placeholder="admin@kesara.lk" class="w-full pl-12 pr-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all">
+              <input type="email" id="email-input" placeholder="example@kesara.lk" class="w-full pl-12 pr-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all">
             </div>
           </div>
 

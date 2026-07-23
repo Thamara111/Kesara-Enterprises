@@ -18,6 +18,7 @@ $has_delivery = in_array($role, ['admin', 'delivery_manager']);
 
 $pending_approvals_count = 0;
 $pending_verification_count = 0;
+$pending_inquiries_count = 0;
 
 // Fetch notification badge counts if the database connection is available
 if (isset($pdo)) {
@@ -29,9 +30,22 @@ if (isset($pdo)) {
         // Count customer orders waiting for payment verification (bank transfers)
         $stmt_pending_orders = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending' AND deleted_at IS NULL");
         $pending_verification_count = (int)$stmt_pending_orders->fetchColumn();
+
+        // Count pending inquiries
+        $admin_id = $_SESSION['admin_id'] ?? 0;
+        $can_assign = in_array($role, ['admin', 'finance_manager']);
+        if ($can_assign) {
+            $stmt_pending_inq = $pdo->query("SELECT COUNT(*) FROM inquiries WHERE status = 'pending' OR status IS NULL");
+            $pending_inquiries_count = (int)$stmt_pending_inq->fetchColumn();
+        } else {
+            $stmt_pending_inq = $pdo->prepare("SELECT COUNT(*) FROM inquiries WHERE assigned_to = ? AND (status = 'pending' OR status IS NULL)");
+            $stmt_pending_inq->execute([$admin_id]);
+            $pending_inquiries_count = (int)$stmt_pending_inq->fetchColumn();
+        }
     } catch (\Exception $e) {
         $pending_approvals_count = 0;
         $pending_verification_count = 0;
+        $pending_inquiries_count = 0;
     }
 }
 ?>
@@ -64,15 +78,29 @@ if (isset($pdo)) {
                 <i class="ti ti-layout-grid text-xl"></i>
                 Dashboard
             </a>
-            <a href="/admin-inquiries" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'inquiries' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
-                <i class="ti ti-inbox text-xl"></i>
-                Inquiries
+            <a href="/admin-inquiries" class="flex items-center justify-between w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'inquiries' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <div class="flex items-center gap-4">
+                    <i class="ti ti-inbox text-xl"></i>
+                    Inquiries
+                </div>
+                <?php if ($pending_inquiries_count > 0): ?>
+                    <span class="px-2 py-0.5 bg-amber-500 text-white text-[9px] font-extrabold rounded-full animate-pulse tracking-wider">
+                        <?= $pending_inquiries_count ?> PENDING
+                    </span>
+                <?php endif; ?>
             </a>
             
             <?php if ($has_finance): ?>
-            <a href="/admin-orders" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'orders' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
-                <i class="ti ti-box text-xl"></i>
-                Orders
+            <a href="/admin-orders" class="flex items-center justify-between w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'orders' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <div class="flex items-center gap-4">
+                    <i class="ti ti-box text-xl"></i>
+                    Orders
+                </div>
+                <?php if ($pending_verification_count > 0): ?>
+                    <span class="px-2 py-0.5 bg-amber-500 text-white text-[9px] font-extrabold rounded-full animate-pulse tracking-wider">
+                        <?= $pending_verification_count ?> PENDING
+                    </span>
+                <?php endif; ?>
             </a>
             <a href="/admin-products" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'products' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                 <i class="ti ti-shirt text-xl"></i>

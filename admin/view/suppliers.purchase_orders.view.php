@@ -151,6 +151,13 @@ if (isset($pdo) && $pdo !== null) {
     try {
         $suppliers_list = $pdo->query("SELECT id, name FROM suppliers ORDER BY name ASC")->fetchAll();
         
+        $inv_list = $pdo->query("SELECT p.name AS p_name, i.colour, i.size FROM inventory i JOIN products p ON i.product_id = p.id ORDER BY p.name ASC, i.colour ASC, i.size ASC")->fetchAll();
+        $inv_options = '<option value="">Select an Item...</option>';
+        foreach ($inv_list as $inv) {
+            $comboName = htmlspecialchars($inv['p_name'] . ' · ' . $inv['colour'] . ' · ' . $inv['size']);
+            $inv_options .= '<option value="' . $comboName . '">' . $comboName . '</option>';
+        }
+        
         $stmt = $pdo->query("SELECT po.id, po.status, po.ordered_at, po.expected_at, po.received_at, po.total, 
                                     s.name AS supplier_name, s.contact_person, s.payment_terms
                              FROM purchase_orders po
@@ -525,7 +532,11 @@ if (isset($pdo) && $pdo !== null) {
                         </thead>
                         <tbody id="poItemsContainer" class="divide-y divide-gray-100">
                             <tr class="hover:bg-gray-50/50 transition-colors">
-                                <td class="p-2"><input type="text" name="item_names[]" placeholder="e.g. Combed Cotton Fabric" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold"></td>
+                                <td class="p-2">
+                                    <select name="item_names[]" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer">
+                                        <?= $inv_options ?>
+                                    </select>
+                                </td>
                                 <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold"></td>
                                 <td class="p-2"><input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold"></td>
                                 <td class="p-2 text-center"><button type="button" onclick="removePOItemRow(this)" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><i class="ti ti-trash text-base"></i></button></td>
@@ -542,6 +553,10 @@ if (isset($pdo) && $pdo !== null) {
         </form>
     </div>
 </div>
+
+<template id="inv-options-template">
+    <?= $inv_options ?>
+</template>
 
 <!-- Print Styles -->
 <style>
@@ -753,7 +768,9 @@ function addPOItemRow() {
     var row = document.createElement('tr');
     row.className = 'hover:bg-gray-50/50 transition-colors';
     row.innerHTML = `
-        <td class="p-2"><input type="text" name="item_names[]" placeholder="e.g. Branded Elastic" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold"></td>
+        <td class="p-2"><select name="item_names[]" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer">
+            ${document.getElementById('inv-options-template').innerHTML}
+        </select></td>
         <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold"></td>
         <td class="p-2"><input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold"></td>
         <td class="p-2 text-center"><button type="button" onclick="removePOItemRow(this)" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><i class="ti ti-trash text-base"></i></button></td>

@@ -295,6 +295,22 @@ if ($method === 'POST') {
                 $ins_tier->execute([$product_id, $min_qty, $max_qty, $price]);
             }
 
+            // Sync Inventory Variants
+            $inv_colors = !empty(trim($colors)) ? array_map('trim', explode(',', $colors)) : ['Standard'];
+            $inv_sizes = !empty(trim($sizes)) ? array_map('trim', explode(',', $sizes)) : ['M'];
+
+            $check_inv = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? AND colour = ? AND size = ?");
+            $ins_inv = $pdo->prepare("INSERT INTO inventory (product_id, colour, size, quantity, restock_min) VALUES (?, ?, ?, 0, 50)");
+
+            foreach ($inv_colors as $c) {
+                foreach ($inv_sizes as $s) {
+                    $check_inv->execute([$product_id, $c, $s]);
+                    if (!$check_inv->fetch()) {
+                        $ins_inv->execute([$product_id, $c, $s]);
+                    }
+                }
+            }
+
             $pdo->commit();
             echo json_encode(["status" => "success", "message" => "Product saved successfully.", "product_id" => $product_id]);
         } catch (\Exception $e) {

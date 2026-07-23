@@ -27,9 +27,9 @@ if (isset($pdo) && $pdo !== null) {
                     'by' => 'Admin'
                 ];
             }
-
             $rows[] = [
                 'id' => (int) $row['id'],
+                'product_name' => $row['product_name'],
                 'name' => $row['product_name'] . ' · ' . $row['colour'] . ' · ' . $row['size'],
                 'sku' => $row['sku'],
                 'size' => $row['size'],
@@ -38,6 +38,9 @@ if (isset($pdo) && $pdo !== null) {
                 'logs' => $item_logs
             ];
         }
+        
+        $all_products = array_unique(array_column($rows, 'product_name'));
+        sort($all_products);
     } catch (\Exception $e) {
         $db_error = $e->getMessage();
     }
@@ -57,11 +60,11 @@ foreach ($rows as $r) {
     if ($r['thresh'] > 0) {
         $p = min(100, (int) round(($r['stock'] / $r['thresh']) * 100));
     }
-    if ($r['stock'] === 0) {
+    if ($r['stock'] <= 50) {
         $out_of_stock_count++;
-    } elseif ($p <= 15) {
-        $critical_count++;
     } elseif ($p <= 50) {
+        $critical_count++;
+    } elseif ($p <= 75) {
         $low_stock_count++;
     }
 }
@@ -201,17 +204,18 @@ if ($pressure_count > 0) {
             <div class="px-8 py-4 bg-gray-50/30 flex items-center gap-4">
                 <div class="relative flex-1">
                     <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                    <input type="text" placeholder="Search product or SKU..."
+                    <input type="text" id="search-input" placeholder="Search product or SKU..."
+                        onkeyup="applyFilters()"
                         class="w-full pl-11 pr-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all">
                 </div>
-                <select
-                    class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm font-medium transition-all">
-                    <option>All categories</option>
-                    <option>Men's briefs</option>
-                    <option>Men's boxers</option>
-                    <option>Men's trunks</option>
-                    <option>Ladies</option>
-                    <option>Children</option>
+                <select id="product-filter" onchange="applyFilters()"
+                    class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm font-medium transition-all max-w-xs">
+                    <option value="">All products</option>
+                    <?php if(!empty($all_products)): ?>
+                        <?php foreach($all_products as $pname): ?>
+                            <option value="<?= htmlspecialchars($pname) ?>"><?= htmlspecialchars($pname) ?></option>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </select>
             </div>
         </div>
@@ -240,15 +244,16 @@ if ($pressure_count > 0) {
                         if ($r['thresh'] > 0) {
                             $p = min(100, (int) round(($r['stock'] / $r['thresh']) * 100));
                         }
-                        $status = $r['stock'] === 0 ? 'Out of stock' : ($p <= 15 ? 'Critical' : ($p <= 50 ? 'Low stock' : 'In stock'));
-                        $stockColor = $p <= 15 ? '#791F1F' : ($p <= 50 ? '#633806' : '#111827');
-                        $barColor = $p <= 15 ? '#E24B4A' : ($p <= 50 ? '#EF9F27' : '#1D9E75');
-                        $badgeClass = $r['stock'] === 0 ? 'bg-gray-100 text-gray-500 border-gray-200' : ($p <= 15 ? 'bg-red-100 text-red-700' : ($p <= 50 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
-                        $badgeText = $r['stock'] === 0 ? 'Out of stock' : ($p <= 15 ? 'Critical' : ($p <= 50 ? 'Low stock' : 'In stock'));
+                        $status = $r['stock'] <= 50 ? 'Out of stock' : ($p <= 50 ? 'Critical' : ($p <= 75 ? 'Low stock' : 'In stock'));
+                        $stockColor = $r['stock'] <= 50 ? '#6B7280' : ($p <= 50 ? '#791F1F' : ($p <= 75 ? '#633806' : '#111827'));
+                        $barColor = $r['stock'] <= 50 ? '#9CA3AF' : ($p <= 50 ? '#E24B4A' : ($p <= 75 ? '#EF9F27' : '#1D9E75'));
+                        $badgeClass = $r['stock'] <= 50 ? 'bg-gray-100 text-gray-500 border-gray-200' : ($p <= 50 ? 'bg-red-100 text-red-700' : ($p <= 75 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
+                        $badgeText = $r['stock'] <= 50 ? 'Out of stock' : ($p <= 50 ? 'Critical' : ($p <= 75 ? 'Low stock' : 'In stock'));
                         ?>
                         <div id="inv-row-<?= $idx ?>"
                             class="inv-row grid grid-cols-[minmax(200px,2fr)_60px_70px_80px_1fr_100px] gap-4 p-4 rounded-2xl cursor-pointer transition-all border border-transparent items-center hover:bg-gray-50"
                             data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($r['id']) ?>"
+                            data-product="<?= htmlspecialchars($r['product_name']) ?>"
                             data-name="<?= htmlspecialchars($r['name']) ?>" data-sku="<?= htmlspecialchars($r['sku']) ?>"
                             data-stock="<?= htmlspecialchars($r['stock']) ?>"
                             data-thresh="<?= htmlspecialchars($r['thresh']) ?>" data-status="<?= htmlspecialchars($status) ?>"
@@ -468,31 +473,51 @@ if ($pressure_count > 0) {
     var selEl = null;
 
     function pct(s, t) { return Math.min(100, Math.round(s / t * 100)); }
-    function barColor(p) { return p <= 15 ? '#E24B4A' : p <= 50 ? '#EF9F27' : '#1D9E75'; }
-    function stockColor(p) { return p <= 15 ? '#791F1F' : p <= 50 ? '#633806' : '#111827'; }
-    function statusText(p) { return p === 0 ? 'Out of stock — cannot fulfil orders' : p <= 15 ? `${p}% of threshold — restock urgently` : p <= 50 ? `${p}% of threshold — restock soon` : `${p}% of threshold — healthy`; }
-    function statusColor(p) { return p <= 15 ? '#791F1F' : p <= 50 ? '#633806' : '#085041'; }
-    function badgeClass(p) { return p === 0 ? 'bg-gray-100 text-gray-500 border-gray-200' : p <= 15 ? 'bg-red-100 text-red-700' : p <= 50 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'; }
-    function badgeText(p) { return p === 0 ? 'Out of stock' : p <= 15 ? 'Critical' : p <= 50 ? 'Low stock' : 'In stock'; }
+    function barColor(s, p) { return s <= 50 ? '#9CA3AF' : p <= 50 ? '#E24B4A' : p <= 75 ? '#EF9F27' : '#1D9E75'; }
+    function stockColor(s, p) { return s <= 50 ? '#6B7280' : p <= 50 ? '#791F1F' : p <= 75 ? '#633806' : '#111827'; }
+    function statusText(s, p) { return s <= 50 ? 'Out of stock — cannot fulfil orders' : p <= 50 ? `${p}% of threshold — restock urgently` : p <= 75 ? `${p}% of threshold — restock soon` : `${p}% of threshold — healthy`; }
+    function statusColor(s, p) { return s <= 50 ? '#6B7280' : p <= 50 ? '#791F1F' : p <= 75 ? '#633806' : '#085041'; }
+    function badgeClass(s, p) { return s <= 50 ? 'bg-gray-100 text-gray-500 border-gray-200' : p <= 50 ? 'bg-red-100 text-red-700' : p <= 75 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'; }
+    function badgeText(s, p) { return s <= 50 ? 'Out of stock' : p <= 50 ? 'Critical' : p <= 75 ? 'Low stock' : 'In stock'; }
 
     var activeFilter = 'All';
 
     function applyFilters() {
         var visibleCount = 0;
+        var searchVal = (document.getElementById('search-input').value || '').toLowerCase();
+        var prodFilter = document.getElementById('product-filter').value;
+        
         document.querySelectorAll('.inv-row').forEach(r => {
             var stock = parseInt(r.dataset.stock);
             var thresh = parseInt(r.dataset.thresh);
             var p = pct(stock, thresh);
-            var status = stock === 0 ? 'Out of stock' : p <= 15 ? 'Critical' : p <= 50 ? 'Low stock' : 'In stock';
+            var status = stock <= 50 ? 'Out of stock' : p <= 50 ? 'Critical' : p <= 75 ? 'Low stock' : 'In stock';
+            var rowName = (r.dataset.name || '').toLowerCase();
+            var rowSku = (r.dataset.sku || '').toLowerCase();
+            var rowProd = r.dataset.product || '';
 
             var visible = true;
             if (activeFilter !== 'All' && status !== activeFilter) {
+                visible = false;
+            }
+            if (searchVal && !rowName.includes(searchVal) && !rowSku.includes(searchVal)) {
+                visible = false;
+            }
+            if (prodFilter && rowProd !== prodFilter) {
                 visible = false;
             }
 
             r.style.display = visible ? '' : 'none';
             if (visible) visibleCount++;
         });
+        
+        // Ensure detail pane shows first visible item or closes if none
+        if (visibleCount > 0) {
+            var firstVisible = Array.from(document.querySelectorAll('.inv-row')).find(r => r.style.display !== 'none');
+            if (firstVisible) selectRow(firstVisible, false);
+        } else {
+            closeAdjPane();
+        }
     }
 
     function renderDetail(el) {
@@ -503,12 +528,12 @@ if ($pressure_count > 0) {
         document.getElementById('d-name').textContent = el.dataset.name;
         document.getElementById('d-sku').textContent = 'SKU: ' + el.dataset.sku;
         document.getElementById('d-stock').textContent = stock;
-        document.getElementById('d-stock').style.color = stockColor(p);
+        document.getElementById('d-stock').style.color = stockColor(stock, p);
         document.getElementById('d-thresh').textContent = thresh;
         document.getElementById('d-bar').style.width = p + '%';
-        document.getElementById('d-bar').style.backgroundColor = barColor(p);
-        document.getElementById('d-status-text').textContent = statusText(p);
-        document.getElementById('d-status-text').style.color = statusColor(p);
+        document.getElementById('d-bar').style.backgroundColor = barColor(stock, p);
+        document.getElementById('d-status-text').textContent = statusText(stock, p);
+        document.getElementById('d-status-text').style.color = statusColor(stock, p);
         document.getElementById('adj-qty').value = Math.max(0, thresh - stock);
         document.getElementById('thresh-input').value = thresh;
 
@@ -588,13 +613,13 @@ if ($pressure_count > 0) {
                 // Update DOM inline
                 var thresh = parseInt(selEl.dataset.thresh);
                 var p = pct(newStock, thresh);
-                var bc = badgeClass(p);
-                var bt = badgeText(p);
+                var bc = badgeClass(newStock, p);
+                var bt = badgeText(newStock, p);
 
                 selEl.querySelector('.stock-val').textContent = newStock;
-                selEl.querySelector('.stock-val').style.color = stockColor(p);
+                selEl.querySelector('.stock-val').style.color = stockColor(newStock, p);
                 selEl.querySelector('.bar-val').style.width = p + '%';
-                selEl.querySelector('.bar-val').style.backgroundColor = barColor(p);
+                selEl.querySelector('.bar-val').style.backgroundColor = barColor(newStock, p);
                 selEl.querySelector('.badge-val').className = `badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${bc} border border-transparent shadow-sm`;
                 selEl.querySelector('.badge-val').textContent = bt;
 
@@ -626,14 +651,14 @@ if ($pressure_count > 0) {
                 selEl.dataset.thresh = thresh;
                 var stock = parseInt(selEl.dataset.stock);
                 var p = pct(stock, thresh);
-                var bc = badgeClass(p);
-                var bt = badgeText(p);
+                var bc = badgeClass(stock, p);
+                var bt = badgeText(stock, p);
 
                 selEl.querySelector('.bar-val').style.width = p + '%';
-                selEl.querySelector('.bar-val').style.backgroundColor = barColor(p);
+                selEl.querySelector('.bar-val').style.backgroundColor = barColor(stock, p);
                 selEl.querySelector('.badge-val').className = `badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${bc} border border-transparent shadow-sm`;
                 selEl.querySelector('.badge-val').textContent = bt;
-                selEl.querySelector('.stock-val').style.color = stockColor(p);
+                selEl.querySelector('.stock-val').style.color = stockColor(stock, p);
 
                 applyFilters();
                 renderDetail(selEl);

@@ -234,8 +234,9 @@ require_once __DIR__ . "/layouts/header.php";
                 <div class="flex flex-wrap gap-2 mb-6">
                     <span class="px-3 py-1 bg-brand-light text-brand text-[10px] font-bold rounded-full border border-brand/10 uppercase"><?= htmlspecialchars($category_name) ?></span>
                     <?php 
-                        $stat = strtolower($product['status'] ?? '');
-                        $is_out_of_stock = ($stat === 'out of stock');
+                        $total_inventory = array_sum(array_column($variations, 'quantity'));
+                        $is_out_of_stock = ($total_inventory <= 50);
+                        $stat = $is_out_of_stock ? 'out of stock' : 'in stock';
                         if ($stat === 'in stock') {
                             $sc_bg = 'bg-green-50 border-green-100';
                             $sc_tx = 'text-green-600';
@@ -252,7 +253,7 @@ require_once __DIR__ . "/layouts/header.php";
                     ?>
                     <span class="px-3 py-1 <?= $sc_bg ?> <?= $sc_tx ?> text-[10px] font-bold rounded-full border flex items-center gap-1.5 uppercase">
                         <div class="w-1.5 h-1.5 rounded-full <?= $sc_dot ?> animate-pulse"></div>
-                        <?= htmlspecialchars($product['status']) ?>
+                        <?= htmlspecialchars(ucwords($stat)) ?>
                     </span>
                 </div>
 
@@ -384,21 +385,22 @@ require_once __DIR__ . "/layouts/header.php";
                                  class="size-row-el flex items-center justify-between p-4 hover:bg-gray-50/50 cursor-pointer transition-colors <?= $is_selected ? 'bg-brand-light/10' : '' ?>">
                                 <div class="flex items-center gap-4">
                                     <span class="w-10 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-xs font-extrabold text-gray-900 bg-gray-50"><?= htmlspecialchars($so) ?></span>
-                                    <span class="text-xs font-bold text-gray-400">
+                                    <span class="text-xs font-bold text-gray-400" id="size-price-wrapper-<?= htmlspecialchars($so) ?>">
                                         <?php if ($can_see_prices): ?>
                                             LKR <span class="size-price-display">...</span>
                                         <?php else: ?>
                                             <span style="filter: blur(4px);">LKR 000</span>
                                         <?php endif; ?>
                                     </span>
+                                    <span id="size-out-badge-<?= htmlspecialchars($so) ?>" class="hidden text-[9px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded uppercase tracking-widest border border-red-100">Out of Stock</span>
                                 </div>
                                 <div class="flex items-center bg-gray-100 border border-gray-200 rounded-xl overflow-hidden shadow-sm" onclick="event.stopPropagation()">
-                                    <button type="button" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', -10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-minus text-xs"></i></button>
+                                    <button type="button" id="size-minus-<?= htmlspecialchars($so) ?>" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', -10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-minus text-xs"></i></button>
                                     <input type="number" id="size-qty-<?= htmlspecialchars($so) ?>" value="<?= $is_selected && !$is_out_of_stock ? (int)$product['moq'] : 0 ?>" min="0" step="10" 
                                            onfocus="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')"
                                            onchange="onSizeQtyChange('<?= htmlspecialchars($so) ?>')" 
                                            class="w-12 text-center text-xs font-black text-gray-900 bg-transparent border-none outline-none focus:ring-0 transition-all duration-300 py-1 disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>>
-                                    <button type="button" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', 10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-plus text-xs"></i></button>
+                                    <button type="button" id="size-plus-<?= htmlspecialchars($so) ?>" onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', 10)" class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed" <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-plus text-xs"></i></button>
                                 </div>
                             </div>
                             <?php endforeach; ?>
@@ -548,8 +550,10 @@ let qty = <?= $is_out_of_stock ? 0 : (int) $product['moq'] ?>;
 const sizeOptions = <?php echo json_encode($size_options); ?>;
 const availableSizes = <?php echo json_encode($sizes); ?>;
 const defaultSize = '<?= htmlspecialchars($default_size) ?>';
-const colorsArray = <?php echo json_encode($colours); ?>;
+const colorsArray = <?php echo json_encode(array_values($colours)); ?>;
 const defaultColor = '<?= htmlspecialchars($default_colour) ?>';
+
+const inventoryVariations = <?php echo json_encode($variations); ?>;
 
 // Initialize nested quantities: selectedQuantities[color][size]
 let selectedQuantities = {};
@@ -719,7 +723,29 @@ function updateColorBadges() {
 let selectedColor = '<?= htmlspecialchars($default_colour) ?>';
 let selectedSize = '<?= htmlspecialchars($default_size) ?>';
 
+// Pre-calculate per-color total stock
+const colorTotalStock = {};
+colorsArray.forEach(c => colorTotalStock[c] = 0);
+inventoryVariations.forEach(v => {
+    if (colorTotalStock[v.colour] !== undefined) {
+        colorTotalStock[v.colour] += parseInt(v.quantity) || 0;
+    }
+});
+
+// Initially disable completely out of stock colors
+colorsArray.forEach((c, idx) => {
+    if (colorTotalStock[c] <= 50) {
+        const btn = document.getElementById('color-btn-' + idx);
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-30', 'cursor-not-allowed');
+        }
+    }
+});
+
 function selectColor(idx, color) {
+    if (colorTotalStock[color] <= 50) return; // Prevent selection if out of stock
+    
     selectedColor = color;
     document.getElementById('selected-color-name').textContent = color;
     
@@ -734,15 +760,54 @@ function selectColor(idx, color) {
     }
     
     // Load saved quantities for the newly selected color into the size fields
+    // And disable sizes that are out of stock
     sizeOptions.forEach(size => {
         const sizeVal = (selectedQuantities[color] && selectedQuantities[color][size]) || 0;
         const input = document.getElementById('size-qty-' + size);
-        if (input) {
-            input.value = sizeVal;
-            updateSizeInputStyles(size, sizeVal);
+        const minusBtn = document.getElementById('size-minus-' + size);
+        const plusBtn = document.getElementById('size-plus-' + size);
+        const outBadge = document.getElementById('size-out-badge-' + size);
+        const priceWrapper = document.getElementById('size-price-wrapper-' + size);
+        
+        let variant = inventoryVariations.find(v => v.colour === color && v.size === size);
+        let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
+        
+        if (qtyAvailable <= 50) {
+            if (input) {
+                input.disabled = true;
+                input.value = 0;
+                input.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+            if (minusBtn) { minusBtn.disabled = true; minusBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
+            if (plusBtn) { plusBtn.disabled = true; plusBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
+            if (outBadge) { outBadge.classList.remove('hidden'); }
+            if (priceWrapper) { priceWrapper.classList.add('hidden'); }
+            // Reset selected quantity
+            if (selectedQuantities[color]) selectedQuantities[color][size] = 0;
+        } else {
+            if (input) {
+                input.disabled = false;
+                input.value = sizeVal;
+                input.classList.remove('opacity-50', 'cursor-not-allowed');
+                updateSizeInputStyles(size, sizeVal);
+            }
+            if (minusBtn) { minusBtn.disabled = false; minusBtn.classList.remove('opacity-50', 'cursor-not-allowed'); }
+            if (plusBtn) { plusBtn.disabled = false; plusBtn.classList.remove('opacity-50', 'cursor-not-allowed'); }
+            if (outBadge) { outBadge.classList.add('hidden'); }
+            if (priceWrapper) { priceWrapper.classList.remove('hidden'); }
         }
     });
+    
+    recalculateTotalQty();
 }
+
+// Initial setup to disable out of stock sizes for the default color
+window.addEventListener('DOMContentLoaded', () => {
+    let defIdx = colorsArray.indexOf(defaultColor);
+    if (defIdx !== -1) {
+        selectColor(defIdx, defaultColor);
+    }
+});
 
 function selectSize(idx, size) {
     selectedSize = size;

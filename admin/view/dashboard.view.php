@@ -107,39 +107,18 @@ if (isset($pdo) && $pdo !== null) {
         }
 
         // Query quantity of underwears in each color and size
-        $stmt_stock = $pdo->query("
-            SELECT colour, size, SUM(quantity) AS total_qty 
-            FROM inventory 
-            GROUP BY colour, size 
-            ORDER BY colour, size
-        ");
-        $stock_by_variant = $stmt_stock->fetchAll();
+
     } catch (\Exception $e) {
         $db_error = $e->getMessage();
     }
 }
 
-if (!function_exists('getColorClass')) {
-    function getColorClass($colorName) {
-        $colors = [
-            'white' => 'bg-white border border-gray-200',
-            'black' => 'bg-gray-900',
-            'grey' => 'bg-gray-400',
-            'blue' => 'bg-blue-700',
-            'red' => 'bg-red-900',
-            'pink' => 'bg-pink-400',
-            'navy' => 'bg-blue-900'
-        ];
-        return $colors[strtolower($colorName)] ?? 'bg-gray-200';
-    }
-}
+
 
 // Fallback values if empty
 if ($current_month_revenue == 0) $current_month_revenue = 0.00;
 
-if (empty($stock_by_variant)) {
-    $stock_by_variant = [];
-}
+
 
 
 if (empty($critical_stock_items)) { $critical_stock_items = []; }
@@ -357,46 +336,12 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
             </div>
         </div>
 
-        <!-- STOCK BY COLOR & SIZE -->
-        <div class="bg-white border border-gray-100 rounded-3xl p-5 md:p-10 shadow-sm overflow-hidden">
-            <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-8">Stock Breakdown by Color & Size</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="border-b border-gray-100">
-                            <th class="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Colour</th>
-                            <th class="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Size</th>
-                            <th class="pb-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Available Quantity</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        <?php foreach ($stock_by_variant as $var): ?>
-                        <tr class="hover:bg-gray-50/50 transition-colors">
-                            <td class="py-4 text-xs font-bold text-gray-900">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-4 h-4 rounded-full border border-gray-200 <?= getColorClass($var['colour']) ?>"></div>
-                                    <span><?= htmlspecialchars($var['colour']) ?></span>
-                                </div>
-                            </td>
-                            <td class="py-4 text-xs font-black text-gray-600">
-                                <span class="px-2.5 py-1 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-extrabold uppercase"><?= htmlspecialchars($var['size']) ?></span>
-                            </td>
-                            <td class="py-4 text-xs font-extrabold text-gray-900 text-right">
-                                <span class="px-3 py-1 bg-brand-light text-brand rounded-full font-bold"><?= number_format($var['total_qty']) ?> pcs</span>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
         <!-- PENDING REGISTRATIONS -->
         <div class="bg-white border border-gray-100 rounded-3xl p-5 md:p-10 shadow-sm overflow-hidden">
             <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-8">Wholesale Applications</h2>
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
                 <?php foreach ($pending_registrations as $reg): ?>
-                <div class="p-6 bg-gray-50 rounded-3xl border border-gray-100 hover:border-brand/30 transition-all group">
+                <a href="/admin-customers" class="block p-6 bg-gray-50 rounded-3xl border border-gray-100 hover:border-brand/30 transition-all group">
                     <div class="flex justify-between items-start mb-4">
                         <h4 class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors"><?= htmlspecialchars($reg['business_name']) ?></h4>
                         <span class="text-[9px] font-bold text-gray-400 uppercase">
@@ -411,11 +356,7 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
                         <p class="text-[10px] font-bold text-gray-500 uppercase"><?= htmlspecialchars($reg['business_type']) ?> · <?= htmlspecialchars($reg['br_number']) ?></p>
                         <p class="text-[11px] text-gray-400 font-medium truncate"><?= htmlspecialchars($reg['email']) ?></p>
                     </div>
-                    <div class="flex gap-3">
-                        <button class="flex-1 bg-brand text-brand-light font-bold py-2.5 rounded-xl text-[10px] uppercase tracking-widest shadow-lg shadow-brand/10 hover:bg-brand-dark transition-all">Approve</button>
-                        <button class="flex-1 bg-white border border-gray-200 text-gray-400 font-bold py-2.5 rounded-xl text-[10px] uppercase tracking-widest hover:border-red-400 hover:text-red-600 transition-all">Reject</button>
-                    </div>
-                </div>
+                </a>
                 <?php endforeach; ?>
             </div>
         </div>
