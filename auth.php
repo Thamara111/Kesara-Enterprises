@@ -405,7 +405,7 @@ require_once __DIR__ . "/layouts/head.php";
                         <input type="checkbox" id="terms" required
                             class="mt-1 rounded text-brand focus:ring-brand border-gray-300">
                         <label for="terms" class="text-xs text-gray-500 leading-relaxed">
-                            I confirm this is a registered business and I agree to the <a href="#"
+                            I confirm this is a registered business and I agree to the <a href="/terms-&-conditions" target="_blank"
                                 class="text-brand font-semibold hover:underline">wholesale terms and conditions</a>.
                         </label>
                     </div>

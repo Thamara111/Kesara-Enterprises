@@ -118,29 +118,33 @@ if (empty($admin_customers)) {
                 <p class="text-sm text-gray-500 mt-1">Manage wholesale buyer accounts and verification.</p>
             </div>
             <!-- Stats -->
-            <div class="grid grid-cols-4 gap-4">
-                <div class="bg-gray-50/50 rounded-2xl p-4 border border-gray-100">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total Customers</p>
-                    <p class="text-2xl font-bold text-gray-900 mt-1"><?= $total_count ?></p>
+            <div class="flex items-center gap-6">
+                <div class="flex gap-4">
+                    <div class="text-center">
+                        <p class="text-[15px] font-bold text-gray-900 mt-1"><?= $total_count ?></p>
+                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Total Customers
+                        </p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-bold text-amber-600 mt-1"><?= $pending_count ?></p>
+                        <p class="text-[9px] font-bold text-amber-400 uppercase tracking-widest mt-0.5">Pending Approval
+                        </p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-bold text-emerald-600 mt-1"><?= $approved_count ?></p>
+                        <p class="text-[9px] font-bold text-blue-400 uppercase tracking-widest mt-0.5">Approved</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-bold text-purple-600 mt-1"><?= $suspended_count ?></p>
+                        <p class="text-[9px] font-bold text-brand/40 uppercase tracking-widest mt-0.5">Suspended</p>
+                    </div>
                 </div>
-                <div class="bg-amber-50/50 rounded-2xl p-4 border border-amber-100">
-                    <p class="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pending Approval</p>
-                    <p class="text-2xl font-bold text-amber-600 mt-1"><?= $pending_count ?></p>
-                </div>
-                <div class="bg-emerald-50/50 rounded-2xl p-4 border border-emerald-100">
-                    <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Approved</p>
-                    <p class="text-2xl font-bold text-emerald-600 mt-1"><?= $approved_count ?></p>
-                </div>
-                <div class="bg-purple-50/50 rounded-2xl p-4 border border-purple-100">
-                    <p class="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Suspended</p>
-                    <p class="text-2xl font-bold text-purple-600 mt-1"><?= $suspended_count ?></p>
-                </div>
+                <button
+                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
+                    onclick="downloadPDF('customer-list-container', 'Customers_List')">
+                    <i class="ti ti-download"></i> Export PDF
+                </button>
             </div>
-            <button
-                class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
-                onclick="downloadPDF('customer-list-container', 'Customers_List')">
-                <i class="ti ti-download"></i> Export PDF
-            </button>
         </div>
         <div class="px-8 py-4 border-b border-gray-100 flex items-center justify-between">
             <!-- Tabs -->
@@ -169,16 +173,6 @@ if (empty($admin_customers)) {
         </div>
 
 
-        <!-- List Header -->
-        <div
-            class="px-8 py-3 bg-gray-50/50 grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1fr)_100px_100px] gap-4 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider items-center">
-            <span></span>
-            <span>Company / Contact</span>
-            <span>Business Type</span>
-            <span class="text-center">Total Spent</span>
-            <span class="text-right">Status</span>
-        </div>
-
         <!-- List -->
         <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar" id="customer-list-container">
             <div class="min-w-[800px] p-6 space-y-1" id="customer-list">
@@ -190,63 +184,79 @@ if (empty($admin_customers)) {
                         <p class="text-xs text-gray-300">Customers who register through the site will appear here.</p>
                     </div>
                 <?php else: ?>
-                    <?php foreach ($admin_customers as $idx => $c): ?>
-                        <div id="customer-row-<?= $idx ?>"
-                            class="customer-row grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1fr)_100px_100px] gap-4 items-center p-4 bg-white border border-gray-100 rounded-2xl cursor-pointer hover:border-brand/30 hover:bg-gray-50/50 transition-all"
-                            data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($c['id']) ?>"
-                            data-name="<?= htmlspecialchars(strtolower($c['name'])) ?>"
-                            data-company="<?= htmlspecialchars(strtolower($c['company'])) ?>"
-                            data-email="<?= htmlspecialchars(strtolower($c['email'])) ?>"
-                            data-phone="<?= htmlspecialchars(strtolower($c['phone'])) ?>"
-                            data-status="<?= htmlspecialchars(strtolower($c['badgeText'])) ?>"
-                            data-av="<?= htmlspecialchars($c['av']) ?>" data-original-name="<?= htmlspecialchars($c['name']) ?>"
-                            data-original-company="<?= htmlspecialchars($c['company']) ?>"
-                            data-original-email="<?= htmlspecialchars($c['email']) ?>"
-                            data-original-phone="<?= htmlspecialchars($c['phone']) ?>"
-                            data-whatsapp="<?= htmlspecialchars($c['whatsapp']) ?>"
-                            data-type="<?= htmlspecialchars($c['type']) ?>" data-br="<?= htmlspecialchars($c['br']) ?>"
-                            data-addr="<?= htmlspecialchars($c['addr']) ?>" data-badge="<?= htmlspecialchars($c['badge']) ?>"
-                            data-badgetext="<?= htmlspecialchars($c['badgeText']) ?>"
-                            data-spent="<?= htmlspecialchars($c['spent']) ?>"
-                            data-orders="<?= htmlspecialchars($c['orders']) ?>"
-                            data-actions="<?= htmlspecialchars($c['actions']) ?>"
-                            data-note="<?= htmlspecialchars($c['note']) ?>"
-                            data-recentorders="<?= htmlspecialchars($c['recentOrders']) ?>" onclick="selectCustomer(this)">
-                            <div
-                                class="w-10 h-10 rounded-xl bg-brand-light text-brand flex items-center justify-center font-bold text-xs shadow-sm border border-brand/5">
-                                <?= htmlspecialchars($c['av']) ?>
-                            </div>
-                            <div>
-                                <p class="text-sm font-bold text-gray-900"><?= htmlspecialchars($c['company']) ?></p>
-                                <p class="text-xs text-gray-400 font-medium mt-0.5"><?= htmlspecialchars($c['name']) ?></p>
-                            </div>
-                            <span class="text-xs text-gray-500 font-semibold"><?= htmlspecialchars($c['type']) ?></span>
-                            <span
-                                class="text-center font-bold text-gray-900 text-xs"><?= htmlspecialchars($c['spent']) ?></span>
-                            <div class="text-right">
-                                <span
-                                    class="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider <?= $c['badge'] ?> border"><?= htmlspecialchars($c['badgeText']) ?></span>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
+                    <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
+                        <thead>
+                            <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
+                                <th class="px-4 py-3 rounded-l-xl w-16"></th>
+                                <th class="px-4 py-3">Company / Contact</th>
+                                <th class="px-4 py-3">Business Type</th>
+                                <th class="px-4 py-3 text-center">Total Spent</th>
+                                <th class="px-4 py-3 text-right rounded-r-xl">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customer-table-body">
+                            <?php foreach ($admin_customers as $idx => $c): ?>
+                                <tr id="customer-row-<?= $idx ?>"
+                                    class="customer-row bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
+                                    data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($c['id']) ?>"
+                                    data-name="<?= htmlspecialchars(strtolower($c['name'])) ?>"
+                                    data-company="<?= htmlspecialchars(strtolower($c['company'])) ?>"
+                                    data-email="<?= htmlspecialchars(strtolower($c['email'])) ?>"
+                                    data-phone="<?= htmlspecialchars(strtolower($c['phone'])) ?>"
+                                    data-status="<?= htmlspecialchars(strtolower($c['badgeText'])) ?>"
+                                    data-av="<?= htmlspecialchars($c['av']) ?>"
+                                    data-original-name="<?= htmlspecialchars($c['name']) ?>"
+                                    data-original-company="<?= htmlspecialchars($c['company']) ?>"
+                                    data-original-email="<?= htmlspecialchars($c['email']) ?>"
+                                    data-original-phone="<?= htmlspecialchars($c['phone']) ?>"
+                                    data-whatsapp="<?= htmlspecialchars($c['whatsapp']) ?>"
+                                    data-type="<?= htmlspecialchars($c['type']) ?>" data-br="<?= htmlspecialchars($c['br']) ?>"
+                                    data-addr="<?= htmlspecialchars($c['addr']) ?>"
+                                    data-badge="<?= htmlspecialchars($c['badge']) ?>"
+                                    data-badgetext="<?= htmlspecialchars($c['badgeText']) ?>"
+                                    data-spent="<?= htmlspecialchars($c['spent']) ?>"
+                                    data-orders="<?= htmlspecialchars($c['orders']) ?>"
+                                    data-actions="<?= htmlspecialchars($c['actions']) ?>"
+                                    data-note="<?= htmlspecialchars($c['note']) ?>"
+                                    data-recentorders="<?= htmlspecialchars($c['recentOrders']) ?>"
+                                    onclick="selectCustomer(this)">
+                                    <td
+                                        class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30 w-16">
+                                        <div
+                                            class="w-10 h-10 rounded-xl bg-brand-light text-brand flex items-center justify-center font-bold text-xs shadow-sm border border-brand/5">
+                                            <?= htmlspecialchars($c['av']) ?>
+                                        </div>
+                                    </td>
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
+                                        <p class="text-sm font-bold text-gray-900"><?= htmlspecialchars($c['company']) ?></p>
+                                        <p class="text-xs text-gray-400 font-medium mt-0.5"><?= htmlspecialchars($c['name']) ?>
+                                        </p>
+                                    </td>
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
+                                        <span
+                                            class="text-xs text-gray-500 font-semibold"><?= htmlspecialchars($c['type']) ?></span>
+                                    </td>
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-center">
+                                        <span
+                                            class="font-bold text-gray-900 text-xs"><?= htmlspecialchars($c['spent']) ?></span>
+                                    </td>
+                                    <td
+                                        class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
+                                        <span
+                                            class="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider <?= $c['badge'] ?> border"><?= htmlspecialchars($c['badgeText']) ?></span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 <?php endif; ?>
             </div>
         </div>
-
-        <!-- Pagination -->
-        <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between">
-            <p class="text-xs font-medium text-gray-500">Showing <span
-                    class="text-gray-900"><?= count($admin_customers) ?></span> of <span
-                    class="text-gray-900"><?= $total_count ?></span> customers</p>
-            <div class="flex gap-2">
-                <button
-                    class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all"><i
-                        class="ti ti-chevron-left text-sm"></i></button>
-                <button
-                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-white font-bold text-xs shadow-lg shadow-brand/20">1</button>
-                <button
-                    class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all"><i
-                        class="ti ti-chevron-right text-sm"></i></button>
+        <!-- Pagination Controls -->
+        <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white" id="pagination-controls">
+            <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
+            <div class="flex items-center gap-2" id="pagination-buttons">
+                <!-- Buttons injected by JS -->
             </div>
         </div>
     </div>
@@ -256,7 +266,7 @@ if (empty($admin_customers)) {
     <div id="customer-detail-backdrop"
         class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300"
         onclick="closeDetailPane()"></div>
-    <div class="fixed inset-y-0 right-0 z-50 w-[400px] max-w-full bg-gray-50 border-l border-gray-200 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto"
+    <div class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-gray-50 border-l border-gray-200 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto"
         id="detail-pane">
         <!-- Detail Header -->
         <div class="p-8 border-b border-gray-200 bg-white">
@@ -339,9 +349,9 @@ if (empty($admin_customers)) {
                     <textarea id="d-comment" rows="4" placeholder="Add a private note about this customer..."
                         class="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-xs font-medium text-gray-700 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand transition-all"></textarea>
                 </div>
-                <button onclick="saveComment()"
+                <button onclick="saveComment(this)"
                     class="w-full flex items-center justify-center gap-2 bg-gray-900 text-white font-bold py-2.5 rounded-xl text-xs uppercase tracking-widest hover:bg-gray-700 transition-all">
-                    <i class="ti ti-device-floppy"></i> Save Note
+                    <i class="ti ti-device-floppy"></i> <span>Save Note</span>
                 </button>
             </div>
         </div>
@@ -534,6 +544,59 @@ if (empty($admin_customers)) {
 
 
 <script>
+    var _activeChip = 'all';
+    var _activeCustomerId = null;
+    var currentPage = 1;
+    var itemsPerPage = 15;
+
+    function goToPage(page) {
+        currentPage = page;
+        applyFilters();
+    }
+
+    function renderPagination(totalItems, totalPages) {
+        var info = document.getElementById('pagination-info');
+        var buttons = document.getElementById('pagination-buttons');
+        if (!info || !buttons) return;
+
+        if (totalItems === 0) {
+            info.textContent = 'Showing 0 entries';
+            buttons.innerHTML = '';
+            return;
+        }
+
+        var start = (currentPage - 1) * itemsPerPage + 1;
+        var end = Math.min(currentPage * itemsPerPage, totalItems);
+        info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
+
+        var html = '';
+        
+        // Prev button
+        var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+        html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
+
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === currentPage) {
+                html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
+            } else if (
+                i === 1 || 
+                i === totalPages || 
+                (i >= currentPage - 1 && i <= currentPage + 1)
+            ) {
+                html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
+            } else if (i === currentPage - 2 || i === currentPage + 2) {
+                html += `<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">...</span>`;
+            }
+        }
+
+        // Next button
+        var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+        html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
+
+        buttons.innerHTML = html;
+    }
+
     function selectCustomer(el, openDrawer = true) {
         if (!el) return;
 
@@ -585,26 +648,26 @@ if (empty($admin_customers)) {
         if (actions === 'pending') {
             actionDiv.innerHTML = `
             <div class="grid grid-cols-2 gap-3">
-                <button onclick="updateStatus(${cid}, 'approved')" class="bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10">Approve</button>
-                <button onclick="updateStatus(${cid}, 'rejected')" class="bg-white border border-gray-200 text-red-600 font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all">Reject</button>
+                <button onclick="updateStatus(${cid}, 'approved', this)" class="bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2"><span>Approve</span></button>
+                <button onclick="updateStatus(${cid}, 'rejected', this)" class="bg-white border border-gray-200 text-red-600 font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center gap-2"><span>Reject</span></button>
             </div>
         `;
         } else if (actions === 'normal') {
             actionDiv.innerHTML = `
-            <button onclick="updateStatus(${cid}, 'suspended')" class="w-full bg-white border border-red-100 text-red-650 font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center gap-2">
-                <i class="ti ti-ban"></i> Suspend Account
+            <button onclick="updateStatus(${cid}, 'suspended', this)" class="w-full bg-white border border-red-100 text-red-650 font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center gap-2">
+                <i class="ti ti-ban"></i> <span>Suspend Account</span>
             </button>
         `;
         } else if (actions === 'suspended') {
             actionDiv.innerHTML = `
-            <button onclick="updateStatus(${cid}, 'approved')" class="w-full bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2">
-                <i class="ti ti-circle-check"></i> Activate Account
+            <button onclick="updateStatus(${cid}, 'approved', this)" class="w-full bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2">
+                <i class="ti ti-circle-check"></i> <span>Activate Account</span>
             </button>
         `;
         } else {
             actionDiv.innerHTML = `
-            <button onclick="updateStatus(${cid}, 'approved')" class="w-full bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2">
-                <i class="ti ti-rotate"></i> Re-evaluate Request
+            <button onclick="updateStatus(${cid}, 'approved', this)" class="w-full bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2">
+                <i class="ti ti-rotate"></i> <span>Re-evaluate Request</span>
             </button>
         `;
         }
@@ -613,46 +676,70 @@ if (empty($admin_customers)) {
         loadComment(cid);
     }
 
-    // ── Filtering state ──────────────────────────────────────────────
-    var _activeChip = 'all';  // 'all' | 'pending' | 'approved' | 'suspended' | 'rejected'
-
     function applyFilters() {
         var q = (document.getElementById('customer-search')?.value || '').toLowerCase().trim();
         var sort = document.getElementById('customer-sort')?.value || 'newest';
-        var list = document.getElementById('customer-list');
+        var list = document.getElementById('customer-table-body') || document.getElementById('customer-list');
         var rows = Array.from(document.querySelectorAll('.customer-row'));
+        var visibleRows = [];
 
         rows.forEach(r => {
-            var visible = true;
-            if (_activeChip !== 'all' && r.dataset.status !== _activeChip) visible = false;
+            var rStatus = r.dataset.status.toLowerCase();
+            var statusMatch = (_activeChip === 'all' || _activeChip === rStatus);
 
-            if (q && !r.dataset.company.includes(q)
-                && !r.dataset.name.includes(q)
-                && !r.dataset.email.includes(q)
-                && !r.dataset.phone.includes(q)) {
-                visible = false;
+            var searchMatch = true;
+            if (q) {
+                searchMatch = r.dataset.company.includes(q) ||
+                    r.dataset.name.includes(q) ||
+                    r.dataset.email.includes(q) ||
+                    r.dataset.phone.includes(q);
             }
 
-            r.style.display = visible ? '' : 'none';
+            if (statusMatch && searchMatch) {
+                visibleRows.push(r);
+            } else {
+                r.style.display = 'none';
+            }
         });
 
         if (sort === 'alpha') {
-            rows.sort((a, b) => a.dataset.originalCompany.localeCompare(b.dataset.originalCompany));
+            visibleRows.sort((a, b) => a.dataset.originalCompany.localeCompare(b.dataset.originalCompany));
         } else if (sort === 'spend') {
             var parseSpend = s => {
                 if (!s || s === '\u2014') return 0;
                 var n = parseFloat(s.replace(/[^\d.]/g, ''));
                 return s.includes('M') ? n * 1e6 : s.includes('K') ? n * 1e3 : n;
             };
-            rows.sort((a, b) => parseSpend(b.dataset.spent) - parseSpend(a.dataset.spent));
+            visibleRows.sort((a, b) => parseSpend(b.dataset.spent) - parseSpend(a.dataset.spent));
         } else if (sort === 'newest') {
-            rows.sort((a, b) => parseInt(a.dataset.idx) - parseInt(b.dataset.idx));
+            // Sort by highest ID first (latest item)
+            visibleRows.sort((a, b) => parseInt(b.dataset.id) - parseInt(a.dataset.id));
         }
 
-        rows.forEach(r => list.appendChild(r));
+        var totalItems = visibleRows.length;
+        var totalPages = Math.ceil(totalItems / itemsPerPage);
+        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        var start = (currentPage - 1) * itemsPerPage;
+        var end = start + itemsPerPage;
+
+        visibleRows.forEach((r, index) => {
+            if (index >= start && index < end) {
+                r.style.display = '';
+            } else {
+                r.style.display = 'none';
+            }
+        });
+
+        if (document.getElementById('customer-table-body')) {
+            visibleRows.forEach(r => list.appendChild(r));
+        }
+
+        renderPagination(totalItems, totalPages);
 
         // Show empty state if no visible rows
-        var visibleCount = rows.filter(r => r.style.display !== 'none').length;
+        var visibleCount = visibleRows.length;
         var emptyState = document.getElementById('empty-state');
         if (!emptyState) {
             emptyState = document.createElement('div');
@@ -663,7 +750,7 @@ if (empty($admin_customers)) {
             <p class="text-sm font-bold text-gray-400">No customers found</p>
             <p class="text-xs text-gray-300">Adjust your search or filter to find customers.</p>
         `;
-            list.appendChild(emptyState);
+            document.getElementById('customer-list').appendChild(emptyState);
         }
         emptyState.style.display = visibleCount === 0 ? 'flex' : 'none';
 
@@ -683,10 +770,9 @@ if (empty($admin_customers)) {
         document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
         el.classList.add('on');
         _activeChip = el.textContent.trim().toLowerCase();
+        currentPage = 1;
         applyFilters();
     }
-
-    // refreshRowStatus removed as it's now handled inline in updateStatus
 
     function showToast(message, variant = 'success', duration = 3500) {
         var icons = { success: '<i class="ti ti-circle-check"></i>', error: '<i class="ti ti-circle-x"></i>', info: '<i class="ti ti-info-circle"></i>' };
@@ -703,7 +789,8 @@ if (empty($admin_customers)) {
         setTimeout(() => { t.classList.remove('toast-show'); t.addEventListener('transitionend', () => t.remove(), { once: true }); }, duration);
     }
 
-    function updateStatus(id, newStatus) {
+    function updateStatus(id, newStatus, btnElement) {
+        if (btnElement) setButtonLoading(btnElement, true);
         fetch('/api/customers.php', {
             method: 'POST',
             headers: {
@@ -752,14 +839,14 @@ if (empty($admin_customers)) {
                 } else {
                     showToast(data.message || 'Failed to update customer status.', 'error');
                 }
+                if (btnElement) setButtonLoading(btnElement, false);
             })
             .catch(err => {
                 console.error(err);
                 showToast('Error: ' + err.message, 'error');
+                if (btnElement) setButtonLoading(btnElement, false);
             });
     }
-
-    var _activeCustomerId = null;
 
     function loadComment(customerId) {
         _activeCustomerId = customerId;
@@ -776,7 +863,7 @@ if (empty($admin_customers)) {
             .catch(() => { ta.placeholder = 'Add a private note about this customer...'; });
     }
 
-    function saveComment() {
+    function saveComment(btnElement) {
         var ta = document.getElementById('d-comment');
         if (!ta || !_activeCustomerId) return;
         var comment = ta.value.trim();
@@ -792,8 +879,12 @@ if (empty($admin_customers)) {
                 } else {
                     showToast(data.message || 'Failed to save note.', 'error');
                 }
+                if (btnElement) setButtonLoading(btnElement, false);
             })
-            .catch(() => showToast('An error occurred while saving note.', 'error'));
+            .catch(() => {
+                showToast('An error occurred while saving note.', 'error');
+                if (btnElement) setButtonLoading(btnElement, false);
+            });
     }
 
     function closeDetailPane() {

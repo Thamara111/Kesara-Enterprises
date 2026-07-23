@@ -19,6 +19,12 @@ if (isset($pdo) && $pdo !== null) {
         $checkDiscount = $pdo->query("SHOW COLUMNS FROM products LIKE 'discount'");
         if (!$checkDiscount->fetch())
             $pdo->exec("ALTER TABLE products ADD COLUMN discount DECIMAL(10,2) DEFAULT 0.00");
+        $checkDiscountStart = $pdo->query("SHOW COLUMNS FROM products LIKE 'discount_start'");
+        if (!$checkDiscountStart->fetch())
+            $pdo->exec("ALTER TABLE products ADD COLUMN discount_start DATE DEFAULT NULL");
+        $checkDiscountEnd = $pdo->query("SHOW COLUMNS FROM products LIKE 'discount_end'");
+        if (!$checkDiscountEnd->fetch())
+            $pdo->exec("ALTER TABLE products ADD COLUMN discount_end DATE DEFAULT NULL");
         $checkGsm = $pdo->query("SHOW COLUMNS FROM products LIKE 'gsm'");
         if (!$checkGsm->fetch())
             $pdo->exec("ALTER TABLE products ADD COLUMN gsm VARCHAR(100) DEFAULT NULL");
@@ -37,7 +43,7 @@ if (isset($pdo) && $pdo !== null) {
         $all_categories = $cat_stmt->fetchAll();
 
         // Fetch all active products, joined with their category names
-        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.gsm, p.waistband,
+        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband,
                                     COALESCE((SELECT SUM(quantity) FROM inventory WHERE product_id = p.id), 0) AS total_stock
                              FROM products p 
                              LEFT JOIN categories c ON p.category_id = c.id 
@@ -81,6 +87,8 @@ if (isset($pdo) && $pdo !== null) {
                 'colors' => $pr['colors'] ?? '',
                 'sizes' => $pr['sizes'] ?? '',
                 'discount' => (float) ($pr['discount'] ?? 0),
+                'discount_start' => $pr['discount_start'] ?? '',
+                'discount_end' => $pr['discount_end'] ?? '',
                 'gsm' => $pr['gsm'] ?? '',
                 'waistband' => $pr['waistband'] ?? '',
                 'tiers' => $formatted_tiers
@@ -105,102 +113,130 @@ if (empty($all_categories)) {
     <!-- LEFT: PRODUCT LIST -->
     <div class="flex-1 flex flex-col bg-white border-r border-gray-100 overflow-hidden">
         <!-- Header -->
-        <div class="p-8 border-b border-gray-50 flex items-center justify-between gap-4">
-            <h1 class="text-xl font-extrabold text-gray-900 tracking-tight uppercase">Products</h1>
-            <!-- Search & Filters -->
-            <div class="space-y-4">
-                <div class="flex gap-4">
-                    <div class="relative flex-1 group">
-                        <i
-                            class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand transition-colors"></i>
-                        <input type="text" id="prod-search" placeholder="Search SKU or Name..."
-                            class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-transparent rounded-2xl text-xs font-medium outline-none focus:bg-white focus:border-brand/20 transition-all">
-                    </div>
-                    <select id="prod-cat-filter"
-                        class="bg-gray-50 border border-transparent rounded-2xl px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest outline-none cursor-pointer focus:bg-white focus:border-brand/20 transition-all">
-                        <option value="">Category</option>
-                        <option value="all">All Categories</option>
-                        <?php foreach ($all_categories as $cat): ?>
-                            <option value="<?= htmlspecialchars($cat['name']) ?>">
-                                <?= htmlspecialchars($cat['name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+        <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Products</h1>
+                <p class="text-sm text-gray-500 mt-1">Manage catalog items, pricing, and availability.</p>
             </div>
+            
             <button onclick="showNew()"
-                class="bg-brand text-brand-light font-bold px-6 py-3 rounded-2xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all flex items-center gap-2 shadow-lg shadow-brand/20">
-                <i class="ti ti-plus"></i> Add Product
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand-dark transition-all shadow-sm">
+                <i class="ti ti-plus text-lg"></i> Add Product
             </button>
+        </div>
+
+        <!-- Filters -->
+        <div class="px-8 py-4 border-b border-gray-100 flex items-center justify-end">
+            <!-- Search & Filters -->
+            <div class="bg-gray-50/30 flex items-center gap-4">
+                <div class="relative flex-1 group">
+                    <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors"></i>
+                    <input type="text" id="prod-search" placeholder="Search SKU or Name..."
+                        class="w-full pl-11 pr-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all">
+                </div>
+                <select id="prod-cat-filter"
+                    class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm font-medium transition-all cursor-pointer">
+                    <option value="">All Categories</option>
+                    <?php foreach ($all_categories as $cat): ?>
+                        <option value="<?= htmlspecialchars($cat['name']) ?>">
+                            <?= htmlspecialchars($cat['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
         </div>
 
 
 
         <!-- Product Table -->
-        <div class="flex-1 overflow-auto px-8 py-4">
-            <div class="min-w-[650px]">
-                <div
-                    class="grid grid-cols-[48px_1fr_80px_80px_100px_80px] gap-4 pb-4 text-[10px] font-bold text-gray-300 uppercase tracking-widest border-b border-gray-50 mb-4 px-2">
-                    <span>IMG</span>
-                    <span>Product Detail</span>
-                    <span>MOQ</span>
-                    <span>Base</span>
-                    <span>Status</span>
-                    <span class="text-right">Actions</span>
-                </div>
-
-                <div id="prod-list" class="space-y-1 pb-10">
-                    <?php if (empty($admin_products)): ?>
-                        <div class="flex flex-col items-center justify-center py-24 text-center gap-4">
-                            <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300"><i
-                                    class="ti ti-shirt text-3xl"></i></div>
-                            <p class="text-sm font-bold text-gray-400">No products found</p>
-                        </div>
-                    <?php else: ?>
-                        <?php foreach ($admin_products as $idx => $p): ?>
-                            <div id="prod-row-<?= $idx ?>"
-                                class="prod-card p-4 bg-white border border-transparent rounded-3xl cursor-pointer transition-all hover:bg-gray-50 grid grid-cols-[48px_1fr_80px_80px_100px_80px] gap-4 items-center group"
-                                data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($p['id']) ?>"
-                                data-name="<?= htmlspecialchars(strtolower($p['name'])) ?>"
-                                data-sku="<?= htmlspecialchars(strtolower($p['sku'])) ?>"
-                                data-cat="<?= htmlspecialchars(strtolower($p['cat'])) ?>"
-                                data-original-name="<?= htmlspecialchars($p['name']) ?>"
-                                data-original-sku="<?= htmlspecialchars($p['sku']) ?>"
-                                data-original-cat="<?= htmlspecialchars($p['cat']) ?>"
-                                data-desc="<?= htmlspecialchars($p['desc']) ?>"
-                                data-images="<?= htmlspecialchars(json_encode($p['images'])) ?>"
-                                data-colors="<?= htmlspecialchars($p['colors']) ?>"
-                                data-sizes="<?= htmlspecialchars($p['sizes']) ?>"
-                                data-discount="<?= htmlspecialchars($p['discount']) ?>"
-                                data-gsm="<?= htmlspecialchars($p['gsm']) ?>"
-                                data-waistband="<?= htmlspecialchars($p['waistband']) ?>"
-                                data-status="<?= htmlspecialchars($p['status']) ?>"
-                                data-tiers="<?= htmlspecialchars(json_encode($p['tiers'])) ?>" onclick="selectProd(this)">
-                                <div
-                                    class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all overflow-hidden">
-                                    <?= (!empty($p['images']) && isset($p['images'][0])) ? '<img src="' . htmlspecialchars($p['images'][0]) . '" alt="' . htmlspecialchars($p['name']) . '" class="w-full h-full object-cover">' : '<i class="ti ti-shirt text-2xl"></i>' ?>
-                                </div>
-                                <div class="min-w-0">
-                                    <h4
-                                        class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors truncate">
-                                        <?= htmlspecialchars($p['name']) ?></h4>
-                                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 truncate">
-                                        <?= htmlspecialchars($p['sku']) ?> · <?= htmlspecialchars($p['cat']) ?></p>
-                                </div>
-                                <span class="text-xs font-bold text-gray-500"><?= htmlspecialchars($p['moq']) ?></span>
-                                <span class="text-xs font-black text-gray-900 truncate">LKR
-                                    <?= htmlspecialchars($p['price']) ?></span>
-                                <span
-                                    class="px-3 py-1 <?= $p['badge'] ?> text-[9px] font-bold rounded-full border uppercase tracking-tighter text-center truncate"><?= htmlspecialchars($p['status']) ?></span>
-                                <div class="flex justify-end gap-2 text-gray-300">
-                                    <button class="p-2 hover:text-brand transition-colors"><i class="ti ti-edit"></i></button>
-                                    <button class="p-2 hover:text-red-500 transition-colors"
-                                        onclick="event.stopPropagation(); selectProd(this.closest('.prod-card')); deleteProduct();"><i
-                                            class="ti ti-trash"></i></button>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
+        <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10">
+            <div class="min-w-[800px] p-6 space-y-1">
+                <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
+                    <thead>
+                        <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
+                            <th class="px-4 py-3 rounded-l-xl w-16">IMG</th>
+                            <th class="px-4 py-3">Product Detail</th>
+                            <th class="px-4 py-3 w-20 text-center">MOQ</th>
+                            <th class="px-4 py-3 w-24">Base</th>
+                            <th class="px-4 py-3 w-24">Status</th>
+                            <th class="px-4 py-3 text-right rounded-r-xl w-24">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="prod-list">
+                        <?php if (empty($admin_products)): ?>
+                            <tr id="empty-state">
+                                <td colspan="6">
+                                    <div class="flex flex-col items-center justify-center py-24 text-center gap-4">
+                                        <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300">
+                                            <i class="ti ti-shirt text-3xl"></i>
+                                        </div>
+                                        <p class="text-sm font-bold text-gray-400">No products found</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($admin_products as $idx => $p): ?>
+                                <tr id="prod-row-<?= $idx ?>"
+                                    class="prod-card bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
+                                    data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($p['id']) ?>"
+                                    data-name="<?= htmlspecialchars(strtolower($p['name'])) ?>"
+                                    data-sku="<?= htmlspecialchars(strtolower($p['sku'])) ?>"
+                                    data-cat="<?= htmlspecialchars(strtolower($p['cat'])) ?>"
+                                    data-original-name="<?= htmlspecialchars($p['name']) ?>"
+                                    data-original-sku="<?= htmlspecialchars($p['sku']) ?>"
+                                    data-original-cat="<?= htmlspecialchars($p['cat']) ?>"
+                                    data-desc="<?= htmlspecialchars($p['desc']) ?>"
+                                    data-images="<?= htmlspecialchars(json_encode($p['images'])) ?>"
+                                    data-colors="<?= htmlspecialchars($p['colors']) ?>"
+                                    data-sizes="<?= htmlspecialchars($p['sizes']) ?>"
+                                    data-discount="<?= htmlspecialchars($p['discount']) ?>"
+                                    data-discount-start="<?= htmlspecialchars($p['discount_start']) ?>"
+                                    data-discount-end="<?= htmlspecialchars($p['discount_end']) ?>"
+                                    data-gsm="<?= htmlspecialchars($p['gsm']) ?>"
+                                    data-waistband="<?= htmlspecialchars($p['waistband']) ?>"
+                                    data-status="<?= htmlspecialchars($p['status']) ?>"
+                                    data-tiers="<?= htmlspecialchars(json_encode($p['tiers'])) ?>" onclick="selectProd(this, false)">
+                                    
+                                    <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30 w-16">
+                                        <div class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all overflow-hidden">
+                                            <?= (!empty($p['images']) && isset($p['images'][0])) ? '<img src="' . htmlspecialchars($p['images'][0]) . '" alt="' . htmlspecialchars($p['name']) . '" class="w-full h-full object-cover">' : '<i class="ti ti-shirt text-2xl"></i>' ?>
+                                        </div>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 min-w-0">
+                                        <h4 class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors truncate"><?= htmlspecialchars($p['name']) ?></h4>
+                                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 truncate"><?= htmlspecialchars($p['sku']) ?> · <?= htmlspecialchars($p['cat']) ?></p>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-center">
+                                        <span class="text-xs font-bold text-gray-500"><?= htmlspecialchars($p['moq']) ?></span>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
+                                        <span class="text-xs font-black text-gray-900 truncate">LKR <?= htmlspecialchars($p['price']) ?></span>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
+                                        <span class="px-2.5 py-1 <?= $p['badge'] ?> text-[9px] font-bold rounded-full border uppercase tracking-tighter text-center truncate"><?= htmlspecialchars($p['status']) ?></span>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
+                                        <div class="flex justify-end gap-2 text-gray-300">
+                                            <button class="p-2 hover:text-brand transition-colors" onclick="event.stopPropagation(); selectProd(this.closest('.prod-card'), true);"><i class="ti ti-edit text-lg"></i></button>
+                                            <button class="p-2 hover:text-red-500 transition-colors" onclick="event.stopPropagation(); selectProd(this.closest('.prod-card'), false); deleteProduct();"><i class="ti ti-trash text-lg"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Pagination Controls -->
+            <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white" id="pagination-controls">
+                <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
+                <div class="flex items-center gap-2" id="pagination-buttons">
+                    <!-- Buttons injected by JS -->
                 </div>
             </div>
         </div>
@@ -212,7 +248,7 @@ if (empty($all_categories)) {
         class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300"
         onclick="closeProductFormPane()"></div>
     <div id="product-form-pane"
-        class="fixed inset-y-0 right-0 z-50 w-[500px] max-w-full bg-gray-50 border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
+        class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-gray-50 border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
         <!-- Form Header -->
         <div class="p-8 border-b border-gray-100 bg-white flex items-center justify-between">
             <h2 id="form-mode-label" class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Edit Product
@@ -268,12 +304,23 @@ if (empty($all_categories)) {
                             class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
                     </div>
                 </div>
-                <div class="space-y-2">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Discount
-                        (%)</label>
-                    <input type="number" step="0.01" id="f-discount"
-                        class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm"
-                        value="0">
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Discount (%)</label>
+                        <input type="number" step="0.01" id="f-discount"
+                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm"
+                            value="0">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid From</label>
+                        <input type="date" id="f-discount-start"
+                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm text-gray-500">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid To</label>
+                        <input type="date" id="f-discount-end"
+                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm text-gray-500">
+                    </div>
                 </div>
                 <div class="space-y-2">
                     <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Product
@@ -335,6 +382,13 @@ if (empty($all_categories)) {
                 <h4
                     class="text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em] border-b border-gray-100 pb-2">
                     Wholesale Tiers</h4>
+                
+                <div class="grid grid-cols-[1fr_1fr_40px] gap-3 px-1 -mb-4">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Min. Qty</label>
+                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Unit Price</label>
+                    <div></div>
+                </div>
+
                 <div id="tier-rows" class="space-y-3">
                     <!-- Injected by JS -->
                 </div>
@@ -392,13 +446,13 @@ if (empty($all_categories)) {
 
             <!-- Controls -->
             <div class="flex gap-4 pt-10">
-                <button onclick="saveProduct()"
-                    class="flex-[2] bg-brand text-brand-light font-bold py-5 rounded-[1.5rem] text-xs uppercase tracking-widest shadow-xl shadow-brand/20 hover:bg-brand-dark transition-all transform hover:-translate-y-px">
-                    Save Changes
+                <button id="btn-prod-save" onclick="saveProduct()"
+                    class="flex-[2] bg-brand text-brand-light font-bold py-5 rounded-[1.5rem] text-xs uppercase tracking-widest shadow-xl shadow-brand/20 hover:bg-brand-dark transition-all transform hover:-translate-y-px flex items-center justify-center gap-2">
+                    <span>Save Changes</span>
                 </button>
                 <button id="btn-prod-delete" onclick="deleteProduct()"
-                    class="flex-1 bg-white border border-red-100 text-red-500 font-bold py-5 rounded-[1.5rem] text-xs uppercase tracking-widest hover:bg-red-50 transition-all">
-                    Delete
+                    class="flex-1 bg-white border border-red-100 text-red-500 font-bold py-5 rounded-[1.5rem] text-xs uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2">
+                    <span>Delete</span>
                 </button>
             </div>
 
@@ -442,6 +496,8 @@ if (empty($all_categories)) {
         document.getElementById('f-cat').value = el.dataset.originalCat || '';
         document.getElementById('f-desc').value = el.dataset.desc || '';
         document.getElementById('f-discount').value = el.dataset.discount || '0';
+        document.getElementById('f-discount-start').value = el.dataset.discountStart || '';
+        document.getElementById('f-discount-end').value = el.dataset.discountEnd || '';
         document.getElementById('f-gsm').value = el.dataset.gsm || '';
         document.getElementById('f-waistband').value = el.dataset.waistband || '';
 
@@ -537,6 +593,8 @@ if (empty($all_categories)) {
         document.getElementById('f-sku').value = '';
         document.getElementById('f-desc').value = '';
         document.getElementById('f-discount').value = '0';
+        document.getElementById('f-discount-start').value = '';
+        document.getElementById('f-discount-end').value = '';
         document.getElementById('f-gsm').value = '';
         document.getElementById('f-waistband').value = '';
         document.getElementById('tier-rows').innerHTML = '';
@@ -653,6 +711,8 @@ if (empty($all_categories)) {
         updateProductPreviewFromUrl('', index);
     }
 
+
+
     function saveProduct() {
         var id = document.getElementById('f-id').value;
         var name = document.getElementById('f-name').value;
@@ -660,6 +720,8 @@ if (empty($all_categories)) {
         var category_name = document.getElementById('f-cat').value;
         var description = document.getElementById('f-desc').value;
         var discount = document.getElementById('f-discount').value;
+        var discountStart = document.getElementById('f-discount-start').value;
+        var discountEnd = document.getElementById('f-discount-end').value;
         var gsm = document.getElementById('f-gsm').value;
         var waistband = document.getElementById('f-waistband').value;
 
@@ -681,6 +743,8 @@ if (empty($all_categories)) {
             showToast("Product Title and SKU Code are required.", "error");
             return;
         }
+        
+        setButtonLoading('btn-prod-save', true);
 
         var formData = new FormData();
         formData.append('id', id ? parseInt(id) : 0);
@@ -695,6 +759,8 @@ if (empty($all_categories)) {
         formData.append('colors', document.getElementById('f-colors').value);
         formData.append('sizes', document.getElementById('f-sizes').value);
         formData.append('discount', discount);
+        formData.append('discount_start', discountStart);
+        formData.append('discount_end', discountEnd);
         formData.append('gsm', gsm);
         formData.append('waistband', waistband);
 
@@ -722,11 +788,13 @@ if (empty($all_categories)) {
                     }, 3000);
                 } else {
                     showToast(data.message || 'Error saving product.', 'error');
+                    setButtonLoading('btn-prod-save', false);
                 }
             })
             .catch(err => {
                 console.error(err);
                 showToast('Network error saving product.', 'error');
+                setButtonLoading('btn-prod-save', false);
             });
     }
 
@@ -758,6 +826,7 @@ if (empty($all_categories)) {
         var id = document.getElementById('f-id').value;
         if (!id) return;
 
+        setButtonLoading('btn-confirm-delete', true);
         fetch('/api/products.php?action=delete', {
             method: 'POST',
             headers: {
@@ -774,20 +843,76 @@ if (empty($all_categories)) {
                     }, 3000);
                 } else {
                     showToast(data.message || 'Error deleting product.', 'error');
+                    setButtonLoading('btn-confirm-delete', false);
                 }
             })
             .catch(err => {
                 console.error(err);
                 showToast('Network error deleting product.', 'error');
+                setButtonLoading('btn-confirm-delete', false);
             });
     }
 
-    // Filters
+    var currentPage = 1;
+    var itemsPerPage = 15;
+
+    function goToPage(page) {
+        currentPage = page;
+        applyFilters();
+    }
+
+    function renderPagination(totalItems, totalPages) {
+        var info = document.getElementById('pagination-info');
+        var buttons = document.getElementById('pagination-buttons');
+        if (!info || !buttons) return;
+
+        if (totalItems === 0) {
+            info.textContent = 'Showing 0 entries';
+            buttons.innerHTML = '';
+            return;
+        }
+
+        var start = (currentPage - 1) * itemsPerPage + 1;
+        var end = Math.min(currentPage * itemsPerPage, totalItems);
+        info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
+
+        var html = '';
+        
+        // Prev button
+        var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+        html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
+
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === currentPage) {
+                html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
+            } else if (
+                i === 1 || 
+                i === totalPages || 
+                (i >= currentPage - 1 && i <= currentPage + 1)
+            ) {
+                html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
+            } else if (i === currentPage - 2 || i === currentPage + 2) {
+                html += `<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">...</span>`;
+            }
+        }
+
+        // Next button
+        var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+        html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
+
+        buttons.innerHTML = html;
+    }
+
     function applyFilters() {
         var q = (document.getElementById('prod-search')?.value || '').toLowerCase().trim();
         var cat = (document.getElementById('prod-cat-filter')?.value || '').toLowerCase();
 
-        document.querySelectorAll('.prod-card').forEach(row => {
+        var list = document.getElementById('prod-list');
+        var rows = Array.from(document.querySelectorAll('.prod-card'));
+        var visibleRows = [];
+
+        rows.forEach(row => {
             var rName = row.dataset.name || '';
             var rSku = row.dataset.sku || '';
             var rCat = row.dataset.cat || '';
@@ -795,12 +920,41 @@ if (empty($all_categories)) {
             var matchQ = !q || rName.includes(q) || rSku.includes(q);
             var matchCat = !cat || cat === 'all' || rCat === cat;
 
-            row.hidden = !(matchQ && matchCat);
+            if (matchQ && matchCat) {
+                visibleRows.push(row);
+            } else {
+                row.hidden = true;
+                row.style.display = 'none';
+            }
         });
+
+        // Sort latest first (highest id)
+        visibleRows.sort((a, b) => parseInt(b.dataset.id) - parseInt(a.dataset.id));
+
+        var totalItems = visibleRows.length;
+        var totalPages = Math.ceil(totalItems / itemsPerPage);
+        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        var start = (currentPage - 1) * itemsPerPage;
+        var end = start + itemsPerPage;
+
+        visibleRows.forEach((r, index) => {
+            if (index >= start && index < end) {
+                r.hidden = false;
+                r.style.display = '';
+            } else {
+                r.hidden = true;
+                r.style.display = 'none';
+            }
+        });
+
+        visibleRows.forEach(r => list.appendChild(r));
+        renderPagination(totalItems, totalPages);
     }
 
-    document.getElementById('prod-search')?.addEventListener('input', applyFilters);
-    document.getElementById('prod-cat-filter')?.addEventListener('change', applyFilters);
+    document.getElementById('prod-search')?.addEventListener('input', () => { currentPage = 1; applyFilters(); });
+    document.getElementById('prod-cat-filter')?.addEventListener('change', () => { currentPage = 1; applyFilters(); });
 
     // Initial render logic
     var firstRow = document.querySelector('.prod-card');
@@ -825,8 +979,8 @@ if (empty($all_categories)) {
         <div class="flex gap-3 w-full">
             <button onclick="closeDeleteModal()"
                 class="flex-1 bg-gray-50 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-100 transition-colors">Cancel</button>
-            <button onclick="confirmDeleteProduct()"
-                class="flex-1 bg-red-500 text-white font-bold py-3.5 rounded-2xl hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all transform hover:-translate-y-px">Delete</button>
+            <button id="btn-confirm-delete" onclick="confirmDeleteProduct()"
+                class="flex-1 bg-red-500 text-white font-bold py-3.5 rounded-2xl hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all transform hover:-translate-y-px flex items-center justify-center gap-2"><span>Delete</span></button>
         </div>
     </div>
 </div>

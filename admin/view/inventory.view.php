@@ -132,61 +132,64 @@ if ($pressure_count > 0) {
                 <p class="text-sm text-gray-500 mt-1">Manage stock levels and warehouse replenishment.</p>
             </div>
             <!-- Stats -->
-            <div class="grid grid-cols-4 gap-4 px-2">
-                <div class="bg-gray-50/50 rounded-2xl p-4 border border-gray-100 text-center">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total SKUs</p>
-                    <p class="text-2xl font-bold text-gray-900 mt-1"><?= $total_skus ?></p>
+            <div class="flex items-center gap-6">
+                <div class="flex gap-4">
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-gray-900"><?= $total_skus ?></p>
+                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Total SKUs</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-red-600"><?= $critical_count ?></p>
+                        <p class="text-[9px] font-bold text-red-500 uppercase tracking-widest mt-0.5">Critical</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-amber-600"><?= $low_stock_count ?></p>
+                        <p class="text-[9px] font-bold text-amber-500 uppercase tracking-widest mt-0.5">Low Stock</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-gray-500"><?= $out_of_stock_count ?></p>
+                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Out of Stock</p>
+                    </div>
                 </div>
-                <div class="bg-red-50/50 rounded-2xl p-4 border border-red-100 text-center">
-                    <p class="text-[10px] font-bold text-red-500 uppercase tracking-wider">Critical Stock</p>
-                    <p class="text-2xl font-bold text-red-600 mt-1"><?= $critical_count ?></p>
-                </div>
-                <div class="bg-amber-50/50 rounded-2xl p-4 border border-amber-100 text-center">
-                    <p class="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Low Stock</p>
-                    <p class="text-2xl font-bold text-amber-600 mt-1"><?= $low_stock_count ?></p>
-                </div>
-                <div class="bg-gray-100/50 rounded-2xl p-4 border border-gray-200 text-center">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Out of Stock</p>
-                    <p class="text-2xl font-bold text-gray-500 mt-1"><?= $out_of_stock_count ?></p>
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <?php if ($pressure_count > 0): ?>
-                    <?php if ($auto_alert_sent): ?>
-                        <!-- Alert fired this page load -->
-                        <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-700"
-                            title="Warning email sent automatically">
-                            <i class="ti ti-circle-check text-base"></i>
-                            <span>Alert sent &middot; <?= htmlspecialchars($auto_alert_time) ?></span>
-                        </div>
-                    <?php elseif ($auto_alert_error): ?>
-                        <!-- API returned an error -->
-                        <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600"
-                            title="<?= htmlspecialchars($auto_alert_error) ?>">
-                            <i class="ti ti-alert-circle text-base"></i>
-                            <span>Alert failed</span>
-                        </div>
+                
+                <div class="flex items-center gap-3 border-l border-gray-100 pl-6">
+                    <?php if ($pressure_count > 0): ?>
+                        <?php if ($auto_alert_sent): ?>
+                            <!-- Alert fired this page load -->
+                            <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-700"
+                                title="Warning email sent automatically">
+                                <i class="ti ti-circle-check text-base"></i>
+                                <span>Alert sent &middot; <?= htmlspecialchars($auto_alert_time) ?></span>
+                            </div>
+                        <?php elseif ($auto_alert_error): ?>
+                            <!-- API returned an error -->
+                            <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600"
+                                title="<?= htmlspecialchars($auto_alert_error) ?>">
+                                <i class="ti ti-alert-circle text-base"></i>
+                                <span>Alert failed</span>
+                            </div>
+                        <?php else: ?>
+                            <!-- Within cooldown window -->
+                            <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-xs font-bold text-amber-700"
+                                title="Next alert after 1 hour cooldown">
+                                <i class="ti ti-clock text-base"></i>
+                                <span>Last alert &middot; <?= htmlspecialchars($auto_alert_time ?? '—') ?></span>
+                            </div>
+                        <?php endif; ?>
                     <?php else: ?>
-                        <!-- Within cooldown window -->
-                        <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-amber-200 bg-amber-50 text-xs font-bold text-amber-700"
-                            title="Next alert after 1 hour cooldown">
-                            <i class="ti ti-clock text-base"></i>
-                            <span>Last alert &middot; <?= htmlspecialchars($auto_alert_time ?? '—') ?></span>
+                        <!-- All stock healthy — no alert needed -->
+                        <div
+                            class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold text-gray-400">
+                            <i class="ti ti-circle-check text-base"></i>
+                            <span>Stock healthy</span>
                         </div>
                     <?php endif; ?>
-                <?php else: ?>
-                    <!-- All stock healthy — no alert needed -->
-                    <div
-                        class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold text-gray-400">
-                        <i class="ti ti-circle-check text-base"></i>
-                        <span>Stock healthy</span>
-                    </div>
-                <?php endif; ?>
-                <button
-                    class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all"
-                    onclick="downloadPDF('inventory-container', 'Inventory_Report')">
-                    <i class="ti ti-download"></i> Export PDF
-                </button>
+                    <button
+                        class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
+                        onclick="downloadPDF('inventory-container', 'Inventory_Report')">
+                        <i class="ti ti-download text-lg"></i> Export PDF
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -205,10 +208,10 @@ if ($pressure_count > 0) {
                 <div class="relative flex-1">
                     <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
                     <input type="text" id="search-input" placeholder="Search product or SKU..."
-                        onkeyup="applyFilters()"
+                        oninput="currentPage=1;applyFilters()"
                         class="w-full pl-11 pr-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all">
                 </div>
-                <select id="product-filter" onchange="applyFilters()"
+                <select id="product-filter" onchange="currentPage=1;applyFilters()"
                     class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm font-medium transition-all max-w-xs">
                     <option value="">All products</option>
                     <?php if(!empty($all_products)): ?>
@@ -233,70 +236,90 @@ if ($pressure_count > 0) {
         </div>
 
         <!-- List -->
-        <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar" id="inv-list-container">
-            <div class="min-w-[800px] p-6 space-y-1" id="inv-list">
-                <?php if (empty($rows)): ?>
-                    <div class="text-xs text-gray-400 text-center py-10 italic">No variants match this filter.</div>
-                <?php else: ?>
-                    <?php foreach ($rows as $idx => $r): ?>
-                        <?php
-                        $p = 0;
-                        if ($r['thresh'] > 0) {
-                            $p = min(100, (int) round(($r['stock'] / $r['thresh']) * 100));
-                        }
-                        $status = $r['stock'] <= 50 ? 'Out of stock' : ($p <= 50 ? 'Critical' : ($p <= 75 ? 'Low stock' : 'In stock'));
-                        $stockColor = $r['stock'] <= 50 ? '#6B7280' : ($p <= 50 ? '#791F1F' : ($p <= 75 ? '#633806' : '#111827'));
-                        $barColor = $r['stock'] <= 50 ? '#9CA3AF' : ($p <= 50 ? '#E24B4A' : ($p <= 75 ? '#EF9F27' : '#1D9E75'));
-                        $badgeClass = $r['stock'] <= 50 ? 'bg-gray-100 text-gray-500 border-gray-200' : ($p <= 50 ? 'bg-red-100 text-red-700' : ($p <= 75 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
-                        $badgeText = $r['stock'] <= 50 ? 'Out of stock' : ($p <= 50 ? 'Critical' : ($p <= 75 ? 'Low stock' : 'In stock'));
-                        ?>
-                        <div id="inv-row-<?= $idx ?>"
-                            class="inv-row grid grid-cols-[minmax(200px,2fr)_60px_70px_80px_1fr_100px] gap-4 p-4 rounded-2xl cursor-pointer transition-all border border-transparent items-center hover:bg-gray-50"
-                            data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($r['id']) ?>"
-                            data-product="<?= htmlspecialchars($r['product_name']) ?>"
-                            data-name="<?= htmlspecialchars($r['name']) ?>" data-sku="<?= htmlspecialchars($r['sku']) ?>"
-                            data-stock="<?= htmlspecialchars($r['stock']) ?>"
-                            data-thresh="<?= htmlspecialchars($r['thresh']) ?>" data-status="<?= htmlspecialchars($status) ?>"
-                            data-logs="<?= htmlspecialchars(json_encode($r['logs'])) ?>" onclick="selectRow(this)">
-                            <div class="min-w-0 flex flex-col justify-center">
-                                <p class="text-sm font-bold text-gray-900 leading-tight truncate">
-                                    <?= htmlspecialchars(implode(' · ', array_slice(explode(' · ', $r['name']), 0, 2))) ?>
-                                </p>
-                                <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">
-                                    <?= htmlspecialchars($r['sku']) ?>
-                                </p>
-                            </div>
-                            <div
-                                class="flex items-center justify-center text-xs font-bold text-gray-500 bg-gray-100/50 rounded-lg h-8">
-                                <?= htmlspecialchars($r['size']) ?>
-                            </div>
-                            <div class="stock-val flex items-center justify-center text-sm font-black"
-                                style="color: <?= $stockColor ?>"><?= htmlspecialchars($r['stock']) ?></div>
-                            <div class="flex items-center justify-center text-xs font-bold text-gray-400">
-                                <?= htmlspecialchars($r['thresh']) ?>
-                            </div>
-                            <div class="flex items-center px-2">
-                                <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                    <div class="bar-val h-full rounded-full transition-all duration-500"
-                                        style="width: <?= $p ?>%; background-color: <?= $barColor ?>"></div>
-                                </div>
-                            </div>
-                            <div class="flex items-center justify-end">
-                                <span
-                                    class="badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest <?= $badgeClass ?> border border-transparent shadow-sm"><?= $badgeText ?></span>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+        <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10" id="inv-list-container">
+            <div class="min-w-[800px] p-6 space-y-1">
+                <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
+                    <thead>
+                        <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
+                            <th class="px-4 py-3 rounded-l-xl w-64">Product / Variant</th>
+                            <th class="px-4 py-3 w-20 text-center">Size</th>
+                            <th class="px-4 py-3 w-24 text-center">Stock</th>
+                            <th class="px-4 py-3 w-24 text-center">Min</th>
+                            <th class="px-4 py-3 text-center">Health</th>
+                            <th class="px-4 py-3 text-right rounded-r-xl w-32">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inv-list">
+                        <?php if (empty($rows)): ?>
+                            <tr>
+                                <td colspan="6" class="text-xs text-gray-400 text-center py-10 italic">No variants match this filter.</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($rows as $idx => $r): ?>
+                                <?php
+                                $p = 0;
+                                if ($r['thresh'] > 0) {
+                                    $p = min(100, (int) round(($r['stock'] / $r['thresh']) * 100));
+                                }
+                                $status = $r['stock'] <= 50 ? 'Out of stock' : ($p <= 50 ? 'Critical' : ($p <= 75 ? 'Low stock' : 'In stock'));
+                                $stockColor = $r['stock'] <= 50 ? '#6B7280' : ($p <= 50 ? '#791F1F' : ($p <= 75 ? '#633806' : '#111827'));
+                                $barColor = $r['stock'] <= 50 ? '#9CA3AF' : ($p <= 50 ? '#E24B4A' : ($p <= 75 ? '#EF9F27' : '#1D9E75'));
+                                $badgeClass = $r['stock'] <= 50 ? 'bg-gray-100 text-gray-500 border-gray-200' : ($p <= 50 ? 'bg-red-100 text-red-700' : ($p <= 75 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
+                                $badgeText = $r['stock'] <= 50 ? 'Out of stock' : ($p <= 50 ? 'Critical' : ($p <= 75 ? 'Low stock' : 'In stock'));
+                                ?>
+                                <tr id="inv-row-<?= $idx ?>"
+                                    class="inv-row bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
+                                    data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($r['id']) ?>"
+                                    data-product="<?= htmlspecialchars($r['product_name']) ?>"
+                                    data-name="<?= htmlspecialchars($r['name']) ?>" data-sku="<?= htmlspecialchars($r['sku']) ?>"
+                                    data-stock="<?= htmlspecialchars($r['stock']) ?>"
+                                    data-thresh="<?= htmlspecialchars($r['thresh']) ?>" data-status="<?= htmlspecialchars($status) ?>"
+                                    data-logs="<?= htmlspecialchars(json_encode($r['logs'])) ?>" onclick="selectRow(this)">
+                                    
+                                    <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30">
+                                        <div class="flex flex-col justify-center">
+                                            <p class="text-sm font-bold text-gray-900 leading-tight truncate group-hover:text-brand transition-colors">
+                                                <?= htmlspecialchars(implode(' · ', array_slice(explode(' · ', $r['name']), 0, 2))) ?>
+                                            </p>
+                                            <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">
+                                                <?= htmlspecialchars($r['sku']) ?>
+                                            </p>
+                                        </div>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
+                                        <div class="flex items-center justify-center text-xs font-bold text-gray-500 bg-gray-100/50 rounded-lg h-8 px-2 mx-auto w-max">
+                                            <?= htmlspecialchars($r['size']) ?>
+                                        </div>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 stock-val text-center text-sm font-black" style="color: <?= $stockColor ?>">
+                                        <?= htmlspecialchars($r['stock']) ?>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-center text-xs font-bold text-gray-400">
+                                        <?= htmlspecialchars($r['thresh']) ?>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
+                                        <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[200px] mx-auto">
+                                            <div class="bar-val h-full rounded-full transition-all duration-500" style="width: <?= $p ?>%; background-color: <?= $barColor ?>"></div>
+                                        </div>
+                                    </td>
+                                    
+                                    <td class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
+                                        <span class="badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest <?= $badgeClass ?> border border-transparent shadow-sm whitespace-nowrap">
+                                            <?= $badgeText ?>
+                                        </span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Pagination -->
-        <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between">
-            <p class="text-xs font-medium text-gray-500">Showing <span class="text-gray-900"><?= count($rows) ?></span>
-                of <span class="text-gray-900"><?= $total_skus ?></span> variants</p>
-            <div class="flex gap-2">
-                <button
                     class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all"><i
                         class="ti ti-chevron-left text-sm"></i></button>
                 <button
@@ -313,7 +336,7 @@ if ($pressure_count > 0) {
     <div id="inventory-detail-backdrop"
         class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300"
         onclick="closeAdjPane()"></div>
-    <div class="fixed inset-y-0 right-0 z-50 w-[400px] max-w-full bg-gray-50 border-l border-gray-200 overflow-y-auto flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300"
+    <div class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-gray-50 border-l border-gray-200 overflow-y-auto flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300"
         id="adj-pane">
         <div class="p-8 border-b border-gray-200 bg-white">
             <div class="flex items-center justify-between mb-6">
@@ -435,18 +458,29 @@ if ($pressure_count > 0) {
 
 <style>
     .chip {
-        padding: 0.5rem 1rem;
-        border-radius: 0.75rem;
-        font-size: 0.75rem;
+        padding: 0.375rem 1rem;
+        border-radius: 9999px;
+        font-size: 0.625rem;
         font-weight: 700;
-        border: 1px solid #e5e7eb;
-        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        border: 1px solid transparent;
+        color: #9CA3AF;
+        background-color: #F9FAFB;
         cursor: pointer;
         transition: all 0.15s ease-in-out;
         white-space: nowrap;
         flex-shrink: 0;
-        background-color: transparent;
     }
+    .chip:hover {
+        background-color: #F3F4F6;
+    }
+    .chip.on {
+        background-color: transparent !important;
+        border-color: transparent !important;
+        color: #111827 !important;
+    }
+    /* We handle .on manually in chipFilter by removing the active classes */
 
     .chip:hover {
         background-color: #f3f4f6;
@@ -481,9 +515,59 @@ if ($pressure_count > 0) {
     function badgeText(s, p) { return s <= 50 ? 'Out of stock' : p <= 50 ? 'Critical' : p <= 75 ? 'Low stock' : 'In stock'; }
 
     var activeFilter = 'All';
+    var currentPage = 1;
+    var itemsPerPage = 15;
+
+    function goToPage(page) {
+        currentPage = page;
+        applyFilters();
+    }
+
+    function renderPagination(totalItems, totalPages) {
+        var info = document.getElementById('pagination-info');
+        var buttons = document.getElementById('pagination-buttons');
+        if (!info || !buttons) return;
+
+        if (totalItems === 0) {
+            info.textContent = 'Showing 0 entries';
+            buttons.innerHTML = '';
+            return;
+        }
+
+        var start = (currentPage - 1) * itemsPerPage + 1;
+        var end = Math.min(currentPage * itemsPerPage, totalItems);
+        info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
+
+        var html = '';
+        
+        // Prev button
+        var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+        html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
+
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === currentPage) {
+                html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
+            } else if (
+                i === 1 || 
+                i === totalPages || 
+                (i >= currentPage - 1 && i <= currentPage + 1)
+            ) {
+                html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
+            } else if (i === currentPage - 2 || i === currentPage + 2) {
+                html += `<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">...</span>`;
+            }
+        }
+
+        // Next button
+        var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+        html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
+
+        buttons.innerHTML = html;
+    }
 
     function applyFilters() {
-        var visibleCount = 0;
+        var visibleRows = [];
         var searchVal = (document.getElementById('search-input').value || '').toLowerCase();
         var prodFilter = document.getElementById('product-filter').value;
         
@@ -497,22 +581,57 @@ if ($pressure_count > 0) {
             var rowProd = r.dataset.product || '';
 
             var visible = true;
-            if (activeFilter !== 'All' && status !== activeFilter) {
-                visible = false;
-            }
-            if (searchVal && !rowName.includes(searchVal) && !rowSku.includes(searchVal)) {
-                visible = false;
-            }
-            if (prodFilter && rowProd !== prodFilter) {
-                visible = false;
-            }
+            if (activeFilter !== 'All' && status !== activeFilter) visible = false;
+            if (searchVal && !rowName.includes(searchVal) && !rowSku.includes(searchVal)) visible = false;
+            if (prodFilter && rowProd !== prodFilter) visible = false;
 
-            r.style.display = visible ? '' : 'none';
-            if (visible) visibleCount++;
+            if (visible) {
+                visibleRows.push(r);
+            } else {
+                r.style.display = 'none';
+            }
         });
+
+        // Sort latest first
+        visibleRows.sort((a, b) => {
+            var aId = parseInt(a.dataset.id) || 0;
+            var bId = parseInt(b.dataset.id) || 0;
+            return bId - aId;
+        });
+
+        var totalItems = visibleRows.length;
+        var totalPages = Math.ceil(totalItems / itemsPerPage);
+        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        var start = (currentPage - 1) * itemsPerPage;
+        var end = start + itemsPerPage;
+
+        visibleRows.forEach((r, index) => {
+            if (index >= start && index < end) {
+                r.style.display = 'table-row';
+            } else {
+                r.style.display = 'none';
+            }
+        });
+
+        var list = document.getElementById('inv-list');
+        visibleRows.forEach(r => list.appendChild(r));
         
-        // Ensure detail pane shows first visible item or closes if none
-        if (visibleCount > 0) {
+        var list = document.getElementById('inv-list');
+        var emptyState = document.getElementById('empty-state');
+        if (emptyState) emptyState.remove();
+
+        if (totalItems === 0) {
+            var tr = document.createElement('tr');
+            tr.id = 'empty-state';
+            tr.innerHTML = '<td colspan="6" class="text-xs text-gray-400 text-center py-10 italic">No variants match this filter.</td>';
+            list.appendChild(tr);
+        }
+        
+        renderPagination(totalItems, totalPages);
+        
+        if (totalItems > 0) {
             var firstVisible = Array.from(document.querySelectorAll('.inv-row')).find(r => r.style.display !== 'none');
             if (firstVisible) selectRow(firstVisible, false);
         } else {
@@ -696,6 +815,7 @@ if ($pressure_count > 0) {
         activeFilter = el.textContent.trim();
 
         closeAdjPane();
+        currentPage = 1;
         applyFilters();
 
         // Find first matching visible row

@@ -32,7 +32,7 @@
             </div>
             <div>
                 <p class="text-sm font-semibold text-gray-400 mb-4">Legal</p>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Terms of sale</a>
+                <a href="/terms-&-conditions" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Terms of sale</a>
                 <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Privacy policy</a>
                 <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Returns policy</a>
             </div>

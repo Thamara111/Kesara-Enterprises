@@ -47,7 +47,7 @@ if (isset($_SESSION['admin_id'])) {
 
     // Matrix defining which views each administrative role is allowed to access
     $role_access = [
-        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp'],
+        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
         'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries', 'trash'],
         'supplier_manager' => ['dashboard', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'login', 'inquiries'],
         'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries']
@@ -149,8 +149,13 @@ $view_config = [
         'show_sidebar' => true
     ],
     'inquiries' => [
-        'title' => 'Customer Inquiries | Kesara Enterprises',
-        'description' => 'Manage and assign customer inquiries.',
+        'title' => 'Inquiries | Kesara Enterprises',
+        'description' => 'Manage and respond to customer inquiries and quotation requests.',
+        'show_sidebar' => true
+    ],
+    'audit_trail' => [
+        'title' => 'Audit Trail | Kesara Enterprises',
+        'description' => 'System activity log and administrative changes.',
         'show_sidebar' => true
     ],
     'whatsapp' => [
@@ -234,6 +239,41 @@ if ($current_config['show_sidebar']): ?>
     }
 endif;
 ?>
+
+<script>
+    // Global helper for action buttons across the entire admin panel
+    function setButtonLoading(btn, isLoading) {
+        if (typeof btn === 'string') btn = document.getElementById(btn);
+        if (!btn) return;
+        
+        if (isLoading) {
+            btn.disabled = true;
+            if (!btn.dataset.originalHtml) {
+                btn.dataset.originalHtml = btn.innerHTML;
+            }
+            btn.innerHTML = `<i class="ti ti-loader animate-spin text-lg"></i> <span>Processing...</span>`;
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+        } else {
+            btn.disabled = false;
+            if (btn.dataset.originalHtml) {
+                btn.innerHTML = btn.dataset.originalHtml;
+            }
+            btn.classList.remove('opacity-75', 'cursor-not-allowed');
+        }
+    }
+
+    // Automatically handle loader for all standard forms
+    document.addEventListener('submit', function(e) {
+        var form = e.target;
+        var submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+            // Prevent double submit natively by disabling the button shortly after (to allow form data to be gathered)
+            setTimeout(() => {
+                setButtonLoading(submitBtn, true);
+            }, 10);
+        }
+    });
+</script>
 </body>
 
 </html>

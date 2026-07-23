@@ -12,6 +12,10 @@ header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers
 // Connect to database
 require_once __DIR__ . "/../database/connection.php";
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Self-healing database check: Ensure all necessary columns exist on the products table
 if (isset($pdo) && $pdo !== null) {
     try {
@@ -26,6 +30,14 @@ if (isset($pdo) && $pdo !== null) {
         $checkDiscount = $pdo->query("SHOW COLUMNS FROM products LIKE 'discount'");
         if (!$checkDiscount->fetch()) {
             $pdo->exec("ALTER TABLE products ADD COLUMN discount DECIMAL(10,2) DEFAULT 0.00");
+        }
+        $checkDiscountStart = $pdo->query("SHOW COLUMNS FROM products LIKE 'discount_start'");
+        if (!$checkDiscountStart->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN discount_start DATE DEFAULT NULL");
+        }
+        $checkDiscountEnd = $pdo->query("SHOW COLUMNS FROM products LIKE 'discount_end'");
+        if (!$checkDiscountEnd->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN discount_end DATE DEFAULT NULL");
         }
         $checkSizes = $pdo->query("SHOW COLUMNS FROM products LIKE 'sizes'");
         if (!$checkSizes->fetch()) {
@@ -62,7 +74,7 @@ if ($method === 'GET') {
     if (isset($pdo) && $pdo !== null) {
         try {
             // Join products with their respective category names
-            $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.gsm, p.waistband 
+            $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband 
                                  FROM products p 
                                  LEFT JOIN categories c ON p.category_id = c.id
                                  ORDER BY p.name ASC");
@@ -98,6 +110,8 @@ if ($method === 'GET') {
                     'colors' => $pr['colors'] ?? '',
                     'sizes' => $pr['sizes'] ?? '',
                     'discount' => (float)($pr['discount'] ?? 0),
+                    'discount_start' => $pr['discount_start'] ?? '',
+                    'discount_end' => $pr['discount_end'] ?? '',
                     'gsm' => $pr['gsm'] ?? '',
                     'waistband' => $pr['waistband'] ?? '',
                     'tiers' => $formatted_tiers
@@ -140,9 +154,20 @@ if ($method === 'POST') {
         if (isset($pdo) && $pdo !== null) {
             try {
                 $pdo->beginTransaction();
+                // Fetch product name before deleting
+                $stmt_name = $pdo->prepare("SELECT name FROM products WHERE id = ?");
+                $stmt_name->execute([$id]);
+                $prod = $stmt_name->fetch();
+                $prod_name = $prod ? $prod['name'] : 'Unknown Product';
+
                 // Soft delete product by setting the deleted_at timestamp
                 $stmt2 = $pdo->prepare("UPDATE products SET deleted_at = NOW() WHERE id = ?");
                 $stmt2->execute([$id]);
+
+                // Audit Log
+                $details = json_encode(['id' => $id, 'name' => $prod_name]);
+                $admin_id = $_SESSION['admin_id'] ?? 1; // Fallback to 1
+                $pdo->prepare("INSERT INTO audit_logs (admin_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)")->execute([$admin_id, 'Delete Product', 'Product', $id, $details]);
                 
                 $pdo->commit();
                 echo json_encode(["status" => "success", "message" => "Product deleted successfully."]);
@@ -175,6 +200,10 @@ if ($method === 'POST') {
     $colors = trim($input['colors'] ?? '');
     $sizes = trim($input['sizes'] ?? '');
     $discount = isset($input['discount']) ? (float)$input['discount'] : 0;
+    $discount_start = trim($input['discount_start'] ?? '');
+    if ($discount_start === '') $discount_start = null;
+    $discount_end = trim($input['discount_end'] ?? '');
+    if ($discount_end === '') $discount_end = null;
     $gsm = trim($input['gsm'] ?? '');
     $waistband = trim($input['waistband'] ?? '');
     
@@ -271,13 +300,13 @@ if ($method === 'POST') {
 
             if ($id > 0) {
                 // Update an existing product record
-                $stmt = $pdo->prepare("UPDATE products SET name = ?, sku = ?, category_id = ?, description = ?, moq = ?, base_price = ?, status = ?, images = ?, colors = ?, sizes = ?, discount = ?, gsm = ?, waistband = ? WHERE id = ?");
-                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $gsm, $waistband, $id]);
+                $stmt = $pdo->prepare("UPDATE products SET name = ?, sku = ?, category_id = ?, description = ?, moq = ?, base_price = ?, status = ?, images = ?, colors = ?, sizes = ?, discount = ?, discount_start = ?, discount_end = ?, gsm = ?, waistband = ? WHERE id = ?");
+                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $discount_start, $discount_end, $gsm, $waistband, $id]);
                 $product_id = $id;
             } else {
                 // Insert a brand new product record
-                $stmt = $pdo->prepare("INSERT INTO products (name, sku, category_id, description, moq, base_price, status, images, colors, sizes, discount, gsm, waistband) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $gsm, $waistband]);
+                $stmt = $pdo->prepare("INSERT INTO products (name, sku, category_id, description, moq, base_price, status, images, colors, sizes, discount, discount_start, discount_end, gsm, waistband) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $discount_start, $discount_end, $gsm, $waistband]);
                 $product_id = $pdo->lastInsertId();
             }
 
@@ -310,6 +339,12 @@ if ($method === 'POST') {
                     }
                 }
             }
+
+            // Audit Log
+            $actionName = ($id > 0) ? 'Update Product' : 'Create Product';
+            $details = json_encode(['name' => $name, 'sku' => $sku]);
+            $admin_id = $_SESSION['admin_id'] ?? 1; // Fallback to 1 if session lost to prevent FK error
+            $pdo->prepare("INSERT INTO audit_logs (admin_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)")->execute([$admin_id, $actionName, 'Product', $product_id, $details]);
 
             $pdo->commit();
             echo json_encode(["status" => "success", "message" => "Product saved successfully.", "product_id" => $product_id]);

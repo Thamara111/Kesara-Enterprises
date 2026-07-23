@@ -151,11 +151,20 @@ if (isset($pdo) && $pdo !== null) {
     try {
         $suppliers_list = $pdo->query("SELECT id, name FROM suppliers ORDER BY name ASC")->fetchAll();
         
-        $inv_list = $pdo->query("SELECT p.name AS p_name, i.colour, i.size FROM inventory i JOIN products p ON i.product_id = p.id ORDER BY p.name ASC, i.colour ASC, i.size ASC")->fetchAll();
+        $prod_list = $pdo->query("SELECT p.name AS p_name, p.colors, p.sizes FROM products p ORDER BY p.name ASC")->fetchAll();
         $inv_options = '<option value="">Select an Item...</option>';
-        foreach ($inv_list as $inv) {
-            $comboName = htmlspecialchars($inv['p_name'] . ' · ' . $inv['colour'] . ' · ' . $inv['size']);
-            $inv_options .= '<option value="' . $comboName . '">' . $comboName . '</option>';
+        foreach ($prod_list as $prod) {
+            $colors = !empty($prod['colors']) ? array_map('trim', explode(',', $prod['colors'])) : ['Default'];
+            $sizes = !empty($prod['sizes']) ? array_map('trim', explode(',', $prod['sizes'])) : ['Default'];
+            
+            foreach ($colors as $c) {
+                foreach ($sizes as $s) {
+                    if (empty($c)) $c = 'Default';
+                    if (empty($s)) $s = 'Default';
+                    $comboName = htmlspecialchars($prod['p_name'] . ' · ' . $c . ' · ' . $s);
+                    $inv_options .= '<option value="' . $comboName . '">' . $comboName . '</option>';
+                }
+            }
         }
         
         $stmt = $pdo->query("SELECT po.id, po.status, po.ordered_at, po.expected_at, po.received_at, po.total, 
@@ -282,40 +291,40 @@ if (isset($pdo) && $pdo !== null) {
     <!-- List Pane -->
     <div id="purchase-orders-list-container" class="flex-1 flex flex-col min-w-0 bg-white">
         <!-- Header -->
-        <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-10">
+        <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Purchase Orders</h1>
-                <p class="text-sm text-gray-500 mt-1">Manage wholesale procurement and supplier shipments</p>
+                <h1 class="text-2xl font-bold text-gray-900">Purchase Orders</h1>
+                <p class="text-sm text-gray-500 mt-1">Manage wholesale procurement and supplier shipments.</p>
             </div>
-            
-        <!-- Stats Grid -->
-        <div class="grid grid-cols-4 gap-4 p-6">
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total</p>
-                <p class="text-2xl font-bold text-gray-900"><?= $total_pos ?></p>
-            </div>
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-t-4 border-t-blue-500 text-center">
-                <p class="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Sent / Pending</p>
-                <p class="text-2xl font-bold text-gray-900"><?= $sent_pending_count ?></p>
-            </div>
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-t-4 border-t-amber-500 text-center">
-                <p class="text-xs font-bold text-amber-600 uppercase tracking-wider mb-1">Partial Receipt</p>
-                <p class="text-2xl font-bold text-gray-900"><?= $partial_count ?></p>
-            </div>
-            <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm border-t-4 border-t-red-500 text-center">
-                <p class="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Overdue</p>
-                <p class="text-2xl font-bold text-gray-900"><?= $overdue_count ?></p>
-            </div>
-        </div>
-            <div class="flex gap-3">
-                <button onclick="downloadPDF('purchase-orders-list-container', 'Purchase_Orders_List')" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all shadow-sm">
-                    <i class="ti ti-download text-lg"></i>
-                    Export PDF
-                </button>
-                <button onclick="openRaisePOModal()" class="inline-flex items-center gap-2 px-4 py-2 bg-brand text-brand-light rounded-xl text-sm font-semibold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
-                    <i class="ti ti-plus text-lg"></i>
-                    Raise PO ↗
-                </button>
+            <!-- Stats -->
+            <div class="flex items-center gap-6">
+                <div class="flex gap-4">
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-gray-900"><?= $total_pos ?></p>
+                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Total</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-blue-600"><?= $sent_pending_count ?></p>
+                        <p class="text-[9px] font-bold text-blue-500 uppercase tracking-widest mt-0.5">Sent/Pending</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-amber-600"><?= $partial_count ?></p>
+                        <p class="text-[9px] font-bold text-amber-500 uppercase tracking-widest mt-0.5">Partial</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-red-600"><?= $overdue_count ?></p>
+                        <p class="text-[9px] font-bold text-red-500 uppercase tracking-widest mt-0.5">Overdue</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-3 border-l border-gray-100 pl-6">
+                    <button onclick="downloadPDF('purchase-orders-list-container', 'Purchase_Orders_List')" class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm">
+                        <i class="ti ti-download text-lg"></i> Export PDF
+                    </button>
+                    <button onclick="openRaisePOModal()" class="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
+                        <i class="ti ti-plus text-lg"></i> Raise PO ↗
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -332,8 +341,8 @@ if (isset($pdo) && $pdo !== null) {
 
 
         <!-- Filters Chips -->
-        <div class="p-6 border-b border-gray-100 flex items-center gap-2 overflow-x-auto bg-white">
-            <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-brand text-brand-light rounded-xl text-xs font-bold shadow-md shadow-brand/10 on transition-all">All</button>
+        <div class="px-8 py-4 border-b border-gray-100 flex items-center gap-2 overflow-x-auto bg-gray-50/30">
+            <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-brand text-brand-light rounded-xl text-xs font-bold shadow-md shadow-brand/10 on transition-all border border-transparent">All</button>
             <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-all">Sent</button>
             <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-all">Partial</button>
             <button onclick="chipFilter(this)" class="chip px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-all">Received</button>
@@ -341,54 +350,73 @@ if (isset($pdo) && $pdo !== null) {
         </div>
 
         <!-- List Pane Body -->
-        <div class="flex-1 overflow-y-auto min-w-0">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-gray-50/20">
-                        <th class="py-4 px-6">PO Code</th>
-                        <th class="py-4 px-6">Supplier</th>
-                        <th class="py-4 px-6">Expected At</th>
-                        <th class="py-4 px-6">Total Amount</th>
-                        <th class="py-4 px-6 text-right">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php if (empty($admin_pos)): ?>
-                        <tr>
-                            <td colspan="5" class="py-8 px-6 text-center text-sm text-gray-400 italic">No purchase orders found.</td>
+        <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10">
+            <div class="min-w-[800px] p-6 space-y-1">
+                <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
+                    <thead>
+                        <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
+                            <th class="px-4 py-3 rounded-l-xl w-32">PO Code</th>
+                            <th class="px-4 py-3 w-64">Supplier</th>
+                            <th class="px-4 py-3 w-40">Expected At</th>
+                            <th class="px-4 py-3 w-40 text-right">Total Amount</th>
+                            <th class="px-4 py-3 text-right rounded-r-xl w-32">Status</th>
                         </tr>
-                    <?php else: ?>
-                        <?php foreach ($admin_pos as $po): ?>
-                            <tr class="po-row border-b border-gray-100 hover:bg-gray-50/50 cursor-pointer transition-all"
-                                id="po-row-<?= $po['id'] ?>"
-                                onclick="selectPO(this)"
-                                data-id="<?= $po['id'] ?>"
-                                data-num="<?= htmlspecialchars($po['num']) ?>"
-                                data-date="<?= htmlspecialchars($po['date']) ?>"
-                                data-badge="<?= htmlspecialchars($po['badge']) ?>"
-                                data-badge-text="<?= htmlspecialchars($po['badgeText']) ?>"
-                                data-supp="<?= htmlspecialchars($po['supp']) ?>"
-                                data-contact="<?= htmlspecialchars($po['contact']) ?>"
-                                data-payment="<?= htmlspecialchars($po['payment']) ?>"
-                                data-expected="<?= htmlspecialchars($po['expected']) ?>"
-                                data-expected-color="<?= htmlspecialchars($po['expectedColor']) ?>"
-                                data-total="<?= htmlspecialchars($po['total']) ?>"
-                                data-alert="<?= htmlspecialchars($po['alert']) ?>"
-                                data-alert-text="<?= htmlspecialchars($po['alertText']) ?>"
-                                data-items="<?= htmlspecialchars($po['items']) ?>"
-                                data-timeline="<?= htmlspecialchars($po['timeline']) ?>">
-                                <td class="py-4 px-6 font-bold text-sm text-gray-900"><?= $po['num'] ?></td>
-                                <td class="py-4 px-6 text-sm text-gray-700"><?= $po['supp'] ?></td>
-                                <td class="py-4 px-6 text-sm text-gray-500"><?= $po['expected'] ?></td>
-                                <td class="py-4 px-6 text-sm font-extrabold text-brand"><?= $po['total'] ?></td>
-                                <td class="py-4 px-6 text-right">
-                                    <span class="px-3 py-1 rounded-full text-[10px] font-bold border <?= $po['badge'] ?>"><?= $po['badgeText'] ?></span>
-                                </td>
+                    </thead>
+                    <tbody id="po-list">
+                        <?php if (empty($admin_pos)): ?>
+                            <tr>
+                                <td colspan="5" class="p-12 text-center text-gray-400 text-sm">No purchase orders found.</td>
                             </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+                        <?php else: ?>
+                            <?php foreach ($admin_pos as $po): ?>
+                                <tr class="po-row bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
+                                    id="po-row-<?= $po['id'] ?>"
+                                    onclick="selectPO(this)"
+                                    data-id="<?= $po['id'] ?>"
+                                    data-num="<?= htmlspecialchars($po['num']) ?>"
+                                    data-date="<?= htmlspecialchars($po['date']) ?>"
+                                    data-badge="<?= htmlspecialchars($po['badge']) ?>"
+                                    data-badge-text="<?= htmlspecialchars($po['badgeText']) ?>"
+                                    data-supp="<?= htmlspecialchars($po['supp']) ?>"
+                                    data-contact="<?= htmlspecialchars($po['contact']) ?>"
+                                    data-payment="<?= htmlspecialchars($po['payment']) ?>"
+                                    data-expected="<?= htmlspecialchars($po['expected']) ?>"
+                                    data-expected-color="<?= htmlspecialchars($po['expectedColor']) ?>"
+                                    data-total="<?= htmlspecialchars($po['total']) ?>"
+                                    data-alert="<?= htmlspecialchars($po['alert']) ?>"
+                                    data-alert-text="<?= htmlspecialchars($po['alertText']) ?>"
+                                    data-items="<?= htmlspecialchars($po['items']) ?>"
+                                    data-timeline="<?= htmlspecialchars($po['timeline']) ?>"
+                                    data-status="<?= htmlspecialchars(strtolower($po['badgeText'])) ?>">
+                                    <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30">
+                                        <p class="font-bold text-sm text-gray-900 group-hover:text-brand transition-colors"><?= $po['num'] ?></p>
+                                        <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight"><?= $po['date'] ?></p>
+                                    </td>
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
+                                        <p class="text-sm font-bold text-gray-700"><?= $po['supp'] ?></p>
+                                    </td>
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
+                                        <p class="text-xs font-semibold <?= $po['expectedColor'] ?> bg-gray-50 px-2 py-1 rounded-lg border w-max"><?= $po['expected'] ?></p>
+                                    </td>
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-right">
+                                        <p class="text-sm font-extrabold text-brand"><?= $po['total'] ?></p>
+                                    </td>
+                                    <td class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
+                                        <span class="px-3 py-1 rounded-full text-[9px] font-bold border <?= $po['badge'] ?> uppercase tracking-wider whitespace-nowrap shadow-sm"><?= $po['badgeText'] ?></span>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            </div>
+            <!-- Pagination Controls -->
+            <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white" id="pagination-controls">
+                <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
+                <div class="flex items-center gap-2" id="pagination-buttons">
+                    <!-- Buttons injected by JS -->
+                </div>
+            </div>
         </div>
     </div>
 
@@ -396,7 +424,7 @@ if (isset($pdo) && $pdo !== null) {
     <div id="po-detail-backdrop" class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300" onclick="closePODetailPane()"></div>
 
     <!-- PO Details Pane (Right) -->
-    <div id="po-detail-pane" class="fixed inset-y-0 right-0 z-50 w-[420px] max-w-full bg-white flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div id="po-detail-pane" class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-white flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto border-l border-gray-200">
         <div id="detail-print-area" class="p-8 flex-1 overflow-y-auto space-y-8 relative">
             <button onclick="closePODetailPane()" class="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none" aria-label="Close details">
                 <i class="ti ti-x text-xl"></i>
@@ -709,33 +737,129 @@ function selectPO(el, openDrawer = true) {
 
 var activeFilter = 'All';
 
+var currentPage = 1;
+var itemsPerPage = 15;
+
+function goToPage(page) {
+    currentPage = page;
+    applyFilters();
+}
+
+function renderPagination(totalItems, totalPages) {
+    var info = document.getElementById('pagination-info');
+    var buttons = document.getElementById('pagination-buttons');
+    if (!info || !buttons) return;
+
+    if (totalItems === 0) {
+        info.textContent = 'Showing 0 entries';
+        buttons.innerHTML = '';
+        return;
+    }
+
+    var start = (currentPage - 1) * itemsPerPage + 1;
+    var end = Math.min(currentPage * itemsPerPage, totalItems);
+    info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
+
+    var html = '';
+    
+    var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+    html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === currentPage) {
+            html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
+        } else if (
+            i === 1 || 
+            i === totalPages || 
+            (i >= currentPage - 1 && i <= currentPage + 1)
+        ) {
+            html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
+        } else if (i === currentPage - 2 || i === currentPage + 2) {
+            html += `<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">...</span>`;
+        }
+    }
+
+    var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+    html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
+
+    buttons.innerHTML = html;
+}
+
 function applyFilters() {
-    document.querySelectorAll('.po-row').forEach(r => {
+    var list = document.getElementById('po-list');
+    var rows = Array.from(document.querySelectorAll('.po-row'));
+    var visibleRows = [];
+
+    rows.forEach(r => {
         var status = r.dataset.badgeText;
         var visible = true;
         if (activeFilter !== 'All' && status !== activeFilter) {
             visible = false;
         }
-        r.style.display = visible ? '' : 'none';
+        
+        if (visible) {
+            visibleRows.push(r);
+        } else {
+            r.hidden = true;
+            r.style.display = 'none';
+        }
     });
+
+    var emptyState = document.getElementById('empty-state');
+    if (emptyState) emptyState.remove();
+
+    if (visibleRows.length === 0) {
+        var tr = document.createElement('tr');
+        tr.id = 'empty-state';
+        tr.innerHTML = '<td colspan="5" class="p-12 text-center text-gray-400 text-sm">No purchase orders match this filter.</td>';
+        list.appendChild(tr);
+        renderPagination(0, 0);
+        return;
+    }
+
+    // Sort latest first (highest id)
+    visibleRows.sort((a, b) => parseInt(b.dataset.id) - parseInt(a.dataset.id));
+
+    var totalItems = visibleRows.length;
+    var totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    var start = (currentPage - 1) * itemsPerPage;
+    var end = start + itemsPerPage;
+
+    visibleRows.forEach((r, index) => {
+        if (index >= start && index < end) {
+            r.hidden = false;
+            r.style.display = '';
+        } else {
+            r.hidden = true;
+            r.style.display = 'none';
+        }
+    });
+
+    visibleRows.forEach(r => list.appendChild(r));
+    renderPagination(totalItems, totalPages);
+}
 }
 
-function chipFilter(el) {
-  document.querySelectorAll('.chip').forEach(c => {
-    c.classList.remove('bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'on');
-    c.classList.add('bg-white', 'text-gray-500', 'border-gray-200');
-  });
-  el.classList.add('bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'on');
-  el.classList.remove('bg-white', 'text-gray-500', 'border-gray-200');
-  
-  activeFilter = el.textContent.trim();
-  closePODetailPane();
-  applyFilters();
-  
-  var firstVisible = Array.from(document.querySelectorAll('.po-row')).find(r => r.style.display !== 'none');
-  if (firstVisible) {
-      selectPO(firstVisible, false);
-  }
+function chipFilter(btn) {
+    document.querySelectorAll('.chip').forEach(c => {
+        c.classList.remove('on', 'bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'border-transparent');
+        c.classList.add('bg-white', 'text-gray-500', 'border-gray-200');
+    });
+    btn.classList.add('on', 'bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'border-transparent');
+    btn.classList.remove('bg-white', 'text-gray-500', 'border-gray-200');
+    
+    activeFilter = btn.innerText.trim();
+    currentPage = 1;
+    closePODetailPane();
+    applyFilters();
+    
+    var firstVisible = Array.from(document.querySelectorAll('.po-row')).find(r => r.style.display !== 'none');
+    if (firstVisible) {
+        selectPO(firstVisible, false);
+    }
 }
 
 function closePODetailPane() {

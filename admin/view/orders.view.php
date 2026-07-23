@@ -168,130 +168,141 @@ if (isset($pdo) && $pdo !== null) {
     <!-- LEFT: ORDER LIST -->
     <div id="orders-container" class="flex-1 flex flex-col bg-white border-r border-gray-100 overflow-hidden">
         <!-- Header -->
-        <div class="px-8 py-6 flex items-center justify-between gap-4">
-            <h1 class="text-xl font-extrabold text-gray-900 tracking-tight uppercase">Orders</h1>
-            <!-- Stats Bar -->
-            <div class="grid grid-cols-4 gap-4">
-                <div class="text-center p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                    <p class="text-[15px] font-black text-gray-900"><?= $total_orders ?></p>
-                    <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Total</p>
-                </div>
-                <div class="text-center p-3 bg-amber-50/50 rounded-2xl border border-amber-100">
-                    <p class="text-[15px] font-black text-amber-600"><?= $pending_orders ?></p>
-                    <p class="text-[9px] font-bold text-amber-400 uppercase tracking-widest mt-0.5">Pending</p>
-                </div>
-                <div class="text-center p-3 bg-blue-50/50 rounded-2xl border border-blue-100">
-                    <p class="text-[15px] font-black text-blue-600"><?= $processing_orders ?></p>
-                    <p class="text-[9px] font-bold text-blue-400 uppercase tracking-widest mt-0.5">Process</p>
-                </div>
-                <div class="text-center p-3 bg-brand-light/50 rounded-2xl border border-brand/10">
-                    <p class="text-[15px] font-black text-brand"><?= $shipped_orders ?></p>
-                    <p class="text-[9px] font-bold text-brand/40 uppercase tracking-widest mt-0.5">Shipped</p>
-                </div>
+        <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Orders</h1>
+                <p class="text-sm text-gray-500 mt-1">Manage and track customer orders.</p>
             </div>
-            <button
-                class="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all"
-                onclick="downloadPDF('orders-container', 'Orders_List')">
-                <i class="ti ti-download text-xl"></i>Export PDF
-            </button>
+            
+            <div class="flex items-center gap-6">
+                <!-- Stats Bar -->
+                <div class="flex gap-4">
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-gray-900"><?= $total_orders ?></p>
+                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Total</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-amber-600"><?= $pending_orders ?></p>
+                        <p class="text-[9px] font-bold text-amber-400 uppercase tracking-widest mt-0.5">Pending</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-blue-600"><?= $processing_orders ?></p>
+                        <p class="text-[9px] font-bold text-blue-400 uppercase tracking-widest mt-0.5">Process</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[15px] font-black text-brand"><?= $shipped_orders ?></p>
+                        <p class="text-[9px] font-bold text-brand/40 uppercase tracking-widest mt-0.5">Shipped</p>
+                    </div>
+                </div>
+                <button
+                    class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
+                    onclick="downloadPDF('orders-container', 'Orders_List')">
+                    <i class="ti ti-download text-lg"></i> Export PDF
+                </button>
+            </div>
         </div>
 
-        <!-- Filters -->
-        <div class="p-8 space-y-6 overflow-y-auto flex-1">
-            <div class="flex justify-between items-center gap-4">
-                <!-- Status Tabs -->
-                <div class="flex flex-wrap gap-2 pb-2">
-                    <button
-                        class="status-tab active-tab px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all"
-                        data-status="all">All</button>
-                    <button
-                        class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all"
-                        data-status="pending">Verification Queue</button>
-                    <button
-                        class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all"
-                        data-status="processing">Processing</button>
-                    <button
-                        class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all"
-                        data-status="shipped">Shipped</button>
-                    <button
-                        class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all"
-                        data-status="delivered">Delivered</button>
-                    <button
-                        class="status-tab px-4 py-1.5 bg-gray-50 text-gray-400 border border-transparent rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-gray-100 transition-all"
-                        data-status="cancelled">Cancelled</button>
-                </div>
-                <div class="flex gap-4">
-                    <div class="relative flex-1 group">
-                        <i
-                            class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand transition-colors"></i>
-                        <input id="order-search" type="text" placeholder="Order ID or Business..."
-                            class="w-full pl-11 pr-4 py-3 bg-gray-50 border border-transparent rounded-2xl text-xs font-medium outline-none focus:bg-white focus:border-brand/20 transition-all">
+        <?php if (!empty($pending_orders) && $pending_orders > 0): ?>
+            <div class="px-8 pt-6 pb-2">
+                <div class="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
+                    <i class="ti ti-alert-triangle text-amber-600 text-lg flex-shrink-0 mt-0.5"></i>
+                    <div>
+                        <p class="text-sm font-bold text-amber-900">Pending Orders</p>
+                        <p class="text-xs text-amber-700 mt-1">You have <strong><?= $pending_orders ?></strong> orders awaiting verification in the queue.</p>
                     </div>
-                    <select id="order-sort"
-                        class="bg-gray-50 border border-transparent rounded-2xl px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest outline-none cursor-pointer focus:bg-white focus:border-brand/20 transition-all">
-                        <option value="newest">Newest First</option>
-                        <option value="oldest">Oldest First</option>
-                    </select>
                 </div>
             </div>
+        <?php endif; ?>
+
+        <!-- Filters -->
+        <div class="px-8 py-4 border-b border-gray-100 flex items-center justify-between">
+            <!-- Status Tabs -->
+            <div class="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
+                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-brand text-brand-light shadow-md shadow-brand/10 border border-transparent on" data-status="all">All</button>
+                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="pending">Verification Queue</button>
+                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="processing">Processing</button>
+                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="shipped">Shipped</button>
+                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="delivered">Delivered</button>
+                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="cancelled">Cancelled</button>
+            </div>
+            
+            <div class="bg-gray-50/30 flex items-center gap-4">
+                <div class="relative flex-1 group">
+                    <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors"></i>
+                    <input id="order-search" type="text" placeholder="Order ID or Business..."
+                        class="w-full pl-11 pr-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all">
+                </div>
+                <select id="order-sort"
+                    class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm font-medium transition-all cursor-pointer">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                </select>
+            </div>
+        </div>
 
             <!-- Order List Table -->
-            <div class="pb-8 overflow-x-auto w-full">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr
-                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                            <th class="px-6 py-4 font-bold">Order ID</th>
-                            <th class="px-6 py-4 font-bold">Company</th>
-                            <th class="px-6 py-4 font-bold">Status</th>
-                            <th class="px-6 py-4 font-bold">Date</th>
-                            <th class="px-6 py-4 font-bold text-right">Price</th>
-                        </tr>
-                    </thead>
-                    <tbody id="order-list">
-                        <?php if (!empty($admin_orders)): ?>
-                            <?php foreach ($admin_orders as $idx => $o): ?>
-                                <tr id="order-card-<?= $idx ?>"
-                                    class="order-card border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer group"
-                                    data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($o['id']) ?>"
-                                    data-formatted-id="<?= htmlspecialchars($o['formattedId']) ?>"
-                                    data-status="<?= htmlspecialchars($o['status']) ?>"
-                                    data-badge="<?= htmlspecialchars($o['badge']) ?>"
-                                    data-badgetext="<?= htmlspecialchars($o['badgeText']) ?>"
-                                    data-company="<?= htmlspecialchars($o['company']) ?>"
-                                    data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
-                                    data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
-                                    data-date="<?= htmlspecialchars($o['date']) ?>"
-                                    data-total="<?= htmlspecialchars($o['total']) ?>"
-                                    data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
-                                    data-timeline="<?= htmlspecialchars(json_encode($o['timeline'])) ?>"
-                                    data-payment-receipt="<?= htmlspecialchars($o['paymentReceipt'] ?? '') ?>"
-                                    onclick="selectOrder(this)">
-                                    <td
-                                        class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
-                                        <?= htmlspecialchars($o['formattedId']) ?>
-                                    </td>
-                                    <td class="px-6 py-4 text-xs font-bold text-gray-600 truncate max-w-[200px]">
-                                        <?= htmlspecialchars($o['company']) ?>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span
-                                            class="px-2.5 py-1 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'VERIFICATION QUEUE', $o['badgeText'])) ?></span>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500 font-medium">
-                                        <?= htmlspecialchars(explode(',', $o['date'])[0]) ?>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-extrabold text-gray-950 text-right">LKR
-                                        <?= htmlspecialchars(explode('.', $o['total'])[0]) ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-
-                <!-- Empty State -->
-                <div id="empty-state"
+            <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10" id="orders-list-container">
+                <div class="min-w-[800px] p-6 space-y-1">
+                    <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
+                        <thead>
+                            <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
+                                <th class="px-4 py-3 rounded-l-xl w-32">Order ID</th>
+                                <th class="px-4 py-3">Company</th>
+                                <th class="px-4 py-3">Status</th>
+                                <th class="px-4 py-3">Date</th>
+                                <th class="px-4 py-3 text-right rounded-r-xl">Price</th>
+                            </tr>
+                        </thead>
+                        <tbody id="order-list">
+                            <?php if (!empty($admin_orders)): ?>
+                                <?php foreach ($admin_orders as $idx => $o): ?>
+                                    <tr id="order-card-<?= $idx ?>"
+                                        class="order-card bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
+                                        data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($o['id']) ?>"
+                                        data-formatted-id="<?= htmlspecialchars($o['formattedId']) ?>"
+                                        data-status="<?= htmlspecialchars($o['status']) ?>"
+                                        data-badge="<?= htmlspecialchars($o['badge']) ?>"
+                                        data-badgetext="<?= htmlspecialchars($o['badgeText']) ?>"
+                                        data-company="<?= htmlspecialchars($o['company']) ?>"
+                                        data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
+                                        data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
+                                        data-date="<?= htmlspecialchars($o['date']) ?>"
+                                        data-total="<?= htmlspecialchars($o['total']) ?>"
+                                        data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
+                                        data-timeline="<?= htmlspecialchars(json_encode($o['timeline'])) ?>"
+                                        data-payment-receipt="<?= htmlspecialchars($o['paymentReceipt'] ?? '') ?>"
+                                        onclick="selectOrder(this)">
+                                        <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30 whitespace-nowrap text-sm font-bold text-gray-900 group-hover:text-brand transition-colors w-32">
+                                            <?= htmlspecialchars($o['formattedId']) ?>
+                                        </td>
+                                        <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-bold text-gray-600 truncate max-w-[200px]">
+                                            <?= htmlspecialchars($o['company']) ?>
+                                        </td>
+                                        <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 whitespace-nowrap">
+                                            <span
+                                                class="px-2.5 py-1 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'VERIFICATION QUEUE', $o['badgeText'])) ?></span>
+                                        </td>
+                                        <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 whitespace-nowrap text-xs text-gray-500 font-medium">
+                                            <?= htmlspecialchars(explode(',', $o['date'])[0]) ?>
+                                        </td>
+                                        <td class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 whitespace-nowrap text-sm font-extrabold text-gray-950 text-right">LKR
+                                            <?= htmlspecialchars(explode('.', $o['total'])[0]) ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Pagination Controls -->
+            <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white" id="pagination-controls">
+                <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
+                <div class="flex items-center gap-2" id="pagination-buttons">
+                    <!-- Buttons injected by JS -->
+                </div>
+            </div>
+        </div>        <div id="empty-state"
                     class="flex-col items-center justify-center py-16 text-center <?= empty($admin_orders) ? 'flex' : 'hidden' ?>">
                     <div class="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
                         <i class="ti ti-search-off text-2xl text-gray-300"></i>
@@ -299,18 +310,17 @@ if (isset($pdo) && $pdo !== null) {
                     <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">No orders found</p>
                     <p class="text-[11px] text-gray-300 mt-1">Try adjusting your filters</p>
                 </div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Backdrop (all screen sizes) -->
-    <div id="order-detail-backdrop"
-        class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300"
-        onclick="closeOrderDetailPane()"></div>
+    <div id="order-detail-backdrop" class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300" onclick="closeOrderDetailPane()"></div>
 
     <!-- RIGHT: ORDER PROFILE & DETAIL -->
     <div id="order-detail-pane"
-        class="fixed inset-y-0 right-0 z-50 w-[500px] max-w-[92vw] bg-gray-50 border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto">
+        class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-gray-50 border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out overflow-y-auto">
         <!-- Profile Header -->
         <div class="p-8 border-b border-gray-100 bg-white flex justify-between items-center">
             <div>
@@ -806,12 +816,62 @@ if (isset($pdo) && $pdo !== null) {
     var activeStatus = 'all';
     var searchQuery = '';
     var sortOrder = 'newest';
+    var currentPage = 1;
+    var itemsPerPage = 15;
+
+    function goToPage(page) {
+        currentPage = page;
+        applyFilters();
+    }
+
+    function renderPagination(totalItems, totalPages) {
+        var info = document.getElementById('pagination-info');
+        var buttons = document.getElementById('pagination-buttons');
+        if (!info || !buttons) return;
+
+        if (totalItems === 0) {
+            info.textContent = 'Showing 0 entries';
+            buttons.innerHTML = '';
+            return;
+        }
+
+        var start = (currentPage - 1) * itemsPerPage + 1;
+        var end = Math.min(currentPage * itemsPerPage, totalItems);
+        info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
+
+        var html = '';
+        
+        // Prev button
+        var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+        html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
+
+        // Page numbers
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === currentPage) {
+                html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
+            } else if (
+                i === 1 || 
+                i === totalPages || 
+                (i >= currentPage - 1 && i <= currentPage + 1)
+            ) {
+                html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
+            } else if (i === currentPage - 2 || i === currentPage + 2) {
+                html += `<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">...</span>`;
+            }
+        }
+
+        // Next button
+        var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+        html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
+
+        buttons.innerHTML = html;
+    }
 
     function applyFilters() {
         var q = searchQuery.toLowerCase().trim();
         var list = document.getElementById('order-list');
         var rows = Array.from(document.querySelectorAll('.order-card'));
-        var visibleCount = 0;
+        var visibleRows = [];
 
         rows.forEach(r => {
             var visible = true;
@@ -831,24 +891,46 @@ if (isset($pdo) && $pdo !== null) {
                 visible = false;
             }
 
-            r.style.display = visible ? '' : 'none';
-            if (visible) visibleCount++;
+            if (visible) {
+                visibleRows.push(r);
+            } else {
+                r.style.display = 'none';
+            }
         });
 
-        rows.sort((a, b) => {
-            var da = new Date(a.dataset.date);
-            var db = new Date(b.dataset.date);
-            return sortOrder === 'newest' ? db - da : da - db;
+        visibleRows.sort((a, b) => {
+            // "newest" means largest ID first.
+            var aId = parseInt(a.dataset.id) || 0;
+            var bId = parseInt(b.dataset.id) || 0;
+            return sortOrder === 'newest' ? bId - aId : aId - bId;
         });
 
-        rows.forEach(r => list.appendChild(r));
+        var totalItems = visibleRows.length;
+        var totalPages = Math.ceil(totalItems / itemsPerPage);
+        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        var start = (currentPage - 1) * itemsPerPage;
+        var end = start + itemsPerPage;
+
+        visibleRows.forEach((r, index) => {
+            if (index >= start && index < end) {
+                r.style.display = '';
+            } else {
+                r.style.display = 'none';
+            }
+        });
+
+        visibleRows.forEach(r => list.appendChild(r));
 
         var emptyState = document.getElementById('empty-state');
         if (emptyState) {
-            emptyState.style.display = visibleCount === 0 ? 'flex' : 'none';
+            emptyState.style.display = totalItems === 0 ? 'flex' : 'none';
         }
 
-        var firstVisible = rows.find(r => r.style.display !== 'none');
+        renderPagination(totalItems, totalPages);
+
+        var firstVisible = visibleRows.find(r => r.style.display !== 'none');
         if (firstVisible) {
             selectOrder(firstVisible, false);
         }
@@ -859,13 +941,14 @@ if (isset($pdo) && $pdo !== null) {
         btn.addEventListener('click', () => {
             // Update active state styles
             document.querySelectorAll('.status-tab').forEach(b => {
-                b.classList.remove('active-tab');
-                b.classList.add('bg-gray-50', 'text-gray-400', 'border', 'border-transparent');
+                b.classList.remove('bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'border-transparent', 'on');
+                b.classList.add('bg-white', 'text-gray-500', 'border-gray-200', 'hover:bg-gray-50');
             });
-            btn.classList.add('active-tab');
-            btn.classList.remove('bg-gray-50', 'text-gray-400', 'border', 'border-transparent');
+            btn.classList.add('bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'border-transparent', 'on');
+            btn.classList.remove('bg-white', 'text-gray-500', 'border-gray-200', 'hover:bg-gray-50');
 
             activeStatus = btn.dataset.status;
+            currentPage = 1;
             applyFilters();
         });
     });
@@ -873,12 +956,14 @@ if (isset($pdo) && $pdo !== null) {
     // ── Search handler ─────────────────────────────────────────────────────────
     document.getElementById('order-search').addEventListener('input', e => {
         searchQuery = e.target.value;
+        currentPage = 1;
         applyFilters();
     });
 
     // ── Sort handler ───────────────────────────────────────────────────────────
     document.getElementById('order-sort').addEventListener('change', e => {
         sortOrder = e.target.value;
+        currentPage = 1;
         applyFilters();
     });
 
@@ -984,12 +1069,8 @@ if (isset($pdo) && $pdo !== null) {
     if (tabParam) {
         var targetTab = document.querySelector(`.status-tab[data-status="${tabParam}"]`);
         if (targetTab) {
-            document.querySelectorAll('.status-tab').forEach(b => {
-                b.classList.remove('active-tab');
-                b.classList.add('bg-gray-50', 'text-gray-400', 'border', 'border-transparent');
-            });
-            targetTab.classList.add('active-tab');
-            targetTab.classList.remove('bg-gray-50', 'text-gray-400', 'border', 'border-transparent');
+            document.querySelectorAll('.status-tab').forEach(b => b.classList.remove('on'));
+            targetTab.classList.add('on');
             activeStatus = tabParam;
         }
     }

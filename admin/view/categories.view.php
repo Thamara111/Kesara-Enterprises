@@ -47,13 +47,15 @@ if (empty($categories_data)) {
     <!-- LEFT: CATEGORIES LIST -->
     <div class="flex-1 flex flex-col bg-white border-r border-gray-100 overflow-hidden">
         <!-- Header -->
-        <div class="p-8 border-b border-gray-50 flex items-center justify-between gap-4">
+        <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
             <div>
-                <h1 class="text-xl font-extrabold text-gray-900 tracking-tight uppercase">Categories</h1>
-                <p class="text-xs font-semibold text-gray-400 mt-1">Manage product classification and catalog sections.</p>
+                <h1 class="text-2xl font-bold text-gray-900">Categories</h1>
+                <p class="text-sm text-gray-500 mt-1">Manage product classification and catalog sections.</p>
             </div>
-            <button onclick="showNew()" class="bg-brand text-brand-light font-bold px-6 py-3 rounded-2xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all flex items-center gap-2 shadow-lg shadow-brand/20">
-                <i class="ti ti-plus"></i> Add Category
+            
+            <button onclick="showNew()"
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand-dark transition-all shadow-sm">
+                <i class="ti ti-plus text-lg"></i> Add Category
             </button>
         </div>
 
@@ -64,21 +66,21 @@ if (empty($categories_data)) {
         <?php endif; ?>
 
         <!-- Categories Table -->
-        <div class="flex-1 overflow-auto px-8 py-6">
-            <div class="min-w-[600px] bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
-                <table class="w-full text-left border-collapse">
+        <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10">
+            <div class="min-w-[600px] p-6 space-y-1">
+                <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
                     <thead>
-                        <tr class="border-b border-gray-100 bg-gray-50/50 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                            <th class="p-6 w-[100px]">Preview</th>
-                            <th class="p-6">Category Detail</th>
-                            <th class="p-6 w-[150px]">Slug</th>
-                            <th class="p-6 w-[150px]">Product Count</th>
-                            <th class="p-6 w-[100px] text-right">Actions</th>
+                        <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
+                            <th class="px-4 py-3 rounded-l-xl w-24">Preview</th>
+                            <th class="px-4 py-3">Category Detail</th>
+                            <th class="px-4 py-3 w-32">Slug</th>
+                            <th class="px-4 py-3 w-32">Product Count</th>
+                            <th class="px-4 py-3 text-right rounded-r-xl w-24">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="cat-table-body" class="divide-y divide-gray-50">
+                    <tbody id="cat-table-body">
                         <?php foreach ($categories_data as $idx => $c): ?>
-                        <tr class="cat-row cursor-pointer transition-colors hover:bg-gray-50/50 bg-white"
+                        <tr class="cat-row bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
                             data-idx="<?= $idx ?>"
                             data-id="<?= htmlspecialchars($c['id']) ?>"
                             data-name="<?= htmlspecialchars($c['name']) ?>"
@@ -87,7 +89,7 @@ if (empty($categories_data)) {
                             data-icon="<?= htmlspecialchars($c['icon'] ?? 'ti-tag') ?>"
                             data-description="<?= htmlspecialchars($c['description']) ?>"
                             onclick="selectCat(this)">
-                            <td class="p-6">
+                            <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30 w-24">
                                 <div class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 transition-all overflow-hidden">
                                     <?php if (!empty($c['image'])): ?>
                                         <img src="<?= htmlspecialchars($c['image']) ?>" alt="<?= htmlspecialchars($c['name']) ?>" class="w-full h-full object-cover">
@@ -96,16 +98,16 @@ if (empty($categories_data)) {
                                     <?php endif; ?>
                                 </div>
                             </td>
-                            <td class="p-6">
+                            <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
                                 <h4 class="text-sm font-bold text-gray-900 truncate"><?= htmlspecialchars($c['name']) ?></h4>
                                 <p class="text-[10px] font-medium text-gray-400 truncate mt-0.5"><?= htmlspecialchars($c['description'] ?: 'No description') ?></p>
                             </td>
-                            <td class="p-6 text-xs font-bold text-gray-500"><?= htmlspecialchars($c['slug']) ?></td>
-                            <td class="p-6 text-xs font-bold text-gray-950"><?= htmlspecialchars($c['product_count'] ?? 0) ?> Products</td>
-                            <td class="p-6 text-right">
+                            <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-bold text-gray-500"><?= htmlspecialchars($c['slug']) ?></td>
+                            <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-bold text-gray-950"><?= htmlspecialchars($c['product_count'] ?? 0) ?> Products</td>
+                            <td class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
                                 <div class="flex justify-end gap-2 text-gray-300">
-                                    <button class="p-2 hover:text-brand transition-colors" aria-label="Edit"><i class="ti ti-edit text-base"></i></button>
-                                    <button onclick="event.stopPropagation(); selectCat(this.closest('tr')); submitDelete();" class="p-2 hover:text-red-500 transition-colors" aria-label="Delete"><i class="ti ti-trash text-base"></i></button>
+                                    <button class="p-2 hover:text-brand transition-colors" aria-label="Edit"><i class="ti ti-edit text-lg"></i></button>
+                                    <button onclick="event.stopPropagation(); selectCat(this.closest('tr')); submitDelete();" class="p-2 hover:text-red-500 transition-colors" aria-label="Delete"><i class="ti ti-trash text-lg"></i></button>
                                 </div>
                             </td>
                         </tr>
@@ -116,13 +118,20 @@ if (empty($categories_data)) {
                     </tbody>
                 </table>
             </div>
+            <!-- Pagination Controls -->
+            <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white" id="pagination-controls">
+                <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
+                <div class="flex items-center gap-2" id="pagination-buttons">
+                    <!-- Buttons injected by JS -->
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- RIGHT: EDIT/ADD FORM -->
     <!-- Backdrop -->
     <div id="cat-form-backdrop" class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300" onclick="closeCatFormPane()"></div>
-    <div id="cat-form-pane" class="fixed inset-y-0 right-0 z-50 w-[500px] max-w-full bg-gray-50 border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div id="cat-form-pane" class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-gray-50 border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
         <!-- Form Header -->
         <div class="p-8 border-b border-gray-100 bg-white flex items-center justify-between">
             <h2 id="form-mode-label" class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Edit Category</h2>
@@ -208,11 +217,91 @@ if (empty($categories_data)) {
 
 <style>
 .cat-row.selected {
-    background-color: #E1F5EE !important;
+    background-color: #f9fafb !important;
 }
 </style>
 
 <script>
+var currentPage = 1;
+var itemsPerPage = 15;
+
+function goToPage(page) {
+    currentPage = page;
+    applyFilters();
+}
+
+function renderPagination(totalItems, totalPages) {
+    var info = document.getElementById('pagination-info');
+    var buttons = document.getElementById('pagination-buttons');
+    if (!info || !buttons) return;
+
+    if (totalItems === 0) {
+        info.textContent = 'Showing 0 entries';
+        buttons.innerHTML = '';
+        return;
+    }
+
+    var start = (currentPage - 1) * itemsPerPage + 1;
+    var end = Math.min(currentPage * itemsPerPage, totalItems);
+    info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
+
+    var html = '';
+    
+    var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+    html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === currentPage) {
+            html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
+        } else if (
+            i === 1 || 
+            i === totalPages || 
+            (i >= currentPage - 1 && i <= currentPage + 1)
+        ) {
+            html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
+        } else if (i === currentPage - 2 || i === currentPage + 2) {
+            html += `<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">...</span>`;
+        }
+    }
+
+    var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
+    html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
+
+    buttons.innerHTML = html;
+}
+
+function applyFilters() {
+    var list = document.getElementById('cat-table-body');
+    if (!list) return;
+    var rows = Array.from(list.querySelectorAll('.cat-row'));
+
+    // Sort latest first (highest id)
+    rows.sort((a, b) => parseInt(b.dataset.id) - parseInt(a.dataset.id));
+
+    var totalItems = rows.length;
+    var totalPages = Math.ceil(totalItems / itemsPerPage);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    var start = (currentPage - 1) * itemsPerPage;
+    var end = start + itemsPerPage;
+
+    rows.forEach((r, index) => {
+        if (index >= start && index < end) {
+            r.style.display = '';
+        } else {
+            r.style.display = 'none';
+        }
+    });
+
+    rows.forEach(r => list.appendChild(r));
+    renderPagination(totalItems, totalPages);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    applyFilters();
+});
+
 function selectCat(el, openDrawer = true) {
     if (!el) return;
     document.querySelectorAll('.cat-row').forEach(r => {
