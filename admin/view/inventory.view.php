@@ -83,40 +83,10 @@ if ($pressure_count > 0) {
     $last_sent = $_SESSION[$cooldown_key] ?? 0;
 
     if ((time() - $last_sent) >= $cooldown_secs) {
-        // Trigger the warning API internally via HTTP POST
-        $ctx = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => "Content-Type: application/json\r\n",
-                'content' => '{}',
-                'timeout' => 8,
-            ]
-        ]);
-
-        // Build absolute URL using current host
-        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-        $api_url = $scheme . '://' . $host . '/api/inventory_warning.php';
-
-        try {
-            $response = @file_get_contents($api_url, false, $ctx);
-            if ($response !== false) {
-                $result = json_decode($response, true);
-                if (isset($result['status']) && in_array($result['status'], ['success', 'partial'])) {
-                    $_SESSION[$cooldown_key] = time();
-                    $auto_alert_sent = true;
-                    $auto_alert_time = date('d M Y, H:i');
-                } else {
-                    $auto_alert_error = $result['message'] ?? 'Unknown error';
-                }
-            } else {
-                $auto_alert_error = 'Could not reach warning API';
-            }
-        } catch (\Exception $e) {
-            $auto_alert_error = $e->getMessage();
-        }
+        $should_trigger_alert = true;
+        $auto_alert_time = date('d M Y, H:i');
     } else {
-        // Within cooldown — show when last alert was sent
+        $should_trigger_alert = false;
         $auto_alert_time = date('d M Y, H:i', $last_sent);
     }
 }
@@ -154,19 +124,11 @@ if ($pressure_count > 0) {
                 
                 <div class="flex items-center gap-3 border-l border-gray-100 pl-6">
                     <?php if ($pressure_count > 0): ?>
-                        <?php if ($auto_alert_sent): ?>
-                            <!-- Alert fired this page load -->
-                            <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-700"
-                                title="Warning email sent automatically">
-                                <i class="ti ti-circle-check text-base"></i>
-                                <span>Alert sent &middot; <?= htmlspecialchars($auto_alert_time) ?></span>
-                            </div>
-                        <?php elseif ($auto_alert_error): ?>
-                            <!-- API returned an error -->
-                            <div class="flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600"
-                                title="<?= htmlspecialchars($auto_alert_error) ?>">
-                                <i class="ti ti-alert-circle text-base"></i>
-                                <span>Alert failed</span>
+                        <?php if (!empty($should_trigger_alert)): ?>
+                            <!-- Alert UI handled by JS -->
+                            <div id="inv-alert-badge" class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold text-gray-500">
+                                <i class="ti ti-loader animate-spin text-base"></i>
+                                <span>Checking alert...</span>
                             </div>
                         <?php else: ?>
                             <!-- Within cooldown window -->
@@ -251,7 +213,7 @@ if ($pressure_count > 0) {
                     </thead>
                     <tbody id="inv-list">
                         <?php if (empty($rows)): ?>
-                            <tr>
+                            <tr id="empty-state">
                                 <td colspan="6" class="text-xs text-gray-400 text-center py-10 italic">No variants match this filter.</td>
                             </tr>
                         <?php else: ?>
@@ -319,14 +281,11 @@ if ($pressure_count > 0) {
                 </table>
             </div>
         </div>
-
-                    class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all"><i
-                        class="ti ti-chevron-left text-sm"></i></button>
-                <button
-                    class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-white font-bold text-xs shadow-lg shadow-brand/20">1</button>
-                <button
-                    class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:bg-gray-50 transition-all"><i
-                        class="ti ti-chevron-right text-sm"></i></button>
+        <!-- Pagination Controls -->
+        <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white z-10" id="pagination-controls">
+            <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
+            <div class="flex items-center gap-2" id="pagination-buttons">
+                <!-- JS injected here -->
             </div>
         </div>
     </div>
@@ -842,5 +801,29 @@ if ($pressure_count > 0) {
         selectRow(firstRow, false);
     }
     closeAdjPane();
+
+    <?php if (!empty($should_trigger_alert)): ?>
+    fetch('/api/inventory_warning.php', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+        var badge = document.getElementById('inv-alert-badge');
+        if (badge) {
+            if (data.status === 'success' || data.status === 'partial') {
+                badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-700';
+                badge.innerHTML = '<i class="ti ti-circle-check text-base"></i><span>Alert sent &middot; <?= htmlspecialchars($auto_alert_time ?? '') ?></span>';
+            } else {
+                badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600';
+                badge.innerHTML = '<i class="ti ti-alert-circle text-base"></i><span>Alert failed</span>';
+                badge.title = data.message || 'Unknown error';
+            }
+        }
+    }).catch(err => {
+        var badge = document.getElementById('inv-alert-badge');
+        if (badge) {
+            badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600';
+            badge.innerHTML = '<i class="ti ti-alert-circle text-base"></i><span>Alert failed</span>';
+        }
+    });
+    <?php endif; ?>
 
 </script>

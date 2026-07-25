@@ -468,5 +468,6 @@ function submitDelete() {
     });
 }
 
-
+// Initial render
+applyFilters();
 </script>

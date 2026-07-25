@@ -26,6 +26,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         if (empty($name) || empty($phone) || empty($email)) {
             $error_msg = "Name, Email, and Phone number are required.";
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error_msg = "Invalid email format.";
+        } elseif (!preg_match('/^0[0-9]{9}$/', $phone)) {
+            $error_msg = "Phone number must start with 0 and contain exactly 10 digits.";
         } else {
             try {
                 if ($action === 'add_driver') {
@@ -611,7 +615,7 @@ foreach ($admin_drivers as $d) {
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Email Address *</label>
-                        <input type="email" name="email" id="driverEmail" required placeholder="e.g. nuwan@kesara.lk"
+                        <input type="email" name="email" id="driverEmail" required pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" placeholder="e.g. nuwan@kesara.lk"
                             class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                     </div>
                     <div>
@@ -625,7 +629,7 @@ foreach ($admin_drivers as $d) {
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Phone Number *</label>
-                        <input type="text" name="phone" id="driverPhone" required placeholder="e.g. +94 77 111 2222"
+                        <input type="tel" name="phone" id="driverPhone" required pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" placeholder="0771234567"
                             class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                     </div>
                     <div>
@@ -643,8 +647,8 @@ foreach ($admin_drivers as $d) {
                             class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Licence Expiry</label>
-                        <input type="date" name="licence_expiry" id="driverLicenceExpiry"
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Licence Expiry *</label>
+                        <input type="date" name="licence_expiry" id="driverLicenceExpiry" min="<?= date('Y-m-d') ?>"
                             class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                     </div>
                 </div>

@@ -64,6 +64,9 @@ if (empty($email)) {
 } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $errors['email'] = 'Please enter a valid email address.';
 }
+if (!empty($phone) && !preg_match('/^0[0-9]{9}$/', $phone)) {
+    $errors['phone'] = 'Phone number must start with 0 and contain exactly 10 digits.';
+}
 if (empty($inquiry_type)) $errors['inquiry_type'] = 'Inquiry type is required.';
 if (empty($message)) $errors['message'] = 'Message is required.';
 

@@ -332,80 +332,88 @@ if (empty($top_customers)) {
 
 <script src="/assets/chart.umd.js"></script>
 <script>
-var grid = 'rgba(0,0,0,0.04)';
-var lbl = '#9ca3af';
-
-// Shared Chart Options
-var commonOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-        legend: { display: false }
+function initCharts() {
+    if (typeof Chart === 'undefined') {
+        setTimeout(initCharts, 100);
+        return;
     }
-};
 
-// Revenue Chart
-new Chart(document.getElementById('revenueChart'), {
-    type: 'bar',
-    data: {
-        labels: ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'],
-        datasets: [
-            { label: 'Revenue', data: [800000, 950000, 1100000, 900000, 1200000, 1400000], backgroundColor: '#0F6E56', borderRadius: 8, barThickness: 20, yAxisID: 'y' },
-            { label: 'Orders', data: [31, 38, 42, 35, 38, 47], backgroundColor: '#E1F5EE', borderRadius: 8, barThickness: 20, yAxisID: 'y2' }
-        ]
-    },
-    options: {
-        ...commonOptions,
-        scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
-            y: { position: 'left', grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl, callback: v => 'LKR ' + (v / 1000) + 'K' } },
-            y2: { position: 'right', grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } }
+    var grid = 'rgba(0,0,0,0.04)';
+    var lbl = '#9ca3af';
+
+    // Shared Chart Options
+    var commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { display: false }
         }
-    }
-});
+    };
 
-// Category Chart
-new Chart(document.getElementById('catChart'), {
-    type: 'doughnut',
-    data: {
-        labels: <?php echo json_encode($category_names); ?>,
-        datasets: [{ data: <?php echo json_encode($category_percentages); ?>, backgroundColor: ['#0F6E56', '#378ADD', '#7F77DD', '#EF9F27', '#9ca3af'], borderWidth: 0, cutout: '75%' }]
-    },
-    options: commonOptions
-});
-
-// Products Chart
-new Chart(document.getElementById('prodChart'), {
-    type: 'bar',
-    data: {
-        labels: <?php echo json_encode(array_column($product_performance, 'name')); ?>,
-        datasets: [{ label: 'Units sold', data: <?php echo json_encode(array_column($product_performance, 'units')); ?>, backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 16 }]
-    },
-    options: {
-        ...commonOptions,
-        indexAxis: 'y',
-        scales: {
-            x: { grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
-            y: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } }
+    // Revenue Chart
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'],
+            datasets: [
+                { label: 'Revenue', data: [800000, 950000, 1100000, 900000, 1200000, 1400000], backgroundColor: '#0F6E56', borderRadius: 8, barThickness: 20, yAxisID: 'y' },
+                { label: 'Orders', data: [31, 38, 42, 35, 38, 47], backgroundColor: '#E1F5EE', borderRadius: 8, barThickness: 20, yAxisID: 'y2' }
+            ]
+        },
+        options: {
+            ...commonOptions,
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
+                y: { position: 'left', grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl, callback: v => 'LKR ' + (v / 1000) + 'K' } },
+                y2: { position: 'right', grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } }
+            }
         }
-    }
-});
+    });
 
-// Buyer Chart
-new Chart(document.getElementById('buyerChart'), {
-    type: 'bar',
-    data: {
-        labels: ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'],
-        datasets: [{ label: 'New buyers', data: [4, 7, 9, 6, 11, 5], backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 24 }]
-    },
-    options: {
-        ...commonOptions,
-        scales: {
-            x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
-            y: { grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl, stepSize: 2 } }
+    // Category Chart
+    new Chart(document.getElementById('catChart'), {
+        type: 'doughnut',
+        data: {
+            labels: <?php echo json_encode($category_names); ?>,
+            datasets: [{ data: <?php echo json_encode($category_percentages); ?>, backgroundColor: ['#0F6E56', '#378ADD', '#7F77DD', '#EF9F27', '#9ca3af'], borderWidth: 0, cutout: '75%' }]
+        },
+        options: commonOptions
+    });
+
+    // Products Chart
+    new Chart(document.getElementById('prodChart'), {
+        type: 'bar',
+        data: {
+            labels: <?php echo json_encode(array_column($product_performance, 'name')); ?>,
+            datasets: [{ label: 'Units sold', data: <?php echo json_encode(array_column($product_performance, 'units')); ?>, backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 16 }]
+        },
+        options: {
+            ...commonOptions,
+            indexAxis: 'y',
+            scales: {
+                x: { grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
+                y: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } }
+            }
         }
-    }
-});
+    });
+
+    // Buyer Chart
+    new Chart(document.getElementById('buyerChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'],
+            datasets: [{ label: 'New buyers', data: [4, 7, 9, 6, 11, 5], backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 24 }]
+        },
+        options: {
+            ...commonOptions,
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
+                y: { grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl, stepSize: 2 } }
+            }
+        }
+    });
+}
+initCharts();
 
 function switchTab(el, tab) {
     document.querySelectorAll('.chip').forEach(t => t.classList.remove('on'));

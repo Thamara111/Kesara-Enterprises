@@ -255,7 +255,6 @@ function applyFilters() {
     renderPagination(totalItems, totalPages);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    applyFilters();
-});
+// Initial render
+applyFilters();
 </script>

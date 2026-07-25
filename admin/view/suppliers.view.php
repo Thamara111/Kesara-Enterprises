@@ -4,6 +4,87 @@
  * Handles the display and management of vendor/supplier profiles.
  * Includes status tracking (Active, On Hold) and contact details.
  */
+
+// Handle Form Submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if ($_POST['action'] === 'save') {
+        $supplier_id = isset($_POST['supplier_id']) ? (int)$_POST['supplier_id'] : 0;
+        $name = trim($_POST['company_name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $contact_person = trim($_POST['contact_person'] ?? '');
+        $phone = trim($_POST['phone'] ?? '');
+        $address = trim($_POST['address'] ?? '');
+        $payment_terms = trim($_POST['payment_terms'] ?? 'Net 30');
+        $category = trim($_POST['category'] ?? 'Fabric');
+        $status = trim($_POST['status'] ?? 'active');
+        $hold_reason = trim($_POST['hold_reason'] ?? '');
+        $hold_since = ($status === 'on_hold') ? date('Y-m-d') : null;
+        
+        $items_raw = trim($_POST['supplied_items'] ?? '');
+        $items_arr = json_decode($items_raw, true);
+        if (!is_array($items_arr)) {
+            $temp = array_filter(array_map('trim', explode(',', $items_raw)));
+            $items_arr = [];
+            foreach ($temp as $t) {
+                $items_arr[] = ['name' => $t, 'cost' => null];
+            }
+        }
+
+        if (empty($name) || empty($email) || empty($phone)) {
+            echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Name, email, and phone are required.', 'error'); });</script>";
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Invalid email format.', 'error'); });</script>";
+        } elseif (!preg_match('/^0[0-9]{9}$/', $phone)) {
+            echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Phone number must start with 0 and contain exactly 10 digits.', 'error'); });</script>";
+        } else {
+            try {
+                if ($supplier_id > 0) {
+                    $stmt = $pdo->prepare("UPDATE suppliers SET name = ?, email = ?, contact_person = ?, phone = ?, address = ?, payment_terms = ?, category = ?, status = ?, hold_reason = ?, hold_since = ? WHERE id = ?");
+                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $category, $status, $hold_reason, $hold_since, $supplier_id]);
+                } else {
+                    $stmt = $pdo->prepare("INSERT INTO suppliers (name, email, contact_person, phone, address, payment_terms, category, status, hold_reason, hold_since) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $category, $status, $hold_reason, $hold_since]);
+                    $supplier_id = $pdo->lastInsertId();
+                    
+                    if (file_exists(__DIR__ . "/../../src/Mailer.php")) {
+                        require_once __DIR__ . "/../../src/Mailer.php";
+                        $subject = "Welcome to Kesara Enterprises Supplier Network";
+                        $body = "<h3>Hello " . htmlspecialchars($contact_person) . ",</h3><p>Your company <strong>" . htmlspecialchars($name) . "</strong> has been registered as a supplier with Kesara Enterprises.</p><p>We look forward to working with you.</p>";
+                        if(class_exists('\App\Mailer')) {
+                            \App\Mailer::send($email, $subject, $body);
+                        }
+                    }
+                }
+
+                $del_stmt = $pdo->prepare("DELETE FROM supplier_items WHERE supplier_id = ?");
+                $del_stmt->execute([$supplier_id]);
+                
+                if (!empty($items_arr)) {
+                    $ins_stmt = $pdo->prepare("INSERT INTO supplier_items (supplier_id, item_name, unit_cost) VALUES (?, ?, ?)");
+                    foreach ($items_arr as $itm) {
+                        $cost = isset($itm['cost']) && is_numeric($itm['cost']) ? $itm['cost'] : null;
+                        $ins_stmt->execute([$supplier_id, $itm['name'], $cost]);
+                    }
+                }
+                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Supplier saved successfully.', 'success'); });</script>";
+            } catch (Exception $e) {
+                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Error saving supplier.', 'error'); });</script>";
+            }
+        }
+    } elseif ($_POST['action'] === 'delete') {
+        $supplier_id = isset($_POST['supplier_id']) ? (int)$_POST['supplier_id'] : 0;
+        if ($supplier_id > 0) {
+            try {
+                $stmt = $pdo->prepare("DELETE FROM suppliers WHERE id = ?");
+                $stmt->execute([$supplier_id]);
+                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Supplier deleted successfully.', 'success'); });</script>";
+            } catch (Exception $e) {
+                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Error deleting supplier.', 'error'); });</script>";
+            }
+        }
+    }
+}
+
 $admin_suppliers = [];
 if (isset($pdo) && $pdo !== null) {
     try {
@@ -28,14 +109,17 @@ if (isset($pdo) && $pdo !== null) {
             ];
             $av = $av_options[$s['id'] % count($av_options)];
 
-            $p_stmt = $pdo->prepare("SELECT item_name FROM supplier_items WHERE supplier_id = ?");
+            $p_stmt = $pdo->prepare("SELECT item_name, unit_cost FROM supplier_items WHERE supplier_id = ?");
             $p_stmt->execute([$s['id']]);
-            $items = $p_stmt->fetchAll(PDO::FETCH_COLUMN);
-
+            $items_rows = $p_stmt->fetchAll();
+            $items_arr = [];
             $products_html = "";
-            foreach ($items as $it) {
-                $products_html .= '<span class="px-3 py-1 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-medium text-gray-600 uppercase tracking-wider">' . htmlspecialchars($it) . '</span>';
+            foreach ($items_rows as $row) {
+                $items_arr[] = ['name' => $row['item_name'], 'cost' => $row['unit_cost']];
+                $cst_str = $row['unit_cost'] !== null ? ' - LKR ' . number_format((float)$row['unit_cost'], 2) : '';
+                $products_html .= '<span class="px-3 py-1 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-medium text-gray-600 uppercase tracking-wider">' . htmlspecialchars($row['item_name']) . $cst_str . '</span>';
             }
+            $items_raw = json_encode($items_arr);
 
             $sp_stmt = $pdo->prepare("SELECT AVG(lead_days) FROM supplier_products WHERE supplier_id = ?");
             $sp_stmt->execute([$s['id']]);
@@ -80,6 +164,8 @@ if (isset($pdo) && $pdo !== null) {
                 'addr' => $s['addr'] ?? '',
                 'terms' => $s['terms'] ?? 'Net 30',
                 'products' => $products_html,
+                'items_raw' => $items_raw,
+                'hold_reason' => $s['hold_reason'] ?? '',
                 'lead' => $lead,
                 'cat' => $s['cat'] ?? 'Fabric',
                 'ontime' => $ontime,
@@ -100,6 +186,19 @@ if (isset($pdo) && $pdo !== null) {
 
 if (empty($admin_suppliers)) {
     $admin_suppliers = [];
+}
+
+$inv_options = '<option value="">Select an item to add...</option>';
+if (isset($pdo) && $pdo !== null) {
+    try {
+        $prod_list = $pdo->query("SELECT p.id AS p_id, p.name AS p_name FROM products p ORDER BY p.name ASC")->fetchAll();
+        foreach ($prod_list as $prod) {
+            $pName = htmlspecialchars($prod['p_name']);
+            $inv_options .= '<option value="' . $pName . '">' . $pName . '</option>';
+        }
+    } catch (\Exception $e) {
+        // Ignore
+    }
 }
 
 
@@ -154,9 +253,9 @@ foreach ($admin_suppliers as $s) {
                         onclick="downloadPDF('suppliers-container', 'Suppliers_List')">
                         <i class="ti ti-download text-lg"></i> Export PDF
                     </button>
-                    <a href="/admin-supplier-add" class="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
+                    <button onclick="openSupplierModal('add')" class="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
                         <i class="ti ti-plus text-lg"></i> Add Supplier
-                    </a>
+                    </button>
                 </div>
             </div>
         </div>
@@ -200,7 +299,7 @@ foreach ($admin_suppliers as $s) {
                     </thead>
                     <tbody id="supplier-list">
                         <?php if (empty($admin_suppliers)): ?>
-                            <tr>
+                            <tr id="empty-state">
                                 <td colspan="5" class="p-12 text-center text-gray-400 text-sm">No suppliers found.</td>
                             </tr>
                         <?php else: ?>
@@ -220,6 +319,8 @@ foreach ($admin_suppliers as $s) {
                                     data-addr="<?= htmlspecialchars($s['addr']) ?>"
                                     data-terms="<?= htmlspecialchars($s['terms']) ?>"
                                     data-products="<?= htmlspecialchars($s['products']) ?>"
+                                    data-items-raw="<?= htmlspecialchars($s['items_raw'], ENT_QUOTES, 'UTF-8') ?>"
+                                    data-hold-reason="<?= htmlspecialchars($s['hold_reason']) ?>"
                                     data-ontimew="<?= htmlspecialchars($s['ontimeW']) ?>"
                                     data-ontime="<?= htmlspecialchars($s['ontime']) ?>"
                                     data-qualityw="<?= htmlspecialchars($s['qualityW']) ?>"
@@ -261,15 +362,7 @@ foreach ($admin_suppliers as $s) {
                     </tbody>
                 </table>
 
-                <!-- Pagination -->
-                <div class="mt-8 flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                    <span class="text-xs font-bold text-gray-400">SHOWING <?= $total_suppliers ?> OF
-                        <?= $total_suppliers ?> SUPPLIERS</span>
-                    <div class="flex gap-2">
-                        <button
-                            class="w-8 h-8 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-brand transition-colors"><i
-                                class="ti ti-chevron-left"></i></button>
-            </div>
+
             <!-- Pagination Controls -->
             <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white" id="pagination-controls">
                 <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
@@ -379,17 +472,100 @@ foreach ($admin_suppliers as $s) {
                 Create Purchase Order ↗
             </a>
             <div class="grid grid-cols-2 gap-3">
-                <a id="d-edit-link" href="#"
+                <button id="d-edit-btn" onclick="openSupplierModal('edit', currentSupplierId)"
                     class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all">
                     <i class="ti ti-edit text-base"></i>
                     Edit
-                </a>
+                </button>
                 <button id="d-hold-btn"
                     class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-red-100 rounded-xl text-xs font-bold text-red-650 hover:bg-red-50 transition-all">
                     <i class="ti ti-ban text-base"></i>
                     Hold
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Supplier Modal -->
+<div id="supplierModal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <h2 id="modalTitle" class="text-xl font-bold text-gray-900">Add New Supplier</h2>
+            <button onclick="closeSupplierModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <i class="ti ti-x text-2xl"></i>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6">
+            <form method="POST" id="supplierForm" action="/admin-suppliers" class="space-y-6" data-turbo="false">
+                <input type="hidden" name="action" id="formAction" value="save">
+                <input type="hidden" name="supplier_id" id="supplierIdInput" value="">
+                <input type="hidden" name="supplied_items" id="suppliedItemsInput" value="">
+
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Supplier Name *</label>
+                        <input type="text" name="company_name" required class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Contact Name *</label>
+                        <input type="text" name="contact_person" required class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Email Address *</label>
+                        <input type="email" name="email" required pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Phone Number *</label>
+                        <input type="tel" name="phone" required pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
+                    </div>
+                    <div class="space-y-2 col-span-2">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Registered Address</label>
+                        <textarea name="address" rows="2" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none resize-none"></textarea>
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Current Status *</label>
+                        <select name="status" id="modalStatusSelect" onchange="toggleHoldReason()" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
+                            <option value="active">Active</option>
+                            <option value="preferred">Preferred</option>
+                            <option value="on_hold">On Hold</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Payment Terms</label>
+                        <input type="text" name="payment_terms" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none" placeholder="e.g. Net 30">
+                    </div>
+                    <div class="space-y-2 hidden" id="holdReasonContainer">
+                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Hold Reason</label>
+                        <input type="text" name="hold_reason" id="modalHoldReason" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none" placeholder="If on hold">
+                    </div>
+                </div>
+
+                <!-- Supplied Items -->
+                <div class="mt-6 pt-6 border-t border-gray-100">
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-3">Supplied Items</label>
+                    <div class="flex flex-wrap gap-2 mb-4" id="modalSuppliedItemsContainer"></div>
+                    <div class="flex gap-2">
+                        <select id="modalAddItemInput" class="flex-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
+                            <?= $inv_options ?>
+                        </select>
+                        <input type="number" id="modalAddItemCost" step="0.01" min="0" class="w-32 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none" placeholder="Unit Cost">
+                        <button type="button" onclick="modalAddSuppliedItem()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-300 transition-all">Add Item</button>
+                    </div>
+                </div>
+
+                <div class="pt-8 border-t border-gray-100 flex justify-between items-center">
+                    <div id="deleteBtnContainer" style="display: none;">
+                        <button type="button" onclick="modalDeleteSupplier()" class="px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-all"><i class="ti ti-trash"></i> Delete</button>
+                    </div>
+                    <div class="flex gap-3 ml-auto">
+                        <button type="button" onclick="closeSupplierModal()" class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all">Cancel</button>
+                        <button type="submit" class="px-6 py-2.5 bg-brand text-brand-light rounded-xl text-sm font-bold shadow-lg shadow-brand/20 hover:opacity-90 transition-all">Save Changes</button>
+                    </div>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -452,7 +628,117 @@ foreach ($admin_suppliers as $s) {
         document.getElementById('d-pos').textContent = el.dataset.orders;
         document.getElementById('d-spend').textContent = el.dataset.spend;
 
-        document.getElementById('d-edit-link').href = '/admin-supplier-edit?id=' + el.dataset.id;
+        currentSupplierId = el.dataset.id;
+    }
+
+    var currentSupplierId = null;
+    var modalSuppliedItems = [];
+
+    function renderModalTags() {
+        var container = document.getElementById('modalSuppliedItemsContainer');
+        container.innerHTML = '';
+        modalSuppliedItems.forEach((item, idx) => {
+            var tag = document.createElement('span');
+            tag.className = 'group flex items-center gap-2 px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-lg text-xs font-bold text-brand';
+            let costStr = item.cost ? ' - LKR ' + parseFloat(item.cost).toFixed(2) : '';
+            tag.innerHTML = `${item.name}${costStr} <button type="button" onclick="modalRemoveTag(${idx})" class="ti ti-x hover:text-red-500"></button>`;
+            container.appendChild(tag);
+        });
+        document.getElementById('suppliedItemsInput').value = JSON.stringify(modalSuppliedItems);
+    }
+
+    function modalAddSuppliedItem() {
+        var input = document.getElementById('modalAddItemInput');
+        var costInput = document.getElementById('modalAddItemCost');
+        var val = input.value.trim();
+        var cost = costInput ? costInput.value.trim() : null;
+        var exists = modalSuppliedItems.some(i => i.name === val);
+        if (val && !exists) {
+            modalSuppliedItems.push({name: val, cost: cost || null});
+            renderModalTags();
+            input.value = '';
+            if (costInput) costInput.value = '';
+        }
+    }
+
+    function modalRemoveTag(idx) {
+        modalSuppliedItems.splice(idx, 1);
+        renderModalTags();
+    }
+
+    function openSupplierModal(mode, id = null) {
+        var form = document.getElementById('supplierForm');
+        form.reset();
+        document.getElementById('formAction').value = 'save';
+        document.getElementById('supplierIdInput').value = '';
+        modalSuppliedItems = [];
+        renderModalTags();
+        toggleHoldReason();
+
+        if (mode === 'edit' && id) {
+            document.getElementById('modalTitle').textContent = 'Edit Supplier';
+            document.getElementById('supplierIdInput').value = id;
+            var row = document.querySelector(`.supplier-row[data-id="${id}"]`);
+            if (row) {
+                form.querySelector('[name="company_name"]').value = row.dataset.name;
+                form.querySelector('[name="email"]').value = row.dataset.email;
+                form.querySelector('[name="contact_person"]').value = row.dataset.contact;
+                form.querySelector('[name="phone"]').value = row.dataset.phone;
+                form.querySelector('[name="address"]').value = row.dataset.addr;
+                
+                let statusVal = row.dataset.status;
+                let statusSelect = form.querySelector('[name="status"]');
+                Array.from(statusSelect.options).forEach(opt => {
+                    if (opt.value.toLowerCase() === statusVal.toLowerCase()) {
+                        statusSelect.value = opt.value;
+                    }
+                });
+
+                form.querySelector('[name="payment_terms"]').value = row.dataset.terms;
+                form.querySelector('[name="hold_reason"]').value = row.dataset.holdReason || '';
+                toggleHoldReason();
+                
+                var itemsRaw = row.dataset.itemsRaw;
+                if (itemsRaw) {
+                    try {
+                        modalSuppliedItems = JSON.parse(itemsRaw);
+                    } catch(e) {
+                        modalSuppliedItems = itemsRaw.split(',').map(s => s.trim()).filter(s => s).map(s => ({name: s, cost: null}));
+                    }
+                    renderModalTags();
+                }
+                
+                document.getElementById('deleteBtnContainer').style.display = 'block';
+            }
+        } else {
+            document.getElementById('modalTitle').textContent = 'Add New Supplier';
+            document.getElementById('deleteBtnContainer').style.display = 'none';
+        }
+        document.getElementById('supplierModal').classList.remove('hidden');
+    }
+
+    function closeSupplierModal() {
+        document.getElementById('supplierModal').classList.add('hidden');
+    }
+
+    function toggleHoldReason() {
+        var status = document.getElementById('modalStatusSelect');
+        var container = document.getElementById('holdReasonContainer');
+        if (status && container) {
+            if (status.value === 'on_hold') {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('modalHoldReason').value = '';
+            }
+        }
+    }
+
+    function modalDeleteSupplier() {
+        if(confirm("Are you sure you want to delete this supplier?")) {
+            document.getElementById('formAction').value = 'delete';
+            document.getElementById('supplierForm').submit();
+        }
     }
 
     var currentPage = 1;
@@ -589,6 +875,7 @@ foreach ($admin_suppliers as $s) {
     }
 
     // Initial Render
+    applyFilters();
     var firstSupplier = document.querySelector('.supplier-row');
     if (firstSupplier) selectSupplier(firstSupplier, false);
     closeSupplierDetailPane();

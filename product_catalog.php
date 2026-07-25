@@ -56,12 +56,16 @@ if ($pdo) {
             $params2[] = $filter_category;
         }
         if (!empty($filter_stock)) {
-            $status_map  = ['in_stock' => 'In Stock','low_stock' => 'Low Stock','on_order' => 'On Order'];
-            $status_vals = [];
-            foreach ($filter_stock as $k) { if (isset($status_map[$k])) $status_vals[] = $status_map[$k]; }
-            if (!empty($status_vals)) {
-                $where2[]  = "p.status IN (" . implode(',', array_fill(0, count($status_vals), '?')) . ")";
-                $params2   = array_merge($params2, $status_vals);
+            $stock_conditions = [];
+            foreach ($filter_stock as $k) { 
+                if ($k === 'in_stock') {
+                    $stock_conditions[] = "COALESCE((SELECT MAX(quantity) FROM inventory WHERE product_id = p.id), 0) > 50";
+                } elseif ($k === 'low_stock' || $k === 'on_order' || $k === 'out_of_stock') {
+                    $stock_conditions[] = "COALESCE((SELECT MAX(quantity) FROM inventory WHERE product_id = p.id), 0) <= 50";
+                }
+            }
+            if (!empty($stock_conditions)) {
+                $where2[] = "(" . implode(" OR ", $stock_conditions) . ")";
             }
         }
         $size_join2 = '';
@@ -72,7 +76,7 @@ if ($pdo) {
         }
         $order_map = ['newest'=>'p.created_at DESC','price_asc'=>'p.base_price ASC','price_desc'=>'p.base_price DESC','alpha'=>'p.name ASC'];
         $order = $order_map[$filter_sort] ?? 'p.created_at DESC';
-        $sql2 = "SELECT DISTINCT p.name, p.sku, p.base_price AS price, p.status, p.images, c.name AS category_name, c.slug AS category_slug
+        $sql2 = "SELECT DISTINCT p.name, p.sku, p.base_price AS price, p.images, c.name AS category_name, c.slug AS category_slug, COALESCE((SELECT MAX(quantity) FROM inventory WHERE product_id = p.id), 0) AS max_inv
                  FROM products p LEFT JOIN categories c ON c.id = p.category_id $size_join2
                  WHERE " . implode(' AND ', $where2) . " ORDER BY $order";
         $stmt = $pdo->prepare($sql2);
@@ -280,7 +284,7 @@ if (!$is_ajax) {
               <div class="flex justify-between items-start mb-2">
                 <h3 class="text-[15px] font-bold text-gray-900 group-hover:text-brand transition-colors"><?php echo htmlspecialchars($p['name']); ?></h3>
                 <?php 
-                    $stat = strtolower($p['status'] ?? '');
+                    $stat = ($p['max_inv'] <= 50) ? 'out of stock' : 'in stock';
                     if ($stat === 'in stock') {
                         $cls = 'bg-brand-light text-brand';
                     } elseif ($stat === 'out of stock') {
@@ -290,7 +294,7 @@ if (!$is_ajax) {
                     }
                 ?>
                 <span class="text-[10px] font-bold px-2 py-0.5 rounded-full <?= $cls ?>">
-                  <?php echo htmlspecialchars($p['status']); ?>
+                  <?php echo htmlspecialchars(ucwords($stat)); ?>
                 </span>
               </div>
               <p class="text-[11px] text-gray-400 font-medium mb-4 tracking-wider uppercase"><?php echo htmlspecialchars($p['sku']); ?></p>

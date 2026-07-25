@@ -387,9 +387,7 @@ function applyFilters() {
 }
 
 // Initial render
-document.addEventListener('DOMContentLoaded', () => {
-    applyFilters();
-});
+applyFilters();
 
 function updateStatus(id, status) {
     fetch('/api/admin_inquiries.php', {

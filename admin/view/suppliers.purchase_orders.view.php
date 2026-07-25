@@ -36,19 +36,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $new_po_id = $pdo->lastInsertId();
             $po_ref = 'PO-2025-' . str_pad($new_po_id, 4, '0', STR_PAD_LEFT);
             
-            $item_stmt = $pdo->prepare("INSERT INTO purchase_order_items (po_id, product_id, item_name, qty_ordered, qty_received, unit_cost) VALUES (?, NULL, ?, ?, 0, ?)");
+            $item_stmt = $pdo->prepare("INSERT INTO purchase_order_items (po_id, product_id, item_name, qty_ordered, qty_received, unit_cost) VALUES (?, ?, ?, ?, 0, ?)");
             $item_rows_html = '';
             $item_total = 0;
             for ($i = 0; $i < count($item_names); $i++) {
                 if (empty($item_names[$i])) continue;
+                
+                $raw_val = $item_names[$i];
+                $prod_id = null;
+                $i_name = $raw_val;
+                if (strpos($raw_val, '|||') !== false) {
+                    $parts = explode('|||', $raw_val);
+                    $prod_id = (int)$parts[0];
+                    $i_name = $parts[3];
+                }
+                
                 $qty  = (int)$item_qtys[$i];
                 $cost = (float)$item_costs[$i];
-                $item_stmt->execute([$new_po_id, $item_names[$i], $qty, $cost]);
+                $item_stmt->execute([$new_po_id, $prod_id, $i_name, $qty, $cost]);
                 $line_total = $qty * $cost;
                 $item_total += $line_total;
                 $item_rows_html .= '
                     <tr>
-                        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#1f2937;">' . htmlspecialchars($item_names[$i]) . '</td>
+                        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#1f2937;">' . htmlspecialchars($i_name) . '</td>
                         <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:center;">' . $qty . '</td>
                         <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:right;">LKR ' . number_format($cost, 2) . '</td>
                         <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:700;color:#0F6E56;text-align:right;">LKR ' . number_format($line_total, 2) . '</td>
@@ -151,9 +161,39 @@ if (isset($pdo) && $pdo !== null) {
     try {
         $suppliers_list = $pdo->query("SELECT id, name FROM suppliers ORDER BY name ASC")->fetchAll();
         
-        $prod_list = $pdo->query("SELECT p.name AS p_name, p.colors, p.sizes FROM products p ORDER BY p.name ASC")->fetchAll();
+        $supplier_items_db = $pdo->query("SELECT supplier_id, item_name, unit_cost FROM supplier_items")->fetchAll();
+        $supplier_items_map = [];
+        foreach ($supplier_items_db as $si) {
+            $sid = (int)$si['supplier_id'];
+            if (!isset($supplier_items_map[$sid])) {
+                $supplier_items_map[$sid] = [];
+            }
+            $supplier_items_map[$sid][] = [
+                'name' => $si['item_name'], 
+                'cost' => $si['unit_cost']
+            ];
+        }
+        
+        $prod_list = $pdo->query("SELECT p.id AS p_id, p.name AS p_name, p.colors, p.sizes FROM products p ORDER BY p.name ASC")->fetchAll();
+        $inventory_db = $pdo->query("SELECT product_id, size, colour, quantity, restock_min FROM inventory")->fetchAll();
+        
+        $stock_map = [];
+        foreach ($inventory_db as $inv) {
+            $key = $inv['product_id'] . '_' . trim($inv['colour']) . '_' . trim($inv['size']);
+            $stock_map[$key] = [
+                'quantity' => (int)$inv['quantity'],
+                'restock_min' => (int)$inv['restock_min']
+            ];
+        }
+
+        $all_product_variants = [];
         $inv_options = '<option value="">Select an Item...</option>';
         foreach ($prod_list as $prod) {
+            $pNameRaw = $prod['p_name'];
+            $pNameHTML = htmlspecialchars($pNameRaw);
+            if (!isset($all_product_variants[$pNameRaw])) {
+                $all_product_variants[$pNameRaw] = [];
+            }
             $colors = !empty($prod['colors']) ? array_map('trim', explode(',', $prod['colors'])) : ['Default'];
             $sizes = !empty($prod['sizes']) ? array_map('trim', explode(',', $prod['sizes'])) : ['Default'];
             
@@ -162,7 +202,29 @@ if (isset($pdo) && $pdo !== null) {
                     if (empty($c)) $c = 'Default';
                     if (empty($s)) $s = 'Default';
                     $comboName = htmlspecialchars($prod['p_name'] . ' · ' . $c . ' · ' . $s);
-                    $inv_options .= '<option value="' . $comboName . '">' . $comboName . '</option>';
+                    
+                    $key = $prod['p_id'] . '_' . $c . '_' . $s;
+                    $value_str = $prod['p_id'] . '|||' . trim($c) . '|||' . trim($s) . '|||' . $comboName;
+                    
+                    $is_critical = false;
+                    
+                    if (isset($stock_map[$key])) {
+                        if ($stock_map[$key]['quantity'] <= $stock_map[$key]['restock_min']) {
+                            $is_critical = true;
+                        }
+                    } else {
+                        // Not in inventory table means 0 stock, so it's critical
+                        $is_critical = true;
+                    }
+
+                    $option_html = '';
+                    if ($is_critical) {
+                        $option_html = '<option value="' . htmlspecialchars($value_str) . '" class="bg-red-50 text-red-700 font-bold">' . $comboName . ' (Low Stock)</option>';
+                    } else {
+                        $option_html = '<option value="' . htmlspecialchars($value_str) . '">' . $comboName . '</option>';
+                    }
+                    $inv_options .= $option_html;
+                    $all_product_variants[$pNameRaw][] = $option_html;
                 }
             }
         }
@@ -364,7 +426,7 @@ if (isset($pdo) && $pdo !== null) {
                     </thead>
                     <tbody id="po-list">
                         <?php if (empty($admin_pos)): ?>
-                            <tr>
+                            <tr id="empty-state">
                                 <td colspan="5" class="p-12 text-center text-gray-400 text-sm">No purchase orders found.</td>
                             </tr>
                         <?php else: ?>
@@ -530,7 +592,8 @@ if (isset($pdo) && $pdo !== null) {
             <div class="grid grid-cols-2 gap-4 mb-6">
                 <div class="space-y-1.5">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select Supplier</label>
-                    <select name="supplier_id" required class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all cursor-pointer">
+                    <select name="supplier_id" id="poSupplierSelect" onchange="updatePOItemsForSupplier(this.value)" required class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all cursor-pointer">
+                        <option value="">Select a Supplier...</option>
                         <?php foreach ($suppliers_list as $supp): ?>
                             <option value="<?= $supp['id'] ?>"><?= htmlspecialchars($supp['name']) ?></option>
                         <?php endforeach; ?>
@@ -538,7 +601,7 @@ if (isset($pdo) && $pdo !== null) {
                 </div>
                 <div class="space-y-1.5">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expected Delivery Date</label>
-                    <input type="date" name="expected_at" required class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all">
+                    <input type="date" name="expected_at" min="<?= date('Y-m-d') ?>" required class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all">
                 </div>
             </div>
             
@@ -561,8 +624,8 @@ if (isset($pdo) && $pdo !== null) {
                         <tbody id="poItemsContainer" class="divide-y divide-gray-100">
                             <tr class="hover:bg-gray-50/50 transition-colors">
                                 <td class="p-2">
-                                    <select name="item_names[]" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer">
-                                        <?= $inv_options ?>
+                                    <select name="item_names[]" required onchange="updateRowCost(this)" class="po-item-select w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer">
+                                        <option value="">Select an Item...</option>
                                     </select>
                                 </td>
                                 <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold"></td>
@@ -583,7 +646,7 @@ if (isset($pdo) && $pdo !== null) {
 </div>
 
 <template id="inv-options-template">
-    <?= $inv_options ?>
+    <option value="">Select an Item...</option>
 </template>
 
 <!-- Print Styles -->
@@ -841,7 +904,6 @@ function applyFilters() {
     visibleRows.forEach(r => list.appendChild(r));
     renderPagination(totalItems, totalPages);
 }
-}
 
 function chipFilter(btn) {
     document.querySelectorAll('.chip').forEach(c => {
@@ -892,7 +954,7 @@ function addPOItemRow() {
     var row = document.createElement('tr');
     row.className = 'hover:bg-gray-50/50 transition-colors';
     row.innerHTML = `
-        <td class="p-2"><select name="item_names[]" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer">
+        <td class="p-2"><select name="item_names[]" required onchange="updateRowCost(this)" class="po-item-select w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer">
             ${document.getElementById('inv-options-template').innerHTML}
         </select></td>
         <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold"></td>
@@ -909,6 +971,54 @@ function removePOItemRow(btn) {
     } else {
         uiAlert("At least one purchase item is required.");
     }
+}
+
+var supplierItemsMap = <?= json_encode($supplier_items_map ?? []) ?>;
+var allProductVariants = <?= json_encode($all_product_variants ?? []) ?>;
+
+function updateRowCost(selectEl) {
+    var opt = selectEl.options[selectEl.selectedIndex];
+    var cost = opt.dataset.cost;
+    var row = selectEl.closest('tr');
+    var costInput = row.querySelector('input[name="item_costs[]"]');
+    if (costInput && cost !== undefined && cost !== null && cost !== "") {
+        costInput.value = parseFloat(cost).toFixed(2);
+    }
+}
+
+function updatePOItemsForSupplier(supplierId) {
+    supplierId = parseInt(supplierId);
+    var items = supplierItemsMap[supplierId] || [];
+    var optionsHtml = '<option value="">Select an Item...</option>';
+    
+    if (items.length > 0) {
+        items.forEach(itemObj => {
+            var item = itemObj.name;
+            var cost = itemObj.cost || '';
+            var costAttr = cost !== '' ? ` data-cost="${cost}"` : '';
+            var variants = allProductVariants[item] || [];
+            variants.forEach(variantHtml => {
+                optionsHtml += variantHtml.replace('<option ', '<option ' + costAttr + ' ');
+            });
+            if (variants.length === 0) {
+                optionsHtml += `<option value="${item}"${costAttr}>${item}</option>`;
+            }
+        });
+    } else {
+        if (supplierId > 0) {
+            optionsHtml = '<option value="">No items assigned to this supplier</option>';
+        } else {
+            // When no supplier selected, show default fallback (empty)
+        }
+    }
+    
+    // Update the template
+    document.getElementById('inv-options-template').innerHTML = optionsHtml;
+    
+    // Update existing selects
+    document.querySelectorAll('.po-item-select').forEach(select => {
+        select.innerHTML = optionsHtml;
+    });
 }
 
 // Actions from Detail Pane

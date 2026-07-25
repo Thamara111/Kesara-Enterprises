@@ -51,14 +51,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             // Find or create inventory item for this product
             if ($item['product_id']) {
-                $inv_stmt = $pdo->prepare("SELECT id, quantity FROM inventory WHERE product_id = ? LIMIT 1");
-                $inv_stmt->execute([$item['product_id']]);
+                $parts = array_map('trim', explode('·', $item['item_name']));
+                $size = 'Default';
+                $color = 'Default';
+                if (count($parts) >= 3) {
+                    $size = array_pop($parts);
+                    $color = array_pop($parts);
+                }
+                
+                $inv_stmt = $pdo->prepare("SELECT id, quantity FROM inventory WHERE product_id = ? AND size = ? AND colour = ? LIMIT 1");
+                $inv_stmt->execute([$item['product_id'], $size, $color]);
                 $inv = $inv_stmt->fetch();
 
                 if (!$inv) {
                     // Create inventory item
-                    $ins_inv = $pdo->prepare("INSERT INTO inventory (product_id, size, colour, quantity, restock_min) VALUES (?, 'M', 'Standard', 0, 200)");
-                    $ins_inv->execute([$item['product_id']]);
+                    $ins_inv = $pdo->prepare("INSERT INTO inventory (product_id, size, colour, quantity, restock_min) VALUES (?, ?, ?, 0, 200)");
+                    $ins_inv->execute([$item['product_id'], $size, $color]);
                     $inv_id = $pdo->lastInsertId();
                     $qty_before = 0;
                 } else {
@@ -102,10 +110,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         \App\Mailer::send('admin@kesara.lk', $subject, $body);
 
         $success_msg = "Goods receipt confirmed and inventory updated successfully!";
-        
-        // Redirect to PO view
-        echo "<script>showToast('Goods receipt confirmed and inventory updated successfully!', 'success'); setTimeout(() => window.location.href = '/admin-purchase-orders', 3000);</script>";
-        exit;
+
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         $error_msg = "Transaction failed: " . $e->getMessage();
@@ -206,6 +211,17 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
     </script>
 <?php endif; ?>
 
+<?php if (!empty($success_msg)): ?>
+    <div class="m-8 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-xs font-semibold text-emerald-700">
+        <?= htmlspecialchars($success_msg) ?>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            showToast(<?= json_encode($success_msg) ?>, 'success');
+        });
+    </script>
+<?php endif; ?>
+
 <form method="POST" class="flex-1 flex overflow-hidden">
     <input type="hidden" name="action" value="confirm_grn">
     <input type="hidden" name="po_id" value="<?= $po_id ?>">
@@ -275,7 +291,7 @@ $grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1.5">
                         <label class="text-xs font-bold text-gray-500">Date Received <span class="text-red-500">*</span></label>
-                        <input type="date" name="received_date" value="<?= date('Y-m-d') ?>" required class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
+                        <input type="date" name="received_date" value="<?= date('Y-m-d') ?>" min="<?= date('Y-m-d') ?>" required class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none">
                     </div>
                     <div class="space-y-1.5">
                         <label class="text-xs font-bold text-gray-500">Received By <span class="text-red-500">*</span></label>

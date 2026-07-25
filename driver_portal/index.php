@@ -57,6 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         
         if (empty($name) || empty($email) || empty($phone) || empty($nic) || empty($vehicle_number) || empty($password) || empty($licence_expiry)) {
             $error_message = "All fields are required.";
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error_message = "Invalid email format.";
+        } elseif (!preg_match('/^0[0-9]{9}$/', $phone)) {
+            $error_message = "Phone number must start with 0 and contain exactly 10 digits.";
         } else {
             if ($pdo) {
                 try {
@@ -280,7 +284,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
             <input type="hidden" name="action" value="login">
             <div>
                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Email Address</label>
-                <input type="email" name="email" required placeholder="e.g. sunil@kesara.lk" class="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                <input type="email" name="email" required pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" placeholder="e.g. sunil@kesara.lk" class="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
             </div>
             <div>
                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Password</label>
@@ -302,11 +306,11 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Email Address</label>
-                    <input type="email" name="email" required placeholder="e.g. sunil@kesara.lk" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <input type="email" name="email" required pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" placeholder="e.g. sunil@kesara.lk" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Phone Number</label>
-                    <input type="text" name="phone" required placeholder="e.g. +94 77 123 4567" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <input type="tel" name="phone" required pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" placeholder="0771234567" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
                 </div>
             </div>
             <div class="grid grid-cols-3 gap-3">

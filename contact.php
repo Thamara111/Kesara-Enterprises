@@ -33,6 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($message)) {
         $errors['message'] = 'Message content is required.';
     }
+    if (!empty($phone) && !preg_match('/^0[0-9]{9}$/', $phone)) {
+        $errors['phone'] = 'Phone number must start with 0 and contain exactly 10 digits.';
+    }
 
     // Save to Database
     if (empty($errors)) {
@@ -198,7 +201,7 @@ require_once __DIR__ . "/layouts/header.php";
                         <div class="grid sm:grid-cols-2 gap-6">
                             <div>
                                 <label for="email" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Email Address *</label>
-                                <input type="email" id="email" name="email" value="<?= htmlspecialchars($email ?? '') ?>" 
+                                <input type="email" id="email" name="email" value="<?= htmlspecialchars($email ?? '') ?>" required pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
                                        class="w-full bg-gray-50 border <?= isset($errors['email']) ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-brand/20' ?> rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all" 
                                        placeholder="you@example.com">
                                 <?php if (isset($errors['email'])): ?>
@@ -208,9 +211,12 @@ require_once __DIR__ . "/layouts/header.php";
 
                             <div>
                                 <label for="phone" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Phone Number</label>
-                                <input type="tel" id="phone" name="phone" value="<?= htmlspecialchars($phone ?? '') ?>" 
-                                       class="w-full bg-gray-50 border border-gray-200 focus:ring-brand/20 rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all" 
-                                       placeholder="Optional (e.g. +94 77 123 4567)">
+                                <input type="tel" id="phone" name="phone" value="<?= htmlspecialchars($phone ?? '') ?>" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits"
+                                       class="w-full bg-gray-50 border <?= isset($errors['phone']) ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-brand/20' ?> rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all" 
+                                       placeholder="Optional (e.g. 0771234567)">
+                                <?php if (isset($errors['phone'])): ?>
+                                    <p class="text-red-500 text-xs mt-1.5 font-medium"><?= $errors['phone'] ?></p>
+                                <?php endif; ?>
                             </div>
                         </div>
 

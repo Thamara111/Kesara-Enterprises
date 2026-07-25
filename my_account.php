@@ -277,11 +277,11 @@ require_once __DIR__ . "/layouts/header.php";
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email Address</label>
-                                    <input type="email" value="<?= htmlspecialchars($user['email']) ?>" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                    <input type="email" value="<?= htmlspecialchars($user['email']) ?>" pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
                                 </div>
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone Number</label>
-                                    <input type="tel" value="<?= htmlspecialchars($user['phone']) ?>" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                    <input type="tel" value="<?= htmlspecialchars($user['phone']) ?>" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
                                 </div>
                             </div>
 

@@ -27,6 +27,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($whatsapp_number) || empty($password) || empty($business_name) || empty($br_number) || empty($business_type) || empty($address)) {
             $error_message = "All fields are required.";
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error_message = "Invalid email format.";
+        } elseif (!preg_match('/^0[0-9]{9}$/', $phone)) {
+            $error_message = "Phone number must start with 0 and be exactly 10 digits.";
+        } elseif (!preg_match('/^0[0-9]{9}$/', $whatsapp_number)) {
+            $error_message = "WhatsApp number must start with 0 and be exactly 10 digits.";
         } else {
             if ($pdo) {
                 try {
@@ -60,6 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $email_error = true;
             if (empty($password))
                 $password_error = true;
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error_message = "Invalid email format.";
+            $email_error = true;
         } else {
             if ($pdo) {
                 try {
@@ -211,7 +220,8 @@ require_once __DIR__ . "/layouts/head.php";
                                     class="text-red-500">*</span></label>
                             <div class="relative">
                                 <input type="email" name="email" required placeholder="you@company.com"
-                                    class="w-full px-4 py-3 bg-gray-50 border <?= $email_error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-brand focus:ring-brand' ?> rounded-lg focus:ring-2 outline-none transition-all text-sm"
+                                    pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+                                    class="w-full pl-12 pr-4 py-3 bg-gray-50 border <?= $email_error ? 'border-red-400 focus:ring-red-400' : 'border-gray-200 focus:ring-brand focus:border-brand' ?> rounded-lg outline-none transition-all text-sm"
                                     value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
                                 <i class="ti ti-mail absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg"></i>
                             </div>
@@ -313,16 +323,17 @@ require_once __DIR__ . "/layouts/head.php";
                                     <label class="block text-sm font-semibold text-gray-700">Email address <span
                                             class="text-red-500">*</span></label>
                                     <input type="email" name="email" required placeholder="you@company.com"
+                                        pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
                                         class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-sm font-semibold text-gray-700">Phone number <span
                                             class="text-red-500">*</span></label>
-                                    <input type="tel" id="register-phone" name="phone" required maxlength="13"
-                                        placeholder="+94 77 123 4567"
+                                    <input type="tel" id="register-phone" name="phone" required maxlength="10"
+                                        pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits"
+                                        placeholder="0771234567"
                                         class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
-                                    <div id="phone-warning" class="hidden text-xs text-red-500 mt-1 font-medium">Letters are
-                                        not allowed. Please enter numbers only.</div>
+                                    <div id="phone-warning" class="hidden text-xs text-red-500 mt-1 font-medium">Please enter exactly 10 digits starting with 0.</div>
                                 </div>
                                 <div class="space-y-2">
                                     <label class="block text-sm font-semibold text-gray-700">WhatsApp number <span
@@ -331,7 +342,7 @@ require_once __DIR__ . "/layouts/head.php";
                                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-green-500"><i
                                                 class="ti ti-brand-whatsapp text-lg"></i></span>
                                         <input type="tel" id="register-whatsapp" name="whatsapp_number" required
-                                            maxlength="13" placeholder="+94 77 123 4567"
+                                            maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" placeholder="0771234567"
                                             class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 outline-none transition-all text-sm">
                                     </div>
                                 </div>

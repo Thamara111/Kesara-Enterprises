@@ -26,7 +26,7 @@ try {
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
     
     // Prepare and execute the query to fetch basic product details (ignoring soft-deleted items)
-    $stmt = $pdo->prepare("SELECT id, name, sku, images FROM products WHERE id IN ($placeholders) AND deleted_at IS NULL");
+    $stmt = $pdo->prepare("SELECT id, name, sku, images, discount, base_price FROM products WHERE id IN ($placeholders) AND deleted_at IS NULL");
     $stmt->execute($ids);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -36,6 +36,8 @@ try {
     // Iterate over each fetched product to gather its specific pricing tiers
     foreach ($products as $p) {
         $product_id = $p['id'];
+        $discount = isset($p['discount']) ? (float)$p['discount'] : 0;
+        $base_price = isset($p['base_price']) ? (float)$p['base_price'] : 0;
         
         // Fetch pricing tiers for the current product, ordered by minimum quantity ascending
         // This is used to determine the lowest possible Minimum Order Quantity (MOQ)
@@ -58,7 +60,7 @@ try {
             }
         } else {
             // Fallback tier definition if the product has no explicit pricing tiers set up
-            $tiers = [['min' => 1, 'max' => null, 'price' => 0]];
+            $tiers = [['min' => 1, 'max' => null, 'price' => $base_price]];
         }
 
         // Decode the JSON images array and pick the first image to display in the cart
@@ -72,6 +74,7 @@ try {
             'meta' => 'SKU ' . $p['sku'],
             'image' => $image,
             'moq' => (int)$moq,
+            'discount' => $discount,
             'tiers' => $tiers
         ];
     }

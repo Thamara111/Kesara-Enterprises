@@ -313,12 +313,12 @@ if (empty($all_categories)) {
                     </div>
                     <div class="space-y-2">
                         <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid From</label>
-                        <input type="date" id="f-discount-start"
+                        <input type="date" id="f-discount-start" min="<?= date('Y-m-d') ?>"
                             class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm text-gray-500">
                     </div>
                     <div class="space-y-2">
                         <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid To</label>
-                        <input type="date" id="f-discount-end"
+                        <input type="date" id="f-discount-end" min="<?= date('Y-m-d') ?>"
                             class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm text-gray-500">
                     </div>
                 </div>
@@ -957,6 +957,7 @@ if (empty($all_categories)) {
     document.getElementById('prod-cat-filter')?.addEventListener('change', () => { currentPage = 1; applyFilters(); });
 
     // Initial render logic
+    applyFilters();
     var firstRow = document.querySelector('.prod-card');
     if (firstRow) {
         selectProd(firstRow, false);

@@ -184,7 +184,7 @@ function loadCartFromStorage() {
 async function initializeCheckout() {
     const storageCart = loadCartFromStorage();
     if (storageCart.length === 0) {
-        window.location.href = '/cart.php';
+        window.location.href = '/cart';
         return;
     }
 

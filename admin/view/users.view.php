@@ -141,7 +141,7 @@ function getRoleMeta($role) {
 
                 <div class="space-y-1.5">
                     <label for="email" class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block ml-1">Email Address</label>
-                    <input type="email" id="email" name="email" required placeholder="e.g. nimal@kesara.lk" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all">
+                    <input type="email" id="email" name="email" required pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" placeholder="e.g. nimal@kesara.lk" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all">
                 </div>
 
                 <div class="space-y-1.5">

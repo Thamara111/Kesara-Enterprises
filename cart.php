@@ -227,6 +227,7 @@ async function initializeCart() {
                     image: dbP.image,
                     moq: dbP.moq,
                     tiers: dbP.tiers,
+                    discount: dbP.discount,
                     qty: finalQty,
                     color: item.color,
                     size: item.size,
@@ -260,14 +261,25 @@ function getPrice(item) {
   // If item is unselected, we still show a price based on its own qty just for display
   if (!item.selected) totalQty = item.qty;
 
+  let basePrice = 0;
   for (let t of item.tiers) {
     const max = t.max === null ? Infinity : t.max;
     if (totalQty >= t.min && totalQty <= max) {
-      return t.price;
+      basePrice = t.price;
+      break;
     }
   }
   // Fallback to highest tier if over max, or lowest if under min
-  return item.tiers[item.tiers.length - 1].price;
+  if (basePrice === 0) {
+      basePrice = item.tiers[item.tiers.length - 1].price;
+  }
+  
+  // Apply discount if present
+  if (item.discount && item.discount > 0) {
+      return basePrice * (1 - (item.discount / 100));
+  }
+  
+  return basePrice;
 }
 
 function getTierLabel(item) {
