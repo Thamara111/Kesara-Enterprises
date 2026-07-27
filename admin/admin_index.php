@@ -50,7 +50,8 @@ if (isset($_SESSION['admin_id'])) {
         'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
         'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries', 'trash'],
         'supplier_manager' => ['dashboard', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'login', 'inquiries'],
-        'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries']
+        'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries'],
+        'example_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries']
     ];
 
     $allowed_views = $role_access[$role] ?? [];
@@ -264,13 +265,15 @@ endif;
 
     // Automatically handle loader for all standard forms
     document.addEventListener('submit', function(e) {
+        if (e.defaultPrevented) return;
         var form = e.target;
         var submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) {
-            // Prevent double submit natively by disabling the button shortly after (to allow form data to be gathered)
-            setTimeout(() => {
-                setButtonLoading(submitBtn, true);
-            }, 10);
+            setTimeout(function() {
+                if (!e.defaultPrevented) {
+                    setButtonLoading(submitBtn, true);
+                }
+            }, 50);
         }
     });
 </script>

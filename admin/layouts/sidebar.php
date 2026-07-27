@@ -15,6 +15,7 @@ $is_admin = ($role === 'admin');
 $has_finance = in_array($role, ['admin', 'finance_manager']);
 $has_supplier = in_array($role, ['admin', 'supplier_manager']);
 $has_delivery = in_array($role, ['admin', 'delivery_manager']);
+$has_example = in_array($role, ['admin', 'example_manager']);
 
 $pending_approvals_count = 0;
 $pending_verification_count = 0;

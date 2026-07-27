@@ -59,7 +59,7 @@ CREATE TABLE admins (
   username VARCHAR(50) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   email VARCHAR(100) NOT NULL UNIQUE,
-  role ENUM('admin', 'finance_manager', 'supplier_manager', 'delivery_manager') DEFAULT 'admin',
+  role ENUM('admin', 'finance_manager', 'supplier_manager', 'delivery_manager', 'example_manager') DEFAULT 'admin',
   failed_attempts INT DEFAULT 0,
   locked_until DATETIME NULL,
   deleted_at DATETIME DEFAULT NULL,
