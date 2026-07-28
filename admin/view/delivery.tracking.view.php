@@ -305,23 +305,47 @@ var legInterpolatedPaths = []; // array of coordinate arrays for each leg
 
 // Load Initial Data
 function initData() {
+    var stored = localStorage.getItem('ke_assignments');
+    if (stored) {
+        try {
+            var parsed = JSON.parse(stored);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                assignments = parsed;
+                return;
+            }
+        } catch (e) {
+            console.error('Error parsing ke_assignments from localStorage:', e);
+        }
+    }
     assignments = [...defaultAssignments];
+}
+
+// Stop any running simulation
+function stopSimulation() {
+    isSimulating = false;
+    if (simInterval) {
+        clearInterval(simInterval);
+        simInterval = null;
+    }
 }
 
 // Show Custom Toast
 function showToast(message, type = 'success') {
     var toast = document.getElementById('custom-toast');
+    if (!toast) return;
     var msgEl = document.getElementById('toast-msg');
     var iconEl = document.getElementById('toast-icon');
     
-    msgEl.textContent = message;
+    if (msgEl) msgEl.textContent = message;
     
-    if (type === 'error') {
-        iconEl.className = 'ti ti-alert-circle text-red-500';
-    } else if (type === 'info') {
-        iconEl.className = 'ti ti-info-circle text-blue-500';
-    } else {
-        iconEl.className = 'ti ti-circle-check text-emerald-500';
+    if (iconEl) {
+        if (type === 'error') {
+            iconEl.className = 'ti ti-alert-circle text-red-500';
+        } else if (type === 'info') {
+            iconEl.className = 'ti ti-info-circle text-blue-500';
+        } else {
+            iconEl.className = 'ti ti-circle-check text-emerald-500';
+        }
     }
     
     toast.classList.remove('translate-y-24', 'opacity-0');
@@ -344,24 +368,38 @@ function initMap() {
         position: 'bottomright'
     }).addTo(map);
 
-    // Load CartoDB Positron - Sleek, Minimalist light theme tiles
+    // SVG Grid fallback tile for offline mode (prevents broken image icons when offline)
+    var offlineGridSvg = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" fill="%23f8fafc"/><path d="M0 64h256M0 128h256M0 192h256M64 0v256M128 0v256M192 0v256" stroke="%23e2e8f0" stroke-width="1"/><text x="12" y="24" fill="%23cbd5e1" font-family="sans-serif" font-size="9" font-weight="bold">OFFLINE GRID</text></svg>';
+
+    // Load CartoDB Positron - Sleek, Minimalist light theme tiles with offline fallback
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
         subdomains: 'abcd',
-        maxZoom: 20
+        maxZoom: 20,
+        errorTileUrl: offlineGridSvg
     }).addTo(map);
 }
 
 // Populate UI Elements
 function populateRunsDropdown() {
     var selector = document.getElementById('run-selector');
+    if (!selector) return;
     selector.innerHTML = '';
+    
+    if (!assignments || assignments.length === 0) {
+        var option = document.createElement('option');
+        option.value = '';
+        option.textContent = 'No active delivery runs';
+        selector.appendChild(option);
+        return;
+    }
     
     assignments.forEach(a => {
         var option = document.createElement('option');
         option.value = a.id;
-        var stopsDone = a.stops.filter(s => s.status.startsWith('Delivered')).length;
-        option.textContent = `${a.id} — ${a.driver.split(' ')[0]} (${stopsDone}/${a.stops.length} stops) [${a.badgeText}]`;
+        var stopsDone = (a.stops || []).filter(s => (s.status || '').startsWith('Delivered')).length;
+        var driverName = (a.driver || 'Driver').split(' ')[0];
+        option.textContent = `${a.id} — ${driverName} (${stopsDone}/${(a.stops || []).length} stops) [${a.badgeText || 'Pending'}]`;
         selector.appendChild(option);
     });
 }
@@ -385,92 +423,115 @@ function interpolatePoints(p1, p2, steps) {
 
 // Populate the Sidebar & HUD Information
 function updateUI(run) {
+    if (!run) return;
+
     // Driver Details
-    document.getElementById('t-av').textContent = run.av;
-    document.getElementById('t-av').className = 'w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-sm shadow-md ' + run.avColor;
-    document.getElementById('t-driver').textContent = run.driver;
-    document.getElementById('t-vehicle').textContent = run.vehicle;
+    var avEl = document.getElementById('t-av');
+    if (avEl) {
+        avEl.textContent = run.av || 'NK';
+        avEl.className = 'w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-sm shadow-md ' + (run.avColor || 'bg-emerald-100 text-emerald-700');
+    }
+
+    var driverEl = document.getElementById('t-driver');
+    if (driverEl) driverEl.textContent = run.driver || 'Unassigned';
+
+    var vehicleEl = document.getElementById('t-vehicle');
+    if (vehicleEl) vehicleEl.textContent = run.vehicle || 'N/A';
     
     // Status Badge
     var badge = document.getElementById('t-status-badge');
-    badge.className = 'px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border ' + run.badge;
-    badge.textContent = run.badgeText;
+    if (badge) {
+        badge.className = 'px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider border ' + (run.badge || '');
+        badge.textContent = run.badgeText || 'Pending';
+    }
     
     // Metrics
-    var completedCount = run.stops.filter(s => s.status.startsWith('Delivered')).length;
-    document.getElementById('t-progress').textContent = `${completedCount} / ${run.stops.length}`;
+    var stops = run.stops || [];
+    var completedCount = stops.filter(s => (s.status || '').startsWith('Delivered')).length;
+    var progressEl = document.getElementById('t-progress');
+    if (progressEl) progressEl.textContent = `${completedCount} / ${stops.length}`;
     
     var estFinishEl = document.getElementById('t-eta');
-    if (run.badgeText === 'Completed') {
-        estFinishEl.textContent = 'Finished';
-        estFinishEl.className = 'text-xl font-bold text-emerald-600 mt-1';
-    } else if (run.badgeText === 'Pending') {
-        estFinishEl.textContent = 'Not started';
-        estFinishEl.className = 'text-xl font-bold text-gray-400 mt-1';
-    } else {
-        estFinishEl.textContent = '12:30 PM';
-        estFinishEl.className = 'text-xl font-bold text-brand mt-1';
+    if (estFinishEl) {
+        if (run.badgeText === 'Completed') {
+            estFinishEl.textContent = 'Finished';
+            estFinishEl.className = 'text-xl font-bold text-emerald-600 mt-1';
+        } else if (run.badgeText === 'Pending') {
+            estFinishEl.textContent = 'Not started';
+            estFinishEl.className = 'text-xl font-bold text-gray-400 mt-1';
+        } else {
+            estFinishEl.textContent = '12:30 PM';
+            estFinishEl.className = 'text-xl font-bold text-brand mt-1';
+        }
     }
 
     // Stop Timeline
     var timeline = document.getElementById('t-stops');
-    timeline.innerHTML = run.stops.map(s => {
-        var statusClass = 'bg-gray-50 text-gray-500 border border-gray-100';
-        var markerDot = 'bg-gray-200 border-gray-300';
-        
-        if (s.status.startsWith('Delivered')) {
-            statusClass = 'bg-emerald-50 text-emerald-700 border border-emerald-100';
-            markerDot = 'bg-emerald-500 border-white ring-2 ring-emerald-100';
-        } else if (s.status === 'In progress') {
-            statusClass = 'bg-blue-50 text-blue-700 border border-blue-100 animate-pulse';
-            markerDot = 'bg-blue-500 border-white ring-4 ring-blue-100';
-        } else if (s.status === 'Not started') {
-            statusClass = 'bg-amber-50 text-amber-700 border border-amber-100';
-            markerDot = 'bg-amber-400 border-white ring-2 ring-amber-100';
-        }
-        
-        return `
-          <div class="relative flex gap-4">
-              <div class="w-5 h-5 rounded-full border text-xs font-bold flex items-center justify-center shrink-0 z-10 transition-all ${markerDot === 'bg-gray-200 border-gray-300' ? 'bg-white text-gray-400 border-gray-200' : 'bg-brand-light text-brand border-brand/20'}">${s.num}</div>
-              <div class="flex-1 min-w-0 pb-4">
-                  <p class="text-xs font-bold text-gray-900">${s.name}</p>
-                  <p class="text-[11px] text-gray-500 mt-0.5">${s.addr}</p>
-                  <div class="mt-2">
-                    <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusClass}">${s.status}</span>
+    if (timeline) {
+        timeline.innerHTML = stops.map(s => {
+            var statusClass = 'bg-gray-50 text-gray-500 border border-gray-100';
+            var markerDot = 'bg-gray-200 border-gray-300';
+            var statusStr = s.status || 'Pending';
+            
+            if (statusStr.startsWith('Delivered')) {
+                statusClass = 'bg-emerald-50 text-emerald-700 border border-emerald-100';
+                markerDot = 'bg-emerald-500 border-white ring-2 ring-emerald-100';
+            } else if (statusStr === 'In progress') {
+                statusClass = 'bg-blue-50 text-blue-700 border border-blue-100 animate-pulse';
+                markerDot = 'bg-blue-500 border-white ring-4 ring-blue-100';
+            } else if (statusStr === 'Not started' || statusStr === 'Pending') {
+                statusClass = 'bg-amber-50 text-amber-700 border border-amber-100';
+                markerDot = 'bg-amber-400 border-white ring-2 ring-amber-100';
+            }
+            
+            return `
+              <div class="relative flex gap-4">
+                  <div class="w-5 h-5 rounded-full border text-xs font-bold flex items-center justify-center shrink-0 z-10 transition-all ${markerDot === 'bg-gray-200 border-gray-300' ? 'bg-white text-gray-400 border-gray-200' : 'bg-brand-light text-brand border-brand/20'}">${s.num}</div>
+                  <div class="flex-1 min-w-0 pb-4">
+                      <p class="text-xs font-bold text-gray-900">${s.name || ''}</p>
+                      <p class="text-[11px] text-gray-500 mt-0.5">${s.addr || ''}</p>
+                      <div class="mt-2">
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusClass}">${statusStr}</span>
+                      </div>
                   </div>
               </div>
-          </div>
-        `;
-    }).join('');
+            `;
+        }).join('');
+    }
 
     // Update Floating Map HUD
-    document.getElementById('hud-id').textContent = run.id;
+    var hudId = document.getElementById('hud-id');
+    if (hudId) hudId.textContent = run.id || '';
+
     var hudDesc = document.getElementById('hud-desc');
     var hudSub = document.getElementById('hud-sub');
     var hudDot = document.getElementById('hud-dot');
     
-    if (run.badgeText === 'Completed') {
-        hudDesc.textContent = 'Delivery run completed successfully.';
-        hudSub.textContent = 'All deliveries completed';
-        hudSub.className = 'text-xs text-emerald-600 font-bold';
-        hudDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
-    } else if (run.badgeText === 'Pending') {
-        hudDesc.textContent = 'Pending start. Dispatch run to begin tracking.';
-        hudSub.textContent = 'Pending dispatch';
-        hudSub.className = 'text-xs text-amber-600 font-bold';
-        hudDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
-    } else {
-        var nextInProg = run.stops.find(s => s.status === 'In progress') || run.stops.find(s => s.status === 'Not started');
-        hudDesc.textContent = nextInProg ? `En route to Stop ${nextInProg.num}: ${nextInProg.name.split(' · ')[1] || nextInProg.name}` : 'En route';
-        hudSub.textContent = 'Live GPS Connection Active';
-        hudSub.className = 'text-xs text-blue-600 font-bold';
-        hudDot.className = 'w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse';
+    if (hudDesc && hudSub && hudDot) {
+        if (run.badgeText === 'Completed') {
+            hudDesc.textContent = 'Delivery run completed successfully.';
+            hudSub.textContent = 'All deliveries completed';
+            hudSub.className = 'text-xs text-emerald-600 font-bold';
+            hudDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+        } else if (run.badgeText === 'Pending') {
+            hudDesc.textContent = 'Pending start. Dispatch run to begin tracking.';
+            hudSub.textContent = 'Pending dispatch';
+            hudSub.className = 'text-xs text-amber-600 font-bold';
+            hudDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
+        } else {
+            var nextInProg = stops.find(s => s.status === 'In progress') || stops.find(s => s.status === 'Not started' || s.status === 'Pending');
+            hudDesc.textContent = nextInProg ? `En route to Stop ${nextInProg.num}: ${nextInProg.name ? (nextInProg.name.split(' · ')[1] || nextInProg.name) : ''}` : 'En route';
+            hudSub.textContent = 'Live GPS Connection Active';
+            hudSub.className = 'text-xs text-blue-600 font-bold';
+            hudDot.className = 'w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse';
+        }
     }
 }
 
 // Generate logs to the Activity telemetry window
 function logTelemetry(message, type = 'INFO') {
     var telDiv = document.getElementById('t-telemetry');
+    if (!telDiv) return;
     var timestamp = new Date().toLocaleTimeString([], { hour12: false });
     
     var colorClass = 'text-emerald-400';
@@ -488,6 +549,8 @@ function logTelemetry(message, type = 'INFO') {
 
 // Draw Route, Warehouse, and Stop Markers on Leaflet Map
 function drawRouteOnMap(run) {
+    if (!map || !run) return;
+
     // Clear existing elements
     if (warehouseMarker) map.removeLayer(warehouseMarker);
     stopMarkers.forEach(m => map.removeLayer(m));
@@ -507,24 +570,25 @@ function drawRouteOnMap(run) {
         iconSize: [32, 32],
         iconAnchor: [16, 16]
     });
-    warehouseMarker = L.marker(whHtml ? warehouseCoords : [6.95, 79.88], { icon: whIcon }).addTo(map)
+    warehouseMarker = L.marker(warehouseCoords, { icon: whIcon }).addTo(map)
         .bindPopup(`<b>KE Central Warehouse (${run.zone || 'Colombo'})</b>`);
         
     // 2. Draw Stop Markers & Gather Route Coordinates
     var routeCoords = [warehouseCoords];
+    var stops = run.stops || [];
     
-    run.stops.forEach(s => {
+    stops.forEach(s => {
         // Fallback coordinates if missing
         if (!s.lat || !s.lng) {
-            // Generate minor random offset from warehouse for custom runs
             var offset = (Math.random() - 0.5) * 0.05;
             s.lat = warehouseCoords[0] + offset;
             s.lng = warehouseCoords[1] + (Math.random() - 0.5) * 0.05;
         }
         
+        var statusStr = s.status || 'Pending';
         var markerColor = 'bg-amber-500';
-        if (s.status.startsWith('Delivered')) markerColor = 'bg-emerald-500';
-        if (s.status === 'In progress') markerColor = 'bg-blue-500';
+        if (statusStr.startsWith('Delivered')) markerColor = 'bg-emerald-500';
+        if (statusStr === 'In progress') markerColor = 'bg-blue-500';
         
         var stopHtml = `<div class="w-7 h-7 rounded-full border border-white flex items-center justify-center shadow-md text-white text-xs font-bold ${markerColor}">${s.num}</div>`;
         var stopIcon = L.divIcon({
@@ -535,7 +599,7 @@ function drawRouteOnMap(run) {
         });
         
         var stopM = L.marker([s.lat, s.lng], { icon: stopIcon }).addTo(map)
-            .bindPopup(`<b>Stop ${s.num}: ${s.name}</b><br><span class="text-xs text-gray-500">${s.addr}</span><br><b class="text-xs mt-1 block">Status: ${s.status}</b>`);
+            .bindPopup(`<b>Stop ${s.num}: ${s.name || ''}</b><br><span class="text-xs text-gray-500">${s.addr || ''}</span><br><b class="text-xs mt-1 block">Status: ${statusStr}</b>`);
         
         stopMarkers.push(stopM);
         routeCoords.push([s.lat, s.lng]);
@@ -550,27 +614,26 @@ function drawRouteOnMap(run) {
     }).addTo(map);
     
     // 4. Place Vehicle Marker
-    // Prioritize simulated GPS coordinates from localStorage if they exist
     var initialVehiclePos = warehouseCoords;
     if (run.sim_coords) {
         initialVehiclePos = run.sim_coords;
-    } else if (run.badgeText === 'Completed') {
-        var lastStop = run.stops[run.stops.length - 1];
+    } else if (run.badgeText === 'Completed' && stops.length > 0) {
+        var lastStop = stops[stops.length - 1];
         initialVehiclePos = [lastStop.lat, lastStop.lng];
     } else if (run.badgeText === 'Active') {
-        // Find current active index
-        var firstIncompleteIdx = run.stops.findIndex(s => !s.status.startsWith('Delivered'));
+        var firstIncompleteIdx = stops.findIndex(s => !(s.status || '').startsWith('Delivered'));
         if (firstIncompleteIdx > 0) {
-            var lastCompletedStop = run.stops[firstIncompleteIdx - 1];
+            var lastCompletedStop = stops[firstIncompleteIdx - 1];
             initialVehiclePos = [lastCompletedStop.lat, lastCompletedStop.lng];
         } else if (firstIncompleteIdx === 0) {
             initialVehiclePos = warehouseCoords;
         }
     }
     
+    var vehicleStr = (run.vehicle || '').toLowerCase();
     var vehicleIconClass = 'ti-motorbike';
-    if (run.vehicle.toLowerCase().includes('van')) vehicleIconClass = 'ti-van';
-    else if (run.vehicle.toLowerCase().includes('lorry')) vehicleIconClass = 'ti-truck';
+    if (vehicleStr.includes('van')) vehicleIconClass = 'ti-van';
+    else if (vehicleStr.includes('lorry') || vehicleStr.includes('truck')) vehicleIconClass = 'ti-truck';
     
     var vehicleHtml = `<div class="w-9 h-9 rounded-full bg-brand-light border-2 border-brand flex items-center justify-center shadow-lg text-brand text-base transition-all"><i class="ti ${vehicleIconClass}"></i></div>`;
     var vIcon = L.divIcon({
@@ -581,11 +644,13 @@ function drawRouteOnMap(run) {
     });
     
     vehicleMarker = L.marker(initialVehiclePos, { icon: vIcon }).addTo(map)
-        .bindPopup(`<b>Live Tracking: ${run.driver}</b><br><span class="text-xs text-gray-500">${run.vehicle}</span>`);
+        .bindPopup(`<b>Live Tracking: ${run.driver || 'Driver'}</b><br><span class="text-xs text-gray-500">${run.vehicle || ''}</span>`);
         
     // 5. Fit map bounds to show route
-    var bounds = L.latLngBounds(routeCoords);
-    map.fitBounds(bounds, { padding: [50, 50] });
+    if (routeCoords.length > 0) {
+        var bounds = L.latLngBounds(routeCoords);
+        map.fitBounds(bounds, { padding: [50, 50] });
+    }
     
     // 6. Precompute leg interpolation coordinates for simulation
     legInterpolatedPaths = [];
@@ -595,7 +660,7 @@ function drawRouteOnMap(run) {
     
     // Determine active index for simulation leg
     if (run.badgeText === 'Active') {
-        var activeIdx = run.stops.findIndex(s => !s.status.startsWith('Delivered'));
+        var activeIdx = stops.findIndex(s => !(s.status || '').startsWith('Delivered'));
         currentLegIndex = activeIdx !== -1 ? activeIdx : 0;
         currentStepIndex = 0;
     } else {
@@ -616,28 +681,35 @@ function changeActiveRun(runId) {
     drawRouteOnMap(activeRun);
     
     // Log dispatch event to telemetry
-    document.getElementById('t-telemetry').innerHTML = '';
-    logTelemetry(`Tracking connection initialized for ${activeRun.id}`, 'SYSTEM');
-    logTelemetry(`Driver: ${activeRun.driver} (${activeRun.vehicle})`, 'SYSTEM');
-    logTelemetry(`Base Warehouse: Central Warehouse (${activeRun.zone})`, 'SYSTEM');
+    var telDiv = document.getElementById('t-telemetry');
+    if (telDiv) telDiv.innerHTML = '';
     
+    logTelemetry(`Tracking connection initialized for ${activeRun.id}`, 'SYSTEM');
+    logTelemetry(`Driver: ${activeRun.driver || 'Unassigned'} (${activeRun.vehicle || 'N/A'})`, 'SYSTEM');
+    logTelemetry(`Base Warehouse: Central Warehouse (${activeRun.zone || 'Colombo'})`, 'SYSTEM');
+    
+    var stops = activeRun.stops || [];
     if (activeRun.badgeText === 'Pending') {
         logTelemetry(`Run is awaiting warehouse release. Ready for dispatch.`, 'WARN');
     } else if (activeRun.badgeText === 'Completed') {
-        logTelemetry(`All ${activeRun.stops.length} deliveries completed successfully. Run finished.`, 'SYSTEM');
-        activeRun.stops.forEach(s => {
-            logTelemetry(`Stop ${s.num}: ${s.name.split(' · ')[1]} -- DELIVERED (${s.status.replace('Delivered ', '')})`, 'DELIVERED');
+        logTelemetry(`All ${stops.length} deliveries completed successfully. Run finished.`, 'SYSTEM');
+        stops.forEach(s => {
+            var sName = s.name ? (s.name.split(' · ')[1] || s.name) : 'Stop';
+            var sStatus = (s.status || '').replace('Delivered ', '');
+            logTelemetry(`Stop ${s.num}: ${sName} -- DELIVERED (${sStatus})`, 'DELIVERED');
         });
     } else {
         // Active
         logTelemetry(`GPS Connection Established. Telemetry active.`, 'SYSTEM');
-        activeRun.stops.forEach(s => {
-            if (s.status.startsWith('Delivered')) {
-                logTelemetry(`Stop ${s.num}: ${s.name.split(' · ')[1]} -- DELIVERED (${s.status.replace('Delivered ', '')})`, 'DELIVERED');
-            } else if (s.status === 'In progress') {
-                logTelemetry(`Stop ${s.num}: ${s.name.split(' · ')[1]} -- EN ROUTE`, 'GPS');
+        stops.forEach(s => {
+            var sName = s.name ? (s.name.split(' · ')[1] || s.name) : 'Stop';
+            var statusStr = s.status || 'Pending';
+            if (statusStr.startsWith('Delivered')) {
+                logTelemetry(`Stop ${s.num}: ${sName} -- DELIVERED (${statusStr.replace('Delivered ', '')})`, 'DELIVERED');
+            } else if (statusStr === 'In progress') {
+                logTelemetry(`Stop ${s.num}: ${sName} -- EN ROUTE`, 'GPS');
             } else {
-                logTelemetry(`Stop ${s.num}: ${s.name.split(' · ')[1]} -- QUEUED`, 'SYSTEM');
+                logTelemetry(`Stop ${s.num}: ${sName} -- QUEUED`, 'SYSTEM');
             }
         });
     }
@@ -646,13 +718,11 @@ function changeActiveRun(runId) {
 // Telemetry call simulated
 function triggerQuickCall() {
     if (!activeRun) return;
-    showToast(`Dialing driver ${activeRun.driver} (${activeRun.vehicle.split(' · ')[0]})...`, 'info');
-    logTelemetry(`Voice link established with driver: ${activeRun.driver}`, 'SYSTEM');
+    var driverName = activeRun.driver || 'Driver';
+    var vehicleInfo = activeRun.vehicle ? activeRun.vehicle.split(' · ')[0] : 'Vehicle';
+    showToast(`Dialing driver ${driverName} (${vehicleInfo})...`, 'info');
+    logTelemetry(`Voice link established with driver: ${driverName}`, 'SYSTEM');
 }
-
-// Instantly skip current leg to next stop — DRIVER PORTAL ONLY
-// (Admin tracking view is read-only; simulation is driven by the driver portal)
-
 
 // Listen for storage events from the Driver Portal
 window.addEventListener('storage', (e) => {
@@ -665,7 +735,6 @@ window.addEventListener('storage', (e) => {
             var updatedRun = assignments.find(a => a.id === activeRun.id);
             if (updatedRun) {
                 // Sync status and stops
-                var oldSimCoords = activeRun.sim_coords;
                 activeRun = updatedRun;
                 updateUI(activeRun);
                 
@@ -680,9 +749,12 @@ window.addEventListener('storage', (e) => {
         }
         
         // Refresh runs selector dropdown text
-        var currentSelVal = document.getElementById('run-selector').value;
-        populateRunsDropdown();
-        document.getElementById('run-selector').value = currentSelVal;
+        var selector = document.getElementById('run-selector');
+        if (selector) {
+            var currentSelVal = selector.value;
+            populateRunsDropdown();
+            selector.value = currentSelVal;
+        }
     }
 });
 
@@ -706,19 +778,23 @@ function startApp() {
     initMap();
     populateRunsDropdown();
     
-    // Route to requested ID from query parameters or default to first
+    // Route to requested ID from query parameters (supports both 'id' and 'assignment_id') or default to first
     var urlParams = new URLSearchParams(window.location.search);
-    var requestedId = urlParams.get('id');
+    var requestedId = urlParams.get('id') || urlParams.get('assignment_id');
+    var selector = document.getElementById('run-selector');
     
     if (requestedId && assignments.some(a => a.id === requestedId)) {
-        document.getElementById('run-selector').value = requestedId;
+        if (selector) selector.value = requestedId;
         changeActiveRun(requestedId);
     } else if (assignments.length > 0) {
-        document.getElementById('run-selector').value = assignments[0].id;
+        if (selector) selector.value = assignments[0].id;
         changeActiveRun(assignments[0].id);
     }
 
-    document.getElementById('toggle-tracking-sidebar').addEventListener('click', openTrackingSidebar);
+    var toggleBtn = document.getElementById('toggle-tracking-sidebar');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', openTrackingSidebar);
+    }
     if (window.innerWidth < 1024) {
         closeTrackingSidebar();
     }

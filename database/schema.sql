@@ -86,12 +86,15 @@ CREATE TABLE suppliers (
 CREATE TABLE delivery_personnel (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
+  email VARCHAR(100) UNIQUE,
+  password VARCHAR(255),
   phone VARCHAR(20),
   nic VARCHAR(20),
   licence_class VARCHAR(20),
   licence_expiry DATE,
   vehicle_type ENUM('motorbike','van','lorry'),
   vehicle_number VARCHAR(20),
+  assigned_area VARCHAR(100) DEFAULT 'Colombo',
   status ENUM('available','on_run','day_off','inactive') DEFAULT 'available',
   joined_date DATE,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP

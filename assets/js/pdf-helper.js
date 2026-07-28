@@ -23,6 +23,26 @@ function downloadPDF(elementId, reportName) {
     // Clone element to sanitize for printing
     const clone = element.cloneNode(true);
 
+    // Convert all canvas elements (e.g. Chart.js charts) in clone to <img> elements with base64 PNG data
+    const origCanvases = element.querySelectorAll('canvas');
+    const cloneCanvases = clone.querySelectorAll('canvas');
+    origCanvases.forEach((origCanvas, idx) => {
+        if (cloneCanvases[idx]) {
+            try {
+                const imgData = origCanvas.toDataURL('image/png');
+                const img = document.createElement('img');
+                img.src = imgData;
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '350px';
+                img.style.display = 'block';
+                img.style.margin = '0 auto';
+                cloneCanvases[idx].parentNode.replaceChild(img, cloneCanvases[idx]);
+            } catch(e) {
+                console.error("Error converting canvas to image for PDF:", e);
+            }
+        }
+    });
+
     // Remove interactive/non-printable elements from clone
     const removeSelectors = [
         'button', 'input', 'select', 'form', '.print\\:hidden', '.no-print',
@@ -33,9 +53,10 @@ function downloadPDF(elementId, reportName) {
         clone.querySelectorAll(sel).forEach(el => el.remove());
     });
 
-    // If clone contains a table, ensure the table itself is styled neatly
+    // If report is an analytics/dashboard report, export the full layout; otherwise if it's a dedicated single table wrapper, export outerHTML.
+    const isReportTab = elementId.startsWith('tab-') || reportName.includes('Report');
     const table = clone.querySelector('table');
-    const contentHtml = table ? table.outerHTML : clone.innerHTML;
+    const contentHtml = (!isReportTab && table && clone.children.length === 1) ? table.outerHTML : clone.innerHTML;
 
     // Format display title and reference code
     const titleMap = {

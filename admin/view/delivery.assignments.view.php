@@ -84,12 +84,18 @@ if (isset($pdo) && $pdo !== null) {
             ];
         }
 
-        // Fetch available drivers
-        $driver_stmt = $pdo->query("SELECT id, name, vehicle_type, vehicle_number FROM delivery_personnel WHERE status = 'available'");
+        // Self-heal: ensure assigned_area column exists in delivery_personnel table
+        $chk_dp = $pdo->query("SHOW COLUMNS FROM delivery_personnel LIKE 'assigned_area'");
+        if (!$chk_dp->fetch()) {
+            $pdo->exec("ALTER TABLE delivery_personnel ADD COLUMN assigned_area VARCHAR(100) DEFAULT 'Colombo'");
+        }
+
+        // Fetch available drivers with assigned area
+        $driver_stmt = $pdo->query("SELECT id, name, vehicle_type, vehicle_number, status, COALESCE(assigned_area, 'Colombo') AS assigned_area FROM delivery_personnel WHERE status != 'inactive' ORDER BY status ASC, name ASC");
         $available_drivers = $driver_stmt->fetchAll();
 
         // Fetch driver performance info
-        $all_drivers_stmt = $pdo->query("SELECT id, name, vehicle_type, vehicle_number FROM delivery_personnel");
+        $all_drivers_stmt = $pdo->query("SELECT id, name, vehicle_type, vehicle_number, COALESCE(assigned_area, 'Colombo') AS assigned_area FROM delivery_personnel");
         $all_drivers = $all_drivers_stmt->fetchAll();
         foreach ($all_drivers as $d) {
             $words = explode(" ", $d['name']);
@@ -101,23 +107,35 @@ if (isset($pdo) && $pdo !== null) {
 
             $driver_info_map[$d['id']] = [
                 'vehicle' => ucfirst($d['vehicle_type']) . ' · ' . $d['vehicle_number'],
-                'zone' => 'Colombo',
+                'zone' => htmlspecialchars($d['assigned_area']),
                 'ot' => '90%'
             ];
             $driver_info_map[$initials] = [
                 'vehicle' => ucfirst($d['vehicle_type']) . ' · ' . $d['vehicle_number'],
-                'zone' => 'Colombo',
+                'zone' => htmlspecialchars($d['assigned_area']),
                 'ot' => '90%'
             ];
         }
 
-        // Fetch unassigned orders
-        $unassigned_stmt = $pdo->query("SELECT o.id 
+        // Fetch unassigned orders with customer address details
+        $unassigned_stmt = $pdo->query("SELECT o.id, u.business_name, u.address 
                                         FROM orders o 
+                                        JOIN users u ON o.user_id = u.id
                                         LEFT JOIN delivery_assignments da ON o.id = da.order_id 
                                         WHERE da.id IS NULL AND o.status IN ('processing', 'pending') 
-                                        LIMIT 5");
-        $unassigned_orders = $unassigned_stmt->fetchAll(PDO::FETCH_COLUMN);
+                                        ORDER BY o.id DESC");
+        $unassigned_orders_raw = $unassigned_stmt->fetchAll();
+        $unassigned_orders = [];
+        $unassigned_order_details = [];
+        foreach ($unassigned_orders_raw as $u_ord) {
+            $unassigned_orders[] = $u_ord['id'];
+            $unassigned_order_details[$u_ord['id']] = [
+                'id' => $u_ord['id'],
+                'formatted_id' => 'KE-2025-' . str_pad($u_ord['id'], 5, '0', STR_PAD_LEFT),
+                'company' => $u_ord['business_name'],
+                'address' => $u_ord['address']
+            ];
+        }
     } catch (\Exception $e) {
         $db_error = $e->getMessage();
     }
@@ -377,7 +395,10 @@ foreach ($admin_assignments as $a) {
             <!-- NEW FORM VIEW -->
             <div id="new-form" class="space-y-6 relative" style="display: none;">
                 <div class="flex justify-between items-center">
-                    <h2 class="text-xl font-bold text-gray-900 tracking-tight">New Assignment</h2>
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-900 tracking-tight">Dispatch New Assignment</h2>
+                        <p class="text-xs text-gray-500 mt-0.5">Filter drivers by delivery area & assign orders</p>
+                    </div>
                     <button onclick="closeAsgnDetailPane()"
                         class="p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none"
                         aria-label="Close details">
@@ -385,74 +406,97 @@ foreach ($admin_assignments as $a) {
                     </button>
                 </div>
 
-                <!-- Assign Driver -->
+                <!-- 1. Area Selection -->
                 <div class="space-y-1.5">
-                    <label class="text-xs font-bold text-gray-500">Assign to Driver <span
-                            class="text-red-500">*</span></label>
+                    <label class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                        <span class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">1</span>
+                        Select Target Area / Zone <span class="text-red-500">*</span>
+                    </label>
+                    <select id="area-select" onchange="filterDriversByArea()"
+                        class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/10 transition-all outline-none cursor-pointer">
+                        <option value="All">All Delivery Areas</option>
+                        <option value="Colombo">Colombo Zone</option>
+                        <option value="Gampaha">Gampaha Zone</option>
+                        <option value="Kandy">Kandy Zone</option>
+                        <option value="Galle">Galle Zone</option>
+                        <option value="Negombo">Negombo Zone</option>
+                        <option value="Kalutara">Kalutara Zone</option>
+                        <option value="Kurunegala">Kurunegala Zone</option>
+                        <option value="Matara">Matara Zone</option>
+                    </select>
+                </div>
+
+                <!-- 2. Assign Driver (Filtered by Area) -->
+                <div class="space-y-1.5">
+                    <label class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                        <span class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">2</span>
+                        Assign to Driver <span class="text-red-500">*</span>
+                    </label>
                     <select id="driver-select" onchange="updateDriverInfo()"
-                        class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none cursor-pointer">
-                        <option value="">Select available driver...</option>
+                        class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/10 transition-all outline-none cursor-pointer">
+                        <option value="">Select driver for target area...</option>
                         <?php foreach ($available_drivers as $d): ?>
-                            <option value="<?= $d['id'] ?>"><?= htmlspecialchars($d['name']) ?> —
-                                <?= ucfirst($d['vehicle_type']) ?></option>
+                            <option value="<?= $d['id'] ?>" data-area="<?= htmlspecialchars($d['assigned_area']) ?>">
+                                <?= htmlspecialchars($d['name']) ?> — <?= ucfirst($d['vehicle_type']) ?> (<?= htmlspecialchars($d['assigned_area']) ?>)
+                            </option>
                         <?php endforeach; ?>
                         <?php if (empty($available_drivers)): ?>
-                            <option value="SR">Saman Rajapaksa — Van · Gampaha</option>
-                            <option value="LW">Lalith Wickrama — Van · Kandy</option>
-                            <option value="KP">Kasun Perera — Lorry · Southern</option>
+                            <option value="SR" data-area="Gampaha">Saman Rajapaksa — Van · Gampaha</option>
+                            <option value="LW" data-area="Kandy">Lalith Wickrama — Van · Kandy</option>
+                            <option value="KP" data-area="Galle">Kasun Perera — Lorry · Galle</option>
                         <?php endif; ?>
                     </select>
                 </div>
 
                 <!-- Driver Info Card -->
                 <div id="driver-info" style="display: none;"
-                    class="p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs space-y-2">
+                    class="p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl text-xs space-y-2">
                     <div class="flex justify-between items-center">
-                        <span class="text-gray-500 font-medium">Vehicle</span>
+                        <span class="text-gray-600 font-medium">Assigned Area</span>
+                        <span id="di-zone" class="font-bold text-emerald-800">—</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600 font-medium">Vehicle</span>
                         <span id="di-vehicle" class="font-bold text-gray-900">—</span>
                     </div>
                     <div class="flex justify-between items-center">
-                        <span class="text-gray-500 font-medium">Zone</span>
-                        <span id="di-zone" class="font-bold text-gray-900">—</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <span class="text-gray-500 font-medium">On-time rate</span>
+                        <span class="text-gray-600 font-medium">On-time rate</span>
                         <span id="di-ot" class="font-bold text-emerald-600">—</span>
                     </div>
                 </div>
 
-                <!-- Orders Checklist -->
+                <!-- 3. Orders Checklist -->
                 <div class="space-y-1.5">
-                    <label class="text-xs font-bold text-gray-500 block">Select Orders to Include <span
-                            class="text-red-500">*</span></label>
-                    <p class="text-[11px] text-gray-400 font-medium">Ready-to-dispatch orders not yet assigned</p>
-                    <div class="flex flex-wrap gap-2 pt-2">
-                        <?php foreach ($unassigned_orders as $ord_id):
-                            $formatted_ord_id = 'KE-2025-' . str_pad($ord_id, 5, '0', STR_PAD_LEFT);
-                            ?>
-                            <span
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-500 hover:border-brand/30 text-xs font-bold cursor-pointer select-none transition-all order-chip"
-                                onclick="toggleOrderChip(this)">
-                                <i class="ti ti-package text-sm"></i> <?= $formatted_ord_id ?>
-                            </span>
-                        <?php endforeach; ?>
-
-                        <?php if (empty($unassigned_orders)): ?>
+                    <label class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                        <span class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">3</span>
+                        Select Orders to Include <span class="text-red-500">*</span>
+                    </label>
+                    <p class="text-[11px] text-gray-400 font-medium">Click order chips to select and inspect delivery address</p>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <?php if (!empty($unassigned_order_details)): ?>
+                            <?php foreach ($unassigned_order_details as $ord): ?>
+                                <span
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-700 hover:border-brand/30 text-xs font-bold cursor-pointer select-none transition-all order-chip"
+                                    data-ord-id="<?= $ord['id'] ?>"
+                                    data-company="<?= htmlspecialchars($ord['company']) ?>"
+                                    data-address="<?= htmlspecialchars($ord['address']) ?>"
+                                    onclick="toggleOrderChip(this)">
+                                    <i class="ti ti-package text-sm"></i> <?= $ord['formatted_id'] ?>
+                                </span>
+                            <?php endforeach; ?>
+                        <?php else: ?>
                             <span class="text-xs text-gray-400 italic">No unassigned processing orders available.</span>
                         <?php endif; ?>
                     </div>
                 </div>
 
-                <!-- Delivery Zone -->
-                <div class="space-y-1.5">
-                    <label class="text-xs font-bold text-gray-500">Delivery Zone</label>
-                    <select
-                        class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none cursor-pointer">
-                        <option>Colombo</option>
-                        <option>Gampaha</option>
-                        <option>Kandy</option>
-                        <option>Southern</option>
-                    </select>
+                <!-- Order Delivery Address Preview Card -->
+                <div id="order-address-preview" class="p-3.5 bg-brand/5 border border-brand/20 rounded-2xl text-xs space-y-1.5">
+                    <div class="flex items-center gap-2 font-bold text-brand-dark">
+                        <i class="ti ti-map-pin text-brand text-base"></i>
+                        <span id="preview-company">Order Delivery Destination Address</span>
+                    </div>
+                    <p id="preview-address" class="text-gray-600 pl-6 text-[11px] leading-relaxed">Select an order chip above to view its delivery street address.</p>
                 </div>
 
                 <!-- Scheduled Departure -->
@@ -696,6 +740,41 @@ foreach ($admin_assignments as $a) {
         }
     }
 
+    function filterDriversByArea() {
+        var selectedArea = document.getElementById('area-select').value;
+        var driverSelect = document.getElementById('driver-select');
+        if (!driverSelect) return;
+        var options = driverSelect.querySelectorAll('option');
+        
+        var matchCount = 0;
+        options.forEach(opt => {
+            if (!opt.value) return; // Keep placeholder option
+            var driverArea = opt.dataset.area || 'Colombo';
+            if (selectedArea === 'All' || driverArea.toLowerCase() === selectedArea.toLowerCase()) {
+                opt.style.display = 'block';
+                opt.disabled = false;
+                matchCount++;
+            } else {
+                opt.style.display = 'none';
+                opt.disabled = true;
+            }
+        });
+
+        if (matchCount === 0 && selectedArea !== 'All') {
+            options.forEach(opt => {
+                if (!opt.value) return;
+                opt.style.display = 'block';
+                opt.disabled = false;
+            });
+        }
+
+        var currentSelected = driverSelect.options[driverSelect.selectedIndex];
+        if (currentSelected && currentSelected.disabled) {
+            driverSelect.value = '';
+            updateDriverInfo();
+        }
+    }
+
     function updateDriverInfo() {
         var val = document.getElementById('driver-select').value;
         var info = document.getElementById('driver-info');
@@ -714,7 +793,52 @@ foreach ($admin_assignments as $a) {
         if (el.classList.contains('sel')) {
             el.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-brand bg-brand-light text-brand text-xs font-bold cursor-pointer select-none transition-all order-chip sel';
         } else {
-            el.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-500 hover:border-brand/30 text-xs font-bold cursor-pointer select-none transition-all order-chip';
+            el.className = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-gray-700 hover:border-brand/30 text-xs font-bold cursor-pointer select-none transition-all order-chip';
+        }
+        updateAddressPreview();
+    }
+
+    function updateAddressPreview() {
+        var selectedChips = document.querySelectorAll('.order-chip.sel');
+        var previewCompany = document.getElementById('preview-company');
+        var previewAddress = document.getElementById('preview-address');
+        if (!previewCompany || !previewAddress) return;
+
+        if (selectedChips.length === 0) {
+            previewCompany.textContent = 'Order Delivery Destination Address';
+            previewAddress.textContent = 'Select an order chip above to view its delivery street address.';
+            return;
+        }
+
+        var addresses = [];
+        var companies = [];
+        var detectedAreas = [];
+
+        selectedChips.forEach(chip => {
+            var comp = chip.dataset.company || 'Customer';
+            var addr = chip.dataset.address || 'Address not provided';
+            companies.push(comp);
+            addresses.push(`${comp}: ${addr}`);
+
+            ['Colombo', 'Gampaha', 'Kandy', 'Galle', 'Negombo', 'Kalutara', 'Kurunegala', 'Matara'].forEach(area => {
+                if (addr.toLowerCase().includes(area.toLowerCase()) && !detectedAreas.includes(area)) {
+                    detectedAreas.push(area);
+                }
+            });
+        });
+
+        if (companies.length === 1) {
+            previewCompany.textContent = companies[0];
+            previewAddress.textContent = addresses[0];
+        } else {
+            previewCompany.textContent = `${companies.length} Delivery Stops Selected`;
+            previewAddress.innerHTML = addresses.map(a => `<div class="py-0.5">• ${a}</div>`).join('');
+        }
+
+        var areaSelect = document.getElementById('area-select');
+        if (areaSelect && areaSelect.value === 'All' && detectedAreas.length > 0) {
+            areaSelect.value = detectedAreas[0];
+            filterDriversByArea();
         }
     }
 

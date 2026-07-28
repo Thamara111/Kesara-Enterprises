@@ -211,7 +211,7 @@ require_once __DIR__ . "/layouts/header.php";
 
                             <div>
                                 <label for="phone" class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Phone Number</label>
-                                <input type="tel" id="phone" name="phone" value="<?= htmlspecialchars($phone ?? '') ?>" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits"
+                                <input type="tel" id="phone" name="phone" value="<?= htmlspecialchars($phone ?? '') ?>" maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
                                        class="w-full bg-gray-50 border <?= isset($errors['phone']) ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-brand/20' ?> rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all" 
                                        placeholder="Optional (e.g. 0771234567)">
                                 <?php if (isset($errors['phone'])): ?>

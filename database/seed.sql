@@ -169,10 +169,10 @@ INSERT INTO purchase_order_items (id, po_id, product_id, item_name, qty_ordered,
 -- ============================================================================
 -- 11. SEED DELIVERY PERSONNEL
 -- ============================================================================
-INSERT INTO delivery_personnel (id, name, phone, nic, licence_class, licence_expiry, vehicle_type, vehicle_number, status, joined_date) VALUES
-(1, 'Rohan Jayaratne', '+94 77 111 2222', '198422301980', 'Heavy/Light', '2030-10-15', 'van', 'WP DA-4859', 'available', '2020-01-15'),
-(2, 'Sunil Perera', '+94 77 333 4444', '199011204859', 'Light Vehicle', '2029-05-20', 'motorbike', 'WP BZ-9842', 'on_run', '2022-03-10'),
-(3, 'Nihal Silva', '+94 71 888 9999', '197945009842', 'Heavy Vehicle', '2028-11-12', 'lorry', 'WP LK-8521', 'day_off', '2015-06-01');
+INSERT INTO delivery_personnel (id, name, phone, nic, licence_class, licence_expiry, vehicle_type, vehicle_number, assigned_area, status, joined_date) VALUES
+(1, 'Rohan Jayaratne', '+94 77 111 2222', '198422301980', 'Heavy/Light', '2030-10-15', 'van', 'WP DA-4859', 'Colombo', 'available', '2020-01-15'),
+(2, 'Sunil Perera', '+94 77 333 4444', '199011204859', 'Light Vehicle', '2029-05-20', 'motorbike', 'WP BZ-9842', 'Gampaha', 'available', '2022-03-10'),
+(3, 'Nihal Silva', '+94 71 888 9999', '197945009842', 'Heavy Vehicle', '2028-11-12', 'lorry', 'WP LK-8521', 'Kandy', 'available', '2015-06-01');
 
 -- Zones
 INSERT INTO personnel_zones (personnel_id, zone) VALUES

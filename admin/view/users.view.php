@@ -155,7 +155,7 @@ function getRoleMeta($role)
                 <p class="text-[11px] text-gray-400 font-medium mt-1">Create access credentials for managers.</p>
             </div>
 
-            <form action="/admin-users" method="POST" class="space-y-4">
+            <form action="/admin-users" method="POST" class="space-y-4" onsubmit="handleRegisterUser(event)">
                 <input type="hidden" name="action" value="register_user">
                 <div class="grid grid-cols-2 gap-4">
                     <div class="space-y-1.5">
@@ -180,7 +180,7 @@ function getRoleMeta($role)
                             class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block ml-1">Default
                             Password</label>
                         <div class="relative">
-                            <input type="password" id="password" name="password" required maxlength="8"
+                            <input type="password" id="password" name="password" required maxlength="12"
                                 placeholder="Min. 8 characters"
                                 class="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all"
                                 oninput="checkStaffPasswordStrength(this.value)">
@@ -210,10 +210,10 @@ function getRoleMeta($role)
                     </div>
                 </div>
 
-                <button type="submit"
+                <button type="submit" id="register-manager-btn"
                     class="w-full bg-brand text-brand-light font-bold py-3.5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2 mt-6">
                     <i class="ti ti-user-plus text-lg"></i>
-                    Register Manager
+                    <span>Register Manager</span>
                 </button>
             </form>
         </div>
@@ -286,6 +286,58 @@ function getRoleMeta($role)
 </div>
 
 <script>
+    function handleRegisterUser(e) {
+        e.preventDefault();
+        var form = e.target;
+        var btn = document.getElementById('register-manager-btn');
+
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('opacity-75', 'cursor-not-allowed');
+            btn.innerHTML = `<i class="ti ti-loader animate-spin text-lg"></i> <span>Registering...</span>`;
+        }
+
+        var formData = new FormData(form);
+
+        fetch('/admin-users', {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(res) { return res.text(); })
+        .then(function(html) {
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(html, 'text/html');
+            var errDiv = doc.querySelector('.bg-red-50 p');
+            
+            if (errDiv && errDiv.textContent) {
+                if (typeof showToast === 'function') {
+                    showToast(errDiv.textContent.trim(), 'error');
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                    btn.innerHTML = `<i class="ti ti-user-plus text-lg"></i> <span>Register Manager</span>`;
+                }
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast('Staff user registered successfully!', 'success');
+                }
+                setTimeout(function() {
+                    window.location.reload();
+                }, 800);
+            }
+        })
+        .catch(function() {
+            if (typeof showToast === 'function') {
+                showToast('Error registering staff user.', 'error');
+            }
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                btn.innerHTML = `<i class="ti ti-user-plus text-lg"></i> <span>Register Manager</span>`;
+            }
+        });
+    }
     function openDeleteUserModal(id, username) {
         document.getElementById('delete-user-id').value = id;
         document.getElementById('delete-user-name').textContent = username;
@@ -377,49 +429,31 @@ function getRoleMeta($role)
             return;
         }
 
-        var score = 0;
-        if (password.length >= 8) score++;
-        if (/[a-z]/.test(password)) score++;
-        if (/[A-Z]/.test(password)) score++;
-        if (/\d/.test(password)) score++;
-        if (/[^A-Za-z0-9]/.test(password)) score++;
+        var hasUpper = /[A-Z]/.test(password);
+        var hasLower = /[a-z]/.test(password);
+        var hasNum = /[0-9]/.test(password);
+        var hasSpecial = /[^A-Za-z0-9]/.test(password);
 
-        var width = "0%";
-        var colorClass = "bg-gray-300";
-        var text = "";
+        var width = "30%";
+        var colorClass = "bg-red-500";
+        var text = "Low";
+        var textClass = "text-[10px] mt-1 text-red-500 font-semibold";
 
-        if (password.length < 8) {
-            width = "20%";
-            colorClass = "bg-red-500";
-            text = "Too Short (Min. 8 characters)";
-        } else {
-            if (score <= 2) {
-                width = "40%";
-                colorClass = "bg-orange-500";
-                text = "Weak";
-            } else if (score === 3 || score === 4) {
-                width = "70%";
-                colorClass = "bg-yellow-500";
-                text = "Medium";
-            } else if (score >= 5) {
-                width = "100%";
-                colorClass = "bg-green-500";
-                text = "Strong";
-            }
+        if (hasUpper && hasLower && hasNum && hasSpecial) {
+            width = "100%";
+            colorClass = "bg-green-500";
+            text = "Strong";
+            textClass = "text-[10px] mt-1 text-green-600 font-semibold";
+        } else if (hasUpper && hasLower && hasNum) {
+            width = "65%";
+            colorClass = "bg-yellow-500";
+            text = "Medium";
+            textClass = "text-[10px] mt-1 text-yellow-600 font-semibold";
         }
 
         bar.style.width = width;
         bar.className = "h-full rounded-full transition-all duration-400 " + colorClass;
         label.textContent = text;
-
-        if (colorClass === 'bg-red-500') {
-            label.className = "text-[10px] mt-1 text-red-500 font-semibold";
-        } else if (colorClass === 'bg-orange-500') {
-            label.className = "text-[10px] mt-1 text-orange-500 font-semibold";
-        } else if (colorClass === 'bg-yellow-500') {
-            label.className = "text-[10px] mt-1 text-yellow-600 font-semibold";
-        } else if (colorClass === 'bg-green-500') {
-            label.className = "text-[10px] mt-1 text-green-600 font-semibold";
-        }
+        label.className = textClass;
     };
 </script>

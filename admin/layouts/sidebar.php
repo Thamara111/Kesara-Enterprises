@@ -167,12 +167,12 @@ if (isset($pdo)) {
                 <i class="ti ti-building-warehouse text-xl"></i>
                 Suppliers
             </a>
-            <div class="pl-12 space-y-1">
-                <a href="/admin-purchase-orders" class="flex items-center gap-4 w-full py-2 text-xs font-bold transition-all <?php echo $current_page === 'purchase_orders' ? 'text-brand-light font-bold' : 'text-gray-500 hover:text-white'; ?>">
+            <div class="space-y-1">
+                <a href="/admin-purchase-orders" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'purchase_orders' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                     <i class="ti ti-file-invoice text-lg"></i>
                     Purchase orders
                 </a>
-                <a href="/admin-goods-received" class="flex items-center gap-4 w-full py-2 text-xs font-bold transition-all <?php echo $current_page === 'goods_received' ? 'text-brand-light font-bold' : 'text-gray-500 hover:text-white'; ?>">
+                <a href="/admin-goods-received" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'goods_received' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                     <i class="ti ti-truck-delivery text-lg"></i>
                     Goods received
                 </a>

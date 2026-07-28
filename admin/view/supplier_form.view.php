@@ -229,7 +229,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                             </div>
                             <div class="space-y-2">
                                 <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Phone Number <span class="text-red-500">*</span></label>
-                                <input type="tel" name="phone" value="<?php echo htmlspecialchars($supplier['phone']); ?>" placeholder="+94 XX XXX XXXX" required
+                                <input type="tel" name="phone" value="<?php echo htmlspecialchars($supplier['phone']); ?>" maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" placeholder="0771234567" required
                                     class="w-full px-4 py-3 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-brand/20 transition-all outline-none font-medium">
                             </div>
                         </div>

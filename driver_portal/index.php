@@ -310,13 +310,13 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Phone Number</label>
-                    <input type="tel" name="phone" required pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" placeholder="0771234567" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <input type="tel" name="phone" required maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" placeholder="0771234567" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
                 </div>
             </div>
             <div class="grid grid-cols-3 gap-3">
                 <div>
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">NIC / ID No</label>
-                    <input type="text" name="nic" required placeholder="e.g. 199012345678" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <input type="text" name="nic" required maxlength="12" pattern="^[0-9]{9}[vVxX]|[0-9]{12}$" title="NIC must be 9 digits followed by V/X or 12 digits" oninput="this.value=this.value.replace(/[^0-9vVxX]/g,'').slice(0,12)" placeholder="e.g. 199012345678" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Licence Class</label>

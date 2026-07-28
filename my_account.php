@@ -281,7 +281,7 @@ require_once __DIR__ . "/layouts/header.php";
                                 </div>
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone Number</label>
-                                    <input type="tel" value="<?= htmlspecialchars($user['phone']) ?>" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                    <input type="tel" value="<?= htmlspecialchars($user['phone']) ?>" maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
                                 </div>
                             </div>
 
@@ -389,11 +389,15 @@ require_once __DIR__ . "/layouts/header.php";
                             </div>
                             <div class="space-y-2">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">New Password</label>
-                                <input type="password" placeholder="Min. 8 characters" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                <input type="password" maxlength="12" placeholder="Min. 8 characters" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all" oninput="checkAccountPasswordStrength(this.value)">
+                                <div class="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                    <div id="account-strengthBar" class="h-full rounded-full transition-all duration-400 w-0 bg-gray-300"></div>
+                                </div>
+                                <p id="account-strengthLabel" class="text-[10px] mt-1 text-gray-400 font-semibold"></p>
                             </div>
                             <div class="space-y-2">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Confirm New Password</label>
-                                <input type="password" placeholder="Repeat new password" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                <input type="password" maxlength="12" placeholder="Repeat new password" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
                             </div>
 
                             <button class="bg-brand text-brand-light font-bold px-8 py-3.5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95">
@@ -434,6 +438,46 @@ function showSection(id) {
         navEl.classList.add('text-gray-400', 'hover:bg-gray-50', 'hover:text-brand');
     }
   });
+}
+
+function checkAccountPasswordStrength(password) {
+    const bar = document.getElementById('account-strengthBar');
+    const label = document.getElementById('account-strengthLabel');
+    if (!bar || !label) return;
+
+    if (!password) {
+        bar.className = "h-full rounded-full transition-all duration-400 w-0 bg-gray-300";
+        bar.style.width = "0%";
+        label.textContent = "";
+        return;
+    }
+
+    const hasUpper = /[A-Z]/.test(password);
+    const hasLower = /[a-z]/.test(password);
+    const hasNum = /[0-9]/.test(password);
+    const hasSpecial = /[^A-Za-z0-9]/.test(password);
+
+    let width = "30%";
+    let colorClass = "bg-red-500";
+    let text = "Low";
+    let textClass = "text-[10px] mt-1 text-red-500 font-semibold";
+
+    if (hasUpper && hasLower && hasNum && hasSpecial) {
+        width = "100%";
+        colorClass = "bg-green-500";
+        text = "Strong";
+        textClass = "text-[10px] mt-1 text-green-600 font-semibold";
+    } else if (hasUpper && hasLower && hasNum) {
+        width = "65%";
+        colorClass = "bg-yellow-500";
+        text = "Medium";
+        textClass = "text-[10px] mt-1 text-yellow-600 font-semibold";
+    }
+
+    bar.style.width = width;
+    bar.className = "h-full rounded-full transition-all duration-400 " + colorClass;
+    label.textContent = text;
+    label.className = textClass;
 }
 </script>
 

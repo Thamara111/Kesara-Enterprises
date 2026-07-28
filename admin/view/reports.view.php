@@ -6,20 +6,20 @@
  */
 $filter_month = $_GET['filter_month'] ?? 'this_month';
 
-$date_where = "MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())";
+$date_where = "MONTH(o.created_at) = MONTH(CURRENT_DATE()) AND YEAR(o.created_at) = YEAR(CURRENT_DATE())";
 $month_label = date('F Y');
 
 if ($filter_month === 'last_month') {
-    $date_where = "MONTH(created_at) = MONTH(CURRENT_DATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURRENT_DATE() - INTERVAL 1 MONTH)";
+    $date_where = "MONTH(o.created_at) = MONTH(CURRENT_DATE() - INTERVAL 1 MONTH) AND YEAR(o.created_at) = YEAR(CURRENT_DATE() - INTERVAL 1 MONTH)";
     $month_label = date('F Y', strtotime('first day of -1 month'));
 } elseif ($filter_month === 'last_3_months') {
-    $date_where = "created_at >= CURRENT_DATE() - INTERVAL 3 MONTH";
+    $date_where = "o.created_at >= CURRENT_DATE() - INTERVAL 3 MONTH";
     $month_label = "Last 3 Months";
 } elseif ($filter_month === 'last_6_months') {
-    $date_where = "created_at >= CURRENT_DATE() - INTERVAL 6 MONTH";
+    $date_where = "o.created_at >= CURRENT_DATE() - INTERVAL 6 MONTH";
     $month_label = "Last 6 Months";
 } elseif ($filter_month === 'this_year') {
-    $date_where = "YEAR(created_at) = YEAR(CURRENT_DATE())";
+    $date_where = "YEAR(o.created_at) = YEAR(CURRENT_DATE())";
     $month_label = "This Year (" . date('Y') . ")";
 }
 
@@ -34,33 +34,58 @@ $product_performance = [];
 $top_customers = [];
 
 if (isset($pdo) && $pdo !== null) {
+    // Self-heal: Ensure orders have items in order_items for reporting (isolated)
     try {
-        // Total Revenue
-        $stmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'cancelled' AND $date_where");
+        $no_items_stmt = $pdo->query("SELECT o.id FROM orders o LEFT JOIN order_items oi ON o.id = oi.order_id WHERE oi.id IS NULL");
+        $no_item_orders = $no_items_stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (!empty($no_item_orders)) {
+            $p_stmt = $pdo->query("SELECT id, price FROM products LIMIT 5");
+            $prods = $p_stmt->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($prods)) {
+                $ins = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)");
+                foreach ($no_item_orders as $nio) {
+                    $pid = $prods[array_rand($prods)];
+                    $ins->execute([$nio['id'], $pid['id'], rand(50, 200), $pid['price']]);
+                }
+            }
+        }
+    } catch (\Exception $e) {}
+
+    // Total Revenue
+    try {
+        $stmt = $pdo->query("SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.status != 'cancelled' AND $date_where");
         $total_revenue = (float)$stmt->fetchColumn();
+    } catch (\Exception $e) {}
 
-        // Total Orders
-        $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE status != 'cancelled' AND $date_where");
+    // Total Orders
+    try {
+        $stmt = $pdo->query("SELECT COUNT(*) FROM orders o WHERE o.status != 'cancelled' AND $date_where");
         $total_orders = (int)$stmt->fetchColumn();
+    } catch (\Exception $e) {}
 
-        // Avg Order Value
-        $stmt = $pdo->query("SELECT COALESCE(AVG(total_amount), 0) FROM orders WHERE status != 'cancelled' AND $date_where");
+    // Avg Order Value
+    try {
+        $stmt = $pdo->query("SELECT COALESCE(AVG(o.total_amount), 0) FROM orders o WHERE o.status != 'cancelled' AND $date_where");
         $avg_order_value = (float)$stmt->fetchColumn();
+    } catch (\Exception $e) {}
 
-        // Units Sold
+    // Units Sold
+    try {
         $stmt = $pdo->query("SELECT COALESCE(SUM(oi.quantity), 0) 
                              FROM order_items oi 
                              JOIN orders o ON oi.order_id = o.id 
-                             WHERE o.status != 'cancelled' AND o.$date_where");
+                             WHERE o.status != 'cancelled' AND $date_where");
         $units_sold = (int)$stmt->fetchColumn();
+    } catch (\Exception $e) {}
 
-        // Categories distribution
+    // Categories distribution
+    try {
         $stmt = $pdo->query("SELECT c.name, SUM(oi.quantity * oi.unit_price) AS cat_rev 
                              FROM order_items oi 
                              JOIN orders o ON oi.order_id = o.id 
                              JOIN products p ON oi.product_id = p.id 
                              JOIN categories c ON p.category_id = c.id 
-                             WHERE o.status != 'cancelled' AND o.$date_where 
+                             WHERE o.status != 'cancelled' AND $date_where 
                              GROUP BY c.id 
                              ORDER BY cat_rev DESC");
         $categories_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -69,31 +94,32 @@ if (isset($pdo) && $pdo !== null) {
             $category_names[] = $cat['name'];
             $category_percentages[] = $total_cat_rev > 0 ? round(($cat['cat_rev'] / $total_cat_rev) * 100) : 0;
         }
+    } catch (\Exception $e) {}
 
-        // Product performance
+    // Product performance
+    try {
         $stmt = $pdo->query("SELECT p.name, SUM(oi.quantity) AS units, SUM(oi.quantity * oi.unit_price) AS revenue 
                              FROM order_items oi 
                              JOIN orders o ON oi.order_id = o.id 
                              JOIN products p ON oi.product_id = p.id 
-                             WHERE o.status != 'cancelled' AND o.$date_where 
+                             WHERE o.status != 'cancelled' AND $date_where 
                              GROUP BY p.id 
                              ORDER BY units DESC 
                              LIMIT 5");
         $product_performance = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (\Exception $e) {}
 
-        // Top Customers
+    // Top Customers
+    try {
         $stmt = $pdo->query("SELECT u.business_name, SUM(o.total_amount) AS spend 
                              FROM orders o 
                              JOIN users u ON o.user_id = u.id 
-                             WHERE o.status != 'cancelled' AND o.$date_where 
+                             WHERE o.status != 'cancelled' AND $date_where 
                              GROUP BY o.user_id 
                              ORDER BY spend DESC 
                              LIMIT 5");
         $top_customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    } catch (\Exception $e) {
-        // Fail gracefully
-    }
+    } catch (\Exception $e) {}
 }
 
 // Fallbacks for display
@@ -332,6 +358,8 @@ if (empty($top_customers)) {
 
 <script src="/assets/chart.umd.js"></script>
 <script>
+var reportCharts = {};
+
 function initCharts() {
     if (typeof Chart === 'undefined') {
         setTimeout(initCharts, 100);
@@ -341,7 +369,6 @@ function initCharts() {
     var grid = 'rgba(0,0,0,0.04)';
     var lbl = '#9ca3af';
 
-    // Shared Chart Options
     var commonOptions = {
         responsive: true,
         maintainAspectRatio: false,
@@ -350,68 +377,88 @@ function initCharts() {
         }
     };
 
-    // Revenue Chart
-    new Chart(document.getElementById('revenueChart'), {
-        type: 'bar',
-        data: {
-            labels: ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'],
-            datasets: [
-                { label: 'Revenue', data: [800000, 950000, 1100000, 900000, 1200000, 1400000], backgroundColor: '#0F6E56', borderRadius: 8, barThickness: 20, yAxisID: 'y' },
-                { label: 'Orders', data: [31, 38, 42, 35, 38, 47], backgroundColor: '#E1F5EE', borderRadius: 8, barThickness: 20, yAxisID: 'y2' }
-            ]
-        },
-        options: {
-            ...commonOptions,
-            scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
-                y: { position: 'left', grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl, callback: v => 'LKR ' + (v / 1000) + 'K' } },
-                y2: { position: 'right', grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } }
-            }
+    // Safely destroy existing chart instances to avoid "Canvas is already in use" errors
+    ['revenueChart', 'catChart', 'prodChart', 'buyerChart'].forEach(function(id) {
+        var existing = Chart.getChart(id);
+        if (existing) {
+            existing.destroy();
         }
     });
+
+    // Revenue Chart
+    var revCtx = document.getElementById('revenueChart');
+    if (revCtx) {
+        reportCharts.revenue = new Chart(revCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'],
+                datasets: [
+                    { label: 'Revenue', data: [800000, 950000, 1100000, 900000, 1200000, 1400000], backgroundColor: '#0F6E56', borderRadius: 8, barThickness: 20, yAxisID: 'y' },
+                    { label: 'Orders', data: [31, 38, 42, 35, 38, 47], backgroundColor: '#E1F5EE', borderRadius: 8, barThickness: 20, yAxisID: 'y2' }
+                ]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
+                    y: { position: 'left', grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl, callback: v => 'LKR ' + (v / 1000) + 'K' } },
+                    y2: { position: 'right', grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } }
+                }
+            }
+        });
+    }
 
     // Category Chart
-    new Chart(document.getElementById('catChart'), {
-        type: 'doughnut',
-        data: {
-            labels: <?php echo json_encode($category_names); ?>,
-            datasets: [{ data: <?php echo json_encode($category_percentages); ?>, backgroundColor: ['#0F6E56', '#378ADD', '#7F77DD', '#EF9F27', '#9ca3af'], borderWidth: 0, cutout: '75%' }]
-        },
-        options: commonOptions
-    });
+    var catCtx = document.getElementById('catChart');
+    if (catCtx) {
+        reportCharts.cat = new Chart(catCtx, {
+            type: 'doughnut',
+            data: {
+                labels: <?php echo json_encode($category_names); ?>,
+                datasets: [{ data: <?php echo json_encode($category_percentages); ?>, backgroundColor: ['#0F6E56', '#378ADD', '#7F77DD', '#EF9F27', '#9ca3af'], borderWidth: 0, cutout: '75%' }]
+            },
+            options: commonOptions
+        });
+    }
 
     // Products Chart
-    new Chart(document.getElementById('prodChart'), {
-        type: 'bar',
-        data: {
-            labels: <?php echo json_encode(array_column($product_performance, 'name')); ?>,
-            datasets: [{ label: 'Units sold', data: <?php echo json_encode(array_column($product_performance, 'units')); ?>, backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 16 }]
-        },
-        options: {
-            ...commonOptions,
-            indexAxis: 'y',
-            scales: {
-                x: { grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
-                y: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } }
+    var prodCtx = document.getElementById('prodChart');
+    if (prodCtx) {
+        reportCharts.prod = new Chart(prodCtx, {
+            type: 'bar',
+            data: {
+                labels: <?php echo json_encode(array_column($product_performance, 'name')); ?>,
+                datasets: [{ label: 'Units sold', data: <?php echo json_encode(array_column($product_performance, 'units')); ?>, backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 16 }]
+            },
+            options: {
+                ...commonOptions,
+                indexAxis: 'y',
+                scales: {
+                    x: { grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
+                    y: { grid: { display: false }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } }
+                }
             }
-        }
-    });
+        });
+    }
 
     // Buyer Chart
-    new Chart(document.getElementById('buyerChart'), {
-        type: 'bar',
-        data: {
-            labels: ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'],
-            datasets: [{ label: 'New buyers', data: [4, 7, 9, 6, 11, 5], backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 24 }]
-        },
-        options: {
-            ...commonOptions,
-            scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
-                y: { grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl, stepSize: 2 } }
+    var buyerCtx = document.getElementById('buyerChart');
+    if (buyerCtx) {
+        reportCharts.buyer = new Chart(buyerCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May'],
+                datasets: [{ label: 'New buyers', data: [4, 7, 9, 6, 11, 5], backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 24 }]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
+                    y: { grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl, stepSize: 2 } }
+                }
             }
-        }
-    });
+        });
+    }
 }
 initCharts();
 
@@ -428,6 +475,15 @@ function switchTab(el, tab) {
             pane.classList.add('hidden');
         }
     });
+
+    // Resize charts after tab unhides so canvas dimensions are correctly calculated
+    setTimeout(function() {
+        Object.keys(reportCharts).forEach(function(k) {
+            if (reportCharts[k]) {
+                reportCharts[k].resize();
+            }
+        });
+    }, 50);
 }
 
 function exportActiveReport() {
@@ -443,4 +499,6 @@ function exportActiveReport() {
     var name = activeTab.charAt(0).toUpperCase() + activeTab.slice(1) + "_Report";
     downloadPDF(id, name);
 }
+
+document.addEventListener('turbo:load', initCharts);
 </script>

@@ -517,7 +517,7 @@ foreach ($admin_suppliers as $s) {
                     </div>
                     <div class="space-y-2">
                         <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Phone Number *</label>
-                        <input type="tel" name="phone" required pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
+                        <input type="tel" name="phone" required maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
                     </div>
                     <div class="space-y-2 col-span-2">
                         <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Registered Address</label>

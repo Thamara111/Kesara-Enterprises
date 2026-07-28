@@ -1084,8 +1084,9 @@ require_once __DIR__ . "/layouts/header.php";
                 <div>
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Phone
                         Number</label>
-                    <input type="tel" id="quotePhone" pattern="^0[0-9]{9}$"
+                    <input type="tel" id="quotePhone" maxlength="10" pattern="^0[0-9]{9}$"
                         title="Phone number must start with 0 and contain exactly 10 digits"
+                        oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
                         placeholder="e.g. 0771234567"
                         class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                 </div>

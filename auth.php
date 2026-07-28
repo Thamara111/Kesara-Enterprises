@@ -331,6 +331,7 @@ require_once __DIR__ . "/layouts/head.php";
                                             class="text-red-500">*</span></label>
                                     <input type="tel" id="register-phone" name="phone" required maxlength="10"
                                         pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits"
+                                        oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
                                         placeholder="0771234567"
                                         class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
                                     <div id="phone-warning" class="hidden text-xs text-red-500 mt-1 font-medium">Please enter exactly 10 digits starting with 0.</div>
@@ -342,7 +343,9 @@ require_once __DIR__ . "/layouts/head.php";
                                         <span class="absolute left-4 top-1/2 -translate-y-1/2 text-green-500"><i
                                                 class="ti ti-brand-whatsapp text-lg"></i></span>
                                         <input type="tel" id="register-whatsapp" name="whatsapp_number" required
-                                            maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" placeholder="0771234567"
+                                            maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits"
+                                            oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
+                                            placeholder="0771234567"
                                             class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-400 focus:border-green-400 outline-none transition-all text-sm">
                                     </div>
                                 </div>
@@ -350,7 +353,7 @@ require_once __DIR__ . "/layouts/head.php";
                                     <label class="block text-sm font-semibold text-gray-700">Password <span
                                             class="text-red-500">*</span></label>
                                     <div class="relative">
-                                        <input type="password" id="register-password" name="password" required minlength="8"
+                                        <input type="password" id="register-password" name="password" required minlength="8" maxlength="12"
                                             placeholder="Min. 8 characters"
                                             class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm"
                                             oninput="checkPasswordStrength(this.value)">
@@ -466,50 +469,32 @@ require_once __DIR__ . "/layouts/head.php";
             return;
         }
 
-        let score = 0;
-        if (password.length >= 8) score++;
-        if (/[a-z]/.test(password)) score++;
-        if (/[A-Z]/.test(password)) score++;
-        if (/\d/.test(password)) score++;
-        if (/[^A-Za-z0-9]/.test(password)) score++;
+        const hasUpper = /[A-Z]/.test(password);
+        const hasLower = /[a-z]/.test(password);
+        const hasNum = /[0-9]/.test(password);
+        const hasSpecial = /[^A-Za-z0-9]/.test(password);
 
-        let width = "0%";
-        let colorClass = "bg-gray-300";
-        let text = "";
+        let width = "30%";
+        let colorClass = "bg-red-500";
+        let text = "Low";
+        let textClass = "text-xs mt-1 text-red-500 font-semibold";
 
-        if (password.length < 8) {
-            width = "20%";
-            colorClass = "bg-red-500";
-            text = "Too Short (Min. 8 characters)";
-        } else {
-            if (score <= 2) {
-                width = "40%";
-                colorClass = "bg-orange-500";
-                text = "Weak";
-            } else if (score === 3 || score === 4) {
-                width = "70%";
-                colorClass = "bg-yellow-500";
-                text = "Medium";
-            } else if (score >= 5) {
-                width = "100%";
-                colorClass = "bg-green-500";
-                text = "Strong";
-            }
+        if (hasUpper && hasLower && hasNum && hasSpecial) {
+            width = "100%";
+            colorClass = "bg-green-500";
+            text = "Strong";
+            textClass = "text-xs mt-1 text-green-600 font-semibold";
+        } else if (hasUpper && hasLower && hasNum) {
+            width = "65%";
+            colorClass = "bg-yellow-500";
+            text = "Medium";
+            textClass = "text-xs mt-1 text-yellow-600 font-semibold";
         }
 
         bar.style.width = width;
         bar.className = "h-full rounded-full transition-all duration-300 " + colorClass;
         label.textContent = text;
-
-        if (colorClass === 'bg-red-500') {
-            label.className = "text-xs mt-1 text-red-500 font-semibold";
-        } else if (colorClass === 'bg-orange-500') {
-            label.className = "text-xs mt-1 text-orange-500 font-semibold";
-        } else if (colorClass === 'bg-yellow-500') {
-            label.className = "text-xs mt-1 text-yellow-600 font-semibold";
-        } else if (colorClass === 'bg-green-500') {
-            label.className = "text-xs mt-1 text-green-600 font-semibold";
-        }
+        label.className = textClass;
     };
 
     function initAuthForm() {

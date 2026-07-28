@@ -22,6 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $licence_expiry = $_POST['licence_expiry'] ?? date('Y-m-d', strtotime('+3 years'));
         $vehicle_type = $_POST['vehicle_type'] ?? 'motorbike';
         $vehicle_number = trim($_POST['vehicle_number'] ?? '');
+        $assigned_area = trim($_POST['assigned_area'] ?? 'Colombo');
         $status = $_POST['status'] ?? 'available';
 
         if (empty($name) || empty($phone) || empty($email)) {
@@ -34,17 +35,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             try {
                 if ($action === 'add_driver') {
                     $hashed_password = !empty($password) ? password_hash($password, PASSWORD_BCRYPT) : password_hash('driver123', PASSWORD_BCRYPT);
-                    $stmt = $pdo->prepare("INSERT INTO delivery_personnel (name, email, password, phone, nic, licence_class, licence_expiry, vehicle_type, vehicle_number, status, joined_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())");
-                    $stmt->execute([$name, $email, $hashed_password, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $status]);
+                    $stmt = $pdo->prepare("INSERT INTO delivery_personnel (name, email, password, phone, nic, licence_class, licence_expiry, vehicle_type, vehicle_number, assigned_area, status, joined_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())");
+                    $stmt->execute([$name, $email, $hashed_password, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $assigned_area, $status]);
                     $success_msg = "Delivery personnel added successfully!";
                 } else {
                     if (!empty($password)) {
                         $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-                        $stmt = $pdo->prepare("UPDATE delivery_personnel SET name = ?, email = ?, password = ?, phone = ?, nic = ?, licence_class = ?, licence_expiry = ?, vehicle_type = ?, vehicle_number = ?, status = ? WHERE id = ?");
-                        $stmt->execute([$name, $email, $hashed_password, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $status, $driver_id]);
+                        $stmt = $pdo->prepare("UPDATE delivery_personnel SET name = ?, email = ?, password = ?, phone = ?, nic = ?, licence_class = ?, licence_expiry = ?, vehicle_type = ?, vehicle_number = ?, assigned_area = ?, status = ? WHERE id = ?");
+                        $stmt->execute([$name, $email, $hashed_password, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $assigned_area, $status, $driver_id]);
                     } else {
-                        $stmt = $pdo->prepare("UPDATE delivery_personnel SET name = ?, email = ?, phone = ?, nic = ?, licence_class = ?, licence_expiry = ?, vehicle_type = ?, vehicle_number = ?, status = ? WHERE id = ?");
-                        $stmt->execute([$name, $email, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $status, $driver_id]);
+                        $stmt = $pdo->prepare("UPDATE delivery_personnel SET name = ?, email = ?, phone = ?, nic = ?, licence_class = ?, licence_expiry = ?, vehicle_type = ?, vehicle_number = ?, assigned_area = ?, status = ? WHERE id = ?");
+                        $stmt->execute([$name, $email, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number, $assigned_area, $status, $driver_id]);
                     }
                     $success_msg = "Profile updated successfully!";
                 }
@@ -620,7 +621,7 @@ foreach ($admin_drivers as $d) {
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Password</label>
-                        <input type="password" name="password" id="driverPassword"
+                        <input type="password" name="password" id="driverPassword" maxlength="12"
                             placeholder="Password (default: driver123)"
                             class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                     </div>
@@ -629,13 +630,13 @@ foreach ($admin_drivers as $d) {
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Phone Number *</label>
-                        <input type="tel" name="phone" id="driverPhone" required pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" placeholder="0771234567"
+                        <input type="tel" name="phone" id="driverPhone" required maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" placeholder="0771234567"
                             class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">NIC / Identity No
                             *</label>
-                        <input type="text" name="nic" id="driverNIC" required placeholder="e.g. 199012345678"
+                        <input type="text" name="nic" id="driverNIC" required maxlength="12" pattern="^[0-9]{9}[vVxX]|[0-9]{12}$" title="NIC must be 9 digits followed by V/X or 12 digits" oninput="this.value=this.value.replace(/[^0-9vVxX]/g,'').slice(0,12)" placeholder="e.g. 199012345678"
                             class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                     </div>
                 </div>
@@ -670,15 +671,31 @@ foreach ($admin_drivers as $d) {
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Status</label>
-                    <select name="status" id="driverStatus"
-                        class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none cursor-pointer">
-                        <option value="available">Available</option>
-                        <option value="on_run">On run</option>
-                        <option value="day_off">Day off</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Assigned Area *</label>
+                        <select name="assigned_area" id="driverAssignedArea"
+                            class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none cursor-pointer">
+                            <option value="Colombo">Colombo</option>
+                            <option value="Gampaha">Gampaha</option>
+                            <option value="Kandy">Kandy</option>
+                            <option value="Galle">Galle</option>
+                            <option value="Negombo">Negombo</option>
+                            <option value="Kalutara">Kalutara</option>
+                            <option value="Kurunegala">Kurunegala</option>
+                            <option value="Matara">Matara</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1.5">Status</label>
+                        <select name="status" id="driverStatus"
+                            class="w-full px-4 py-2 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none cursor-pointer">
+                            <option value="available">Available</option>
+                            <option value="on_run">On run</option>
+                            <option value="day_off">Day off</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 

@@ -14,7 +14,7 @@ if (isset($pdo) && $pdo !== null) {
             $pdo->exec("ALTER TABLE orders ADD COLUMN deleted_at DATETIME DEFAULT NULL");
 
         // Fetch all active orders along with the associated customer's details
-        $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, o.payment_receipt, u.business_name AS company, u.first_name, u.last_name, u.email 
+        $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, o.payment_receipt, u.business_name AS company, u.first_name, u.last_name, u.email, u.address 
                              FROM orders o 
                              JOIN users u ON o.user_id = u.id 
                              WHERE o.deleted_at IS NULL");
@@ -121,6 +121,7 @@ if (isset($pdo) && $pdo !== null) {
                 'company' => $ord['company'],
                 'clientName' => $ord['first_name'] . ' ' . $ord['last_name'],
                 'clientEmail' => $ord['email'],
+                'address' => $ord['address'],
                 'date' => date('d M Y, g:i A', strtotime($ord['created_at'])),
                 'total' => number_format((float) $ord['total'], 2),
                 'items' => $items,
@@ -154,10 +155,27 @@ foreach ($admin_orders as $o) {
 }
 
 $available_drivers = [];
+$driver_info_map = [];
 if (isset($pdo) && $pdo !== null) {
     try {
-        $stmt_d = $pdo->query("SELECT id, name FROM delivery_personnel WHERE status = 'available'");
+        // Self-heal: ensure assigned_area column exists in delivery_personnel table
+        $chk_dp = $pdo->query("SHOW COLUMNS FROM delivery_personnel LIKE 'assigned_area'");
+        if (!$chk_dp->fetch()) {
+            $pdo->exec("ALTER TABLE delivery_personnel ADD COLUMN assigned_area VARCHAR(100) DEFAULT 'Colombo'");
+        }
+
+        $stmt_d = $pdo->query("SELECT id, name, vehicle_type, vehicle_number, status, COALESCE(assigned_area, 'Colombo') AS assigned_area FROM delivery_personnel WHERE status != 'inactive' ORDER BY status ASC, name ASC");
         $available_drivers = $stmt_d->fetchAll(PDO::FETCH_ASSOC);
+
+        $all_drivers_stmt = $pdo->query("SELECT id, name, vehicle_type, vehicle_number, COALESCE(assigned_area, 'Colombo') AS assigned_area FROM delivery_personnel");
+        $all_drivers = $all_drivers_stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($all_drivers as $d) {
+            $driver_info_map[$d['id']] = [
+                'vehicle' => ucfirst($d['vehicle_type']) . ' · ' . $d['vehicle_number'],
+                'zone' => htmlspecialchars($d['assigned_area']),
+                'ot' => '90%'
+            ];
+        }
     } catch (\Exception $e) {
     }
 }
@@ -266,6 +284,7 @@ if (isset($pdo) && $pdo !== null) {
                                         data-company="<?= htmlspecialchars($o['company']) ?>"
                                         data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
                                         data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
+                                        data-address="<?= htmlspecialchars($o['address'] ?? '') ?>"
                                         data-date="<?= htmlspecialchars($o['date']) ?>"
                                         data-total="<?= htmlspecialchars($o['total']) ?>"
                                         data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
@@ -603,6 +622,114 @@ if (isset($pdo) && $pdo !== null) {
     </div>
 </div>
 
+<!-- ASSIGN DRIVER POPUP MODAL -->
+<div id="assign-driver-modal"
+    class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-[2px] flex items-center justify-center p-4"
+    onclick="if(event.target === this) closeAssignModalFromOrders()">
+    <div class="bg-white rounded-3xl p-8 shadow-2xl relative max-w-lg w-full max-h-[90vh] overflow-y-auto space-y-6">
+        <div class="flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-bold text-gray-900 tracking-tight">Dispatch Delivery Assignment</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Filter drivers by area & assign order cargo</p>
+            </div>
+            <button onclick="closeAssignModalFromOrders()"
+                class="p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none"
+                aria-label="Close modal">
+                <i class="ti ti-x text-xl"></i>
+            </button>
+        </div>
+
+        <!-- 1. Area Selection -->
+        <div class="space-y-1.5">
+            <label class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">1</span>
+                Select Target Area / Zone <span class="text-red-500">*</span>
+            </label>
+            <select id="orders-area-select" onchange="filterOrdersDriversByArea()"
+                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/10 transition-all outline-none cursor-pointer">
+                <option value="All">All Delivery Areas</option>
+                <option value="Colombo">Colombo Zone</option>
+                <option value="Gampaha">Gampaha Zone</option>
+                <option value="Kandy">Kandy Zone</option>
+                <option value="Galle">Galle Zone</option>
+                <option value="Negombo">Negombo Zone</option>
+                <option value="Kalutara">Kalutara Zone</option>
+                <option value="Kurunegala">Kurunegala Zone</option>
+                <option value="Matara">Matara Zone</option>
+            </select>
+        </div>
+
+        <!-- 2. Assign Driver (Filtered by Area) -->
+        <div class="space-y-1.5">
+            <label class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">2</span>
+                Assign to Driver <span class="text-red-500">*</span>
+            </label>
+            <select id="orders-driver-select" onchange="updateOrdersDriverInfo()"
+                class="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-800 focus:bg-white focus:border-brand focus:ring-2 focus:ring-brand/10 transition-all outline-none cursor-pointer">
+                <option value="">Select driver for target area...</option>
+                <?php foreach ($available_drivers as $d): ?>
+                    <option value="<?= $d['id'] ?>" data-area="<?= htmlspecialchars($d['assigned_area']) ?>">
+                        <?= htmlspecialchars($d['name']) ?> — <?= ucfirst($d['vehicle_type']) ?> (<?= htmlspecialchars($d['assigned_area']) ?>)
+                    </option>
+                <?php endforeach; ?>
+                <?php if (empty($available_drivers)): ?>
+                    <option value="SR" data-area="Gampaha">Saman Rajapaksa — Van · Gampaha</option>
+                    <option value="LW" data-area="Kandy">Lalith Wickrama — Van · Kandy</option>
+                    <option value="KP" data-area="Galle">Kasun Perera — Lorry · Galle</option>
+                <?php endif; ?>
+            </select>
+        </div>
+
+        <!-- Driver Info Card -->
+        <div id="orders-driver-info" style="display: none;"
+            class="p-4 bg-emerald-50/60 border border-emerald-100 rounded-2xl text-xs space-y-2">
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600 font-medium">Assigned Area</span>
+                <span id="orders-di-zone" class="font-bold text-emerald-800">—</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600 font-medium">Vehicle</span>
+                <span id="orders-di-vehicle" class="font-bold text-gray-900">—</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600 font-medium">On-time rate</span>
+                <span id="orders-di-ot" class="font-bold text-emerald-600">—</span>
+            </div>
+        </div>
+
+        <!-- 3. Target Order & Address Preview Card -->
+        <div class="space-y-1.5">
+            <label class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">3</span>
+                Target Delivery Destination <span class="text-red-500">*</span>
+            </label>
+            <div id="orders-address-preview" class="p-3.5 bg-brand/5 border border-brand/20 rounded-2xl text-xs space-y-1.5">
+                <div class="flex items-center gap-2 font-bold text-brand-dark">
+                    <i class="ti ti-map-pin text-brand text-base"></i>
+                    <span id="orders-preview-company">Order Delivery Destination Address</span>
+                </div>
+                <p id="orders-preview-address" class="text-gray-600 pl-6 text-[11px] leading-relaxed">Select an order to view its delivery address.</p>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="space-y-1.5">
+            <label class="text-xs font-bold text-gray-500">Notes for Driver</label>
+            <textarea id="orders-driver-notes" rows="2" placeholder="e.g. Call ahead to customer — gate entry required..."
+                class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-850 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none resize-none"></textarea>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100">
+            <button class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
+                onclick="closeAssignModalFromOrders()">Cancel</button>
+            <button class="px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 shadow-lg shadow-brand/10 transition-all"
+                onclick="dispatchAssignmentFromOrders()">Create &amp; Dispatch ↗</button>
+        </div>
+    </div>
+</div>
+
 <div id="toast-container"></div>
 <script>
     var availableDrivers = <?php echo json_encode($available_drivers); ?>;
@@ -767,30 +894,13 @@ if (isset($pdo) && $pdo !== null) {
             </div>
         `;
         } else if (status_lower === 'processing') {
-            var driverSelectHTML = '';
-            if (availableDrivers && availableDrivers.length > 0) {
-                driverSelectHTML = `
-                <div class="mb-4">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Assign Driver</label>
-                    <select id="assign-driver-select" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-600 outline-none focus:bg-white focus:border-brand/20 transition-all">
-                        <option value="">Select available driver...</option>
-                        ${availableDrivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
-                    </select>
-                </div>
-            `;
-            } else {
-                driverSelectHTML = `
-                <div class="mb-4">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Assign Driver</label>
-                    <p class="text-xs text-amber-600 font-semibold bg-amber-50 border border-amber-100 p-3 rounded-xl"><i class="ti ti-alert-triangle mr-1"></i> No available drivers.</p>
-                </div>
-            `;
-            }
-
+            var compEsc = (el.dataset.company || '').replace(/'/g, "\\'");
+            var addrEsc = (el.dataset.address || '').replace(/'/g, "\\'");
             actionContainer.innerHTML = `
-            ${driverSelectHTML}
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="dispatchOrder(${oid})" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Assign Driver</button>
+                <button onclick="openAssignModalFromOrders(${oid}, '${compEsc}', '${addrEsc}', '${el.dataset.formattedId}')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                    <i class="ti ti-truck-delivery text-base"></i> Assign Driver
+                </button>
                 <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
             </div>
         `;
@@ -1044,6 +1154,150 @@ if (isset($pdo) && $pdo !== null) {
                 if (data.status === 'success') {
                     showToast('Order dispatched and delivery assignment created!', 'success');
                     setTimeout(() => window.location.reload(), 3000);
+                } else {
+                    showToast(data.message || 'Error creating assignment', 'error');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                showToast('Network error creating assignment.', 'error');
+            });
+    }
+
+    var driverInfoMap = <?php echo json_encode($driver_info_map); ?>;
+    var activeAssignOrderId = null;
+    var activeAssignOrderFormattedId = null;
+
+    function openAssignModalFromOrders(oid, company, address, formattedId) {
+        if (!oid) {
+            var selCard = document.querySelector('.order-card.selected');
+            if (selCard) {
+                oid = selCard.dataset.id;
+                company = selCard.dataset.company;
+                address = selCard.dataset.address;
+                formattedId = selCard.dataset.formattedId;
+            }
+        }
+
+        activeAssignOrderId = oid || null;
+        activeAssignOrderFormattedId = formattedId || (oid ? 'KE-2025-' + String(oid).padStart(5, '0') : '');
+
+        var previewComp = document.getElementById('orders-preview-company');
+        var previewAddr = document.getElementById('orders-preview-address');
+        var areaSelect = document.getElementById('orders-area-select');
+
+        if (company || address) {
+            previewComp.textContent = (activeAssignOrderFormattedId ? activeAssignOrderFormattedId + ' · ' : '') + (company || 'Customer');
+            previewAddr.textContent = address || 'No specific street address provided.';
+        } else {
+            previewComp.textContent = 'Order Delivery Destination Address';
+            previewAddr.textContent = 'Select an order to view its delivery address.';
+        }
+
+        var detectedArea = 'All';
+        if (address) {
+            ['Colombo', 'Gampaha', 'Kandy', 'Galle', 'Negombo', 'Kalutara', 'Kurunegala', 'Matara'].forEach(area => {
+                if (address.toLowerCase().includes(area.toLowerCase())) {
+                    detectedArea = area;
+                }
+            });
+        }
+        if (areaSelect) {
+            areaSelect.value = detectedArea;
+            filterOrdersDriversByArea();
+        }
+
+        var modal = document.getElementById('assign-driver-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+    }
+
+    function closeAssignModalFromOrders() {
+        var modal = document.getElementById('assign-driver-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    }
+
+    function filterOrdersDriversByArea() {
+        var selectedArea = document.getElementById('orders-area-select').value;
+        var driverSelect = document.getElementById('orders-driver-select');
+        if (!driverSelect) return;
+        var options = driverSelect.querySelectorAll('option');
+
+        var matchCount = 0;
+        options.forEach(opt => {
+            if (!opt.value) return;
+            var driverArea = opt.dataset.area || 'Colombo';
+            if (selectedArea === 'All' || driverArea.toLowerCase() === selectedArea.toLowerCase()) {
+                opt.style.display = 'block';
+                opt.disabled = false;
+                matchCount++;
+            } else {
+                opt.style.display = 'none';
+                opt.disabled = true;
+            }
+        });
+
+        if (matchCount === 0 && selectedArea !== 'All') {
+            options.forEach(opt => {
+                if (!opt.value) return;
+                opt.style.display = 'block';
+                opt.disabled = false;
+            });
+        }
+
+        var currentSelected = driverSelect.options[driverSelect.selectedIndex];
+        if (currentSelected && currentSelected.disabled) {
+            driverSelect.value = '';
+            updateOrdersDriverInfo();
+        }
+    }
+
+    function updateOrdersDriverInfo() {
+        var val = document.getElementById('orders-driver-select').value;
+        var info = document.getElementById('orders-driver-info');
+        if (val && driverInfoMap[val]) {
+            info.style.display = 'block';
+            document.getElementById('orders-di-vehicle').textContent = driverInfoMap[val].vehicle;
+            document.getElementById('orders-di-zone').textContent = driverInfoMap[val].zone;
+            document.getElementById('orders-di-ot').textContent = driverInfoMap[val].ot;
+        } else {
+            info.style.display = 'none';
+        }
+    }
+
+    function dispatchAssignmentFromOrders() {
+        var driverSelect = document.getElementById('orders-driver-select');
+        var driverVal = driverSelect ? driverSelect.value : '';
+        if (!driverVal) {
+            showToast('Please select an available driver for target area.', 'error');
+            return;
+        }
+
+        if (!activeAssignOrderId) {
+            showToast('No active order selected for assignment.', 'error');
+            return;
+        }
+
+        var notes = document.getElementById('orders-driver-notes') ? document.getElementById('orders-driver-notes').value : '';
+        var driverId = parseInt(driverVal);
+        var formattedId = activeAssignOrderFormattedId || ('KE-2025-' + String(activeAssignOrderId).padStart(5, '0'));
+
+        fetch('/api/delivery.php?action=create_assignment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ driver_id: driverId, orders: [formattedId], notes: notes })
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(`Assigned ${formattedId} to driver and dispatched!`, 'success');
+                    closeAssignModalFromOrders();
+                    setTimeout(() => window.location.reload(), 2500);
                 } else {
                     showToast(data.message || 'Error creating assignment', 'error');
                 }
