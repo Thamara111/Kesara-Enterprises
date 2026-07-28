@@ -96,8 +96,20 @@ $prod_specs = [
     'packaging' => 'Bulk pack',
     'lead' => '3–5 Business Days'
 ];
-// Extract discount
-$discount = isset($product['discount']) ? (float) $product['discount'] : 0;
+// Extract discount with active date range validation
+$discount_pct = isset($product['discount']) ? (float) $product['discount'] : 0;
+$d_start = !empty($product['discount_start']) ? $product['discount_start'] : null;
+$d_end   = !empty($product['discount_end'])   ? $product['discount_end']   : null;
+
+$today_str = date('Y-m-d');
+$discount = 0;
+if ($discount_pct > 0) {
+    $valid_s = empty($d_start) || ($today_str >= $d_start);
+    $valid_e = empty($d_end)   || ($today_str <= $d_end);
+    if ($valid_s && $valid_e) {
+        $discount = $discount_pct;
+    }
+}
 
 // Extract sizes
 if (!empty(trim($product['sizes'] ?? ''))) {

@@ -26,7 +26,7 @@ try {
     $placeholders = implode(',', array_fill(0, count($ids), '?'));
     
     // Prepare and execute the query to fetch basic product details (ignoring soft-deleted items)
-    $stmt = $pdo->prepare("SELECT id, name, sku, images, discount, base_price FROM products WHERE id IN ($placeholders) AND deleted_at IS NULL");
+    $stmt = $pdo->prepare("SELECT id, name, sku, images, discount, discount_start, discount_end, base_price FROM products WHERE id IN ($placeholders) AND deleted_at IS NULL");
     $stmt->execute($ids);
     $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -36,7 +36,18 @@ try {
     // Iterate over each fetched product to gather its specific pricing tiers
     foreach ($products as $p) {
         $product_id = $p['id'];
-        $discount = isset($p['discount']) ? (float)$p['discount'] : 0;
+        $discount_pct = isset($p['discount']) ? (float)$p['discount'] : 0;
+        $d_start = !empty($p['discount_start']) ? $p['discount_start'] : null;
+        $d_end   = !empty($p['discount_end'])   ? $p['discount_end']   : null;
+        $today_str = date('Y-m-d');
+        $discount = 0;
+        if ($discount_pct > 0) {
+            $valid_s = empty($d_start) || ($today_str >= $d_start);
+            $valid_e = empty($d_end)   || ($today_str <= $d_end);
+            if ($valid_s && $valid_e) {
+                $discount = $discount_pct;
+            }
+        }
         $base_price = isset($p['base_price']) ? (float)$p['base_price'] : 0;
         
         // Fetch pricing tiers for the current product, ordered by minimum quantity ascending

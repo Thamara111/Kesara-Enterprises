@@ -96,6 +96,22 @@ if ($method === 'GET') {
                     ];
                 }
 
+                // Calculate active discount status and effective price
+                $today_str = date('Y-m-d');
+                $base_price = (float)$pr['price'];
+                $discount_val = (float)($pr['discount'] ?? 0);
+                $d_start = !empty($pr['discount_start']) ? $pr['discount_start'] : null;
+                $d_end   = !empty($pr['discount_end'])   ? $pr['discount_end']   : null;
+                $is_discount_active = false;
+                if ($discount_val > 0) {
+                    $valid_s = empty($d_start) || ($today_str >= $d_start);
+                    $valid_e = empty($d_end)   || ($today_str <= $d_end);
+                    if ($valid_s && $valid_e) {
+                        $is_discount_active = true;
+                    }
+                }
+                $effective_price = $is_discount_active ? round($base_price * (1 - ($discount_val / 100)), 2) : $base_price;
+
                 // Construct the structured response array for this specific product
                 $products[] = [
                     'id' => (int)$pr['id'],
@@ -103,13 +119,15 @@ if ($method === 'GET') {
                     'sku' => $pr['sku'],
                     'cat' => $pr['cat'] ?? 'Uncategorized',
                     'moq' => (int)$pr['moq'],
-                    'price' => (float)$pr['price'],
+                    'price' => $base_price,
                     'status' => $pr['status'],
                     'desc' => $pr['desc'] ?? '',
                     'images' => json_decode($pr['images'] ?? '[]', true) ?: [],
                     'colors' => $pr['colors'] ?? '',
                     'sizes' => $pr['sizes'] ?? '',
-                    'discount' => (float)($pr['discount'] ?? 0),
+                    'discount' => $discount_val,
+                    'is_discount_active' => $is_discount_active,
+                    'effective_price' => $effective_price,
                     'discount_start' => $pr['discount_start'] ?? '',
                     'discount_end' => $pr['discount_end'] ?? '',
                     'gsm' => $pr['gsm'] ?? '',

@@ -76,7 +76,7 @@ if ($pdo) {
         }
         $order_map = ['newest'=>'p.created_at DESC','price_asc'=>'p.base_price ASC','price_desc'=>'p.base_price DESC','alpha'=>'p.name ASC'];
         $order = $order_map[$filter_sort] ?? 'p.created_at DESC';
-        $sql2 = "SELECT DISTINCT p.name, p.sku, p.base_price AS price, p.discount, p.images, c.name AS category_name, c.slug AS category_slug, COALESCE((SELECT MAX(quantity) FROM inventory WHERE product_id = p.id), 0) AS max_inv
+        $sql2 = "SELECT DISTINCT p.name, p.sku, p.base_price AS price, p.discount, p.discount_start, p.discount_end, p.images, c.name AS category_name, c.slug AS category_slug, COALESCE((SELECT MAX(quantity) FROM inventory WHERE product_id = p.id), 0) AS max_inv
                  FROM products p LEFT JOIN categories c ON c.id = p.category_id $size_join2
                  WHERE " . implode(' AND ', $where2) . " ORDER BY $order";
         $stmt = $pdo->prepare($sql2);
@@ -270,12 +270,25 @@ if (!$is_ajax) {
         </div>
         <?php else: ?>
         <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          <?php foreach ($paged_products as $p): ?>
+          <?php foreach ($paged_products as $p): 
+            $today_str = date('Y-m-d');
+            $discount_pct = (float)($p['discount'] ?? 0);
+            $d_start = !empty($p['discount_start']) ? $p['discount_start'] : null;
+            $d_end   = !empty($p['discount_end'])   ? $p['discount_end']   : null;
+            $is_discount_active = false;
+            if ($discount_pct > 0) {
+                $valid_s = empty($d_start) || ($today_str >= $d_start);
+                $valid_e = empty($d_end)   || ($today_str <= $d_end);
+                if ($valid_s && $valid_e) {
+                    $is_discount_active = true;
+                }
+            }
+          ?>
           <a href="/product?sku=<?php echo htmlspecialchars($p['sku']); ?>" class="bg-white border border-gray-100 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
             <div class="bg-gray-50 h-48 flex items-center justify-center border-b border-gray-50 relative overflow-hidden">
-              <?php if (isset($p['discount']) && $p['discount'] > 0): ?>
+              <?php if ($is_discount_active): ?>
               <div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-md z-10 shadow-sm flex items-center gap-1">
-                <i class="ti ti-discount-2"></i> <?php echo floatval($p['discount']); ?>% OFF
+                <i class="ti ti-discount-2"></i> <?php echo floatval($discount_pct); ?>% OFF
               </div>
               <?php endif; ?>
               <?php $prod_images=json_decode($p['images']??'[]',true); if(!empty($prod_images)&&!empty($prod_images[0])): ?>
@@ -308,9 +321,9 @@ if (!$is_ajax) {
                   <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Wholesale Price</p>
                   <p class="text-sm font-bold text-gray-900">
                     <?php if ($can_see_prices): ?>
-                      <?php if (isset($p['discount']) && $p['discount'] > 0 && is_numeric($p['price'])): ?>
+                      <?php if ($is_discount_active && is_numeric($p['price'])): ?>
                         <span class="text-gray-400 line-through text-[11px] mr-1">LKR <?php echo number_format($p['price'], 2); ?></span>
-                        <span class="text-red-600">LKR <?php echo number_format($p['price'] * (1 - $p['discount'] / 100), 2); ?></span>
+                        <span class="text-red-600">LKR <?php echo number_format($p['price'] * (1 - $discount_pct / 100), 2); ?></span>
                       <?php else: ?>
                         LKR <?php echo is_numeric($p['price'])?number_format($p['price'],2):htmlspecialchars($p['price']); ?>
                       <?php endif; ?>
