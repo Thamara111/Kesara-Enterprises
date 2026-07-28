@@ -302,8 +302,8 @@ foreach ($admin_drivers as $d) {
                 
                 <div class="flex items-center gap-3 border-l border-gray-100 pl-6">
                     <button class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
-                        onclick="window.print()">
-                        <i class="ti ti-download text-lg"></i> Export PDF
+                        onclick="downloadPDF('driver-list-container', 'Delivery_Personnel_Report')">
+                        <i class="ti ti-printer text-lg"></i> Export PDF
                     </button>
                     <button class="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20"
                         onclick="openAddDriverModal()">

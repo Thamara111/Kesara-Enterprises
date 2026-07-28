@@ -148,8 +148,8 @@ if ($pressure_count > 0) {
                     <?php endif; ?>
                     <button
                         class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
-                        onclick="downloadPDF('inventory-container', 'Inventory_Report')">
-                        <i class="ti ti-download text-lg"></i> Export PDF
+                        onclick="downloadPDF('inv-list-container', 'Inventory_Report')">
+                        <i class="ti ti-printer text-lg"></i> Export PDF
                     </button>
                 </div>
             </div>

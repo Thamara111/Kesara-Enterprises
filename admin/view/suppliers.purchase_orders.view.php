@@ -381,7 +381,7 @@ if (isset($pdo) && $pdo !== null) {
                 
                 <div class="flex items-center gap-3 border-l border-gray-100 pl-6">
                     <button onclick="downloadPDF('purchase-orders-list-container', 'Purchase_Orders_List')" class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm">
-                        <i class="ti ti-download text-lg"></i> Export PDF
+                        <i class="ti ti-printer text-lg"></i> Export PDF
                     </button>
                     <button onclick="openRaisePOModal()" class="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
                         <i class="ti ti-plus text-lg"></i> Raise PO ↗
@@ -412,7 +412,7 @@ if (isset($pdo) && $pdo !== null) {
         </div>
 
         <!-- List Pane Body -->
-        <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10">
+        <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10" id="purchase-orders-list-container">
             <div class="min-w-[800px] p-6 space-y-1">
                 <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
                     <thead>
@@ -559,7 +559,7 @@ if (isset($pdo) && $pdo !== null) {
             </a>
             <div class="grid grid-cols-2 gap-3">
                 <button onclick="printPO()" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all">
-                    <i class="ti ti-download text-base"></i>
+                    <i class="ti ti-printer text-base"></i>
                     Print PO
                 </button>
                 <button onclick="resendPO()" class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all">
