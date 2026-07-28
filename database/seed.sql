@@ -44,10 +44,10 @@ INSERT INTO categories (id, name, slug, icon, description) VALUES
 INSERT INTO products (id, name, sku, category_id, description, moq, base_price, status) VALUES
 (1, 'Classic Cotton Brief', 'KB-001', 1, 'Classic cut men`s brief. Suitable for all-day wear. Ideal for retail bundles.', 50, 95.00, 'In Stock'),
 (2, 'Stretch Boxer', 'KB-008', 2, 'Premium stretch cotton boxers with reinforced stitching.', 100, 155.00, 'In Stock'),
-(3, 'Ladies Hipster', 'KL-003', 4, 'Soft touch hipster briefs for maximum comfort.', 50, 115.00, 'Low Stock'),
+(3, 'Ladies Hipster', 'KL-003', 4, 'Soft touch hipster briefs for maximum comfort.', 50, 115.00, 'In Stock'),
 (4, 'Kids Trunk Set', 'KC-012', 5, 'Comfy cotton trunks for children in fun colors.', 60, 98.00, 'In Stock'),
 (5, 'Modal Trunk', 'KB-015', 3, 'Luxury modal fabric trunks with dynamic waistband.', 100, 260.00, 'In Stock'),
-(6, 'Sports Brief', 'KB-022', 1, 'Breathable sports mesh brief with moisture-wicking technology.', 50, 175.00, 'Low Stock'),
+(6, 'Sports Brief', 'KB-022', 1, 'Breathable sports mesh brief with moisture-wicking technology.', 50, 175.00, 'In Stock'),
 (7, 'Cotton Trunk', 'KB-034', 3, 'Everyday standard combed cotton trunks.', 80, 210.00, 'In Stock'),
 (8, 'Seamless Brief', 'KL-009', 4, 'Invisible seamless briefs for women.', 50, 180.00, 'In Stock');
 
@@ -119,11 +119,11 @@ INSERT INTO supplier_products (supplier_id, product_id, unit_cost, lead_days, is
 -- 8. SEED INVENTORY
 -- ============================================================================
 INSERT INTO inventory (id, product_id, size, colour, quantity, restock_min) VALUES
-(1, 1, 'M', 'White', 500, 200),
-(2, 1, 'L', 'White', 420, 200),
-(3, 2, 'L', 'Black', 180, 200),
-(4, 3, 'S', 'Pink', 80, 100),
-(5, 5, 'M', 'Grey', 350, 200);
+(1, 1, 'M', 'White', 1000, 200),
+(2, 1, 'L', 'White', 1000, 200),
+(3, 2, 'L', 'Black', 1000, 200),
+(4, 3, 'S', 'Pink', 1000, 100),
+(5, 5, 'M', 'Grey', 1000, 200);
 
 -- ============================================================================
 -- 9. SEED ORDERS & ITEMS & LOGS

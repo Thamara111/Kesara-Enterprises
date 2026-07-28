@@ -13,6 +13,7 @@ $is_logged_in = isset($_SESSION['user_id']);
 
         <!-- Desktop Navigation -->
         <div class="hidden md:flex items-center gap-8">
+            <a href="/" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">Home</a>
             <a href="/catalog" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">Products</a>
             <a href="/about" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">About</a>
             <a href="/contact" class="text-sm font-medium text-gray-600 hover:text-brand transition-colors cursor-pointer">Contact</a>
@@ -44,6 +45,7 @@ $is_logged_in = isset($_SESSION['user_id']);
 
     <!-- Mobile Dropdown Menu -->
     <div id="mobile-menu" class="hidden md:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 shadow-lg px-6 py-6 space-y-4 z-50">
+        <a href="/" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Home</a>
         <a href="/catalog" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Products</a>
         <a href="/about" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">About</a>
         <a href="/contact" class="block text-sm font-bold text-gray-600 hover:text-brand transition-colors">Contact</a>
