@@ -248,6 +248,7 @@ require_once __DIR__ . "/layouts/header.php";
                     <span
                         class="px-3 py-1 bg-brand-light text-brand text-[10px] font-bold rounded-full border border-brand/10 uppercase"><?= htmlspecialchars($category_name) ?></span>
                     <?php
+                    $total_product_stock = count($variations) > 0 ? array_sum(array_column($variations, 'quantity')) : 0;
                     $max_variant_inventory = count($variations) > 0 ? max(array_column($variations, 'quantity')) : 0;
                     $is_out_of_stock = ($max_variant_inventory <= 50);
                     $stat = $is_out_of_stock ? 'out of stock' : 'in stock';
@@ -269,6 +270,11 @@ require_once __DIR__ . "/layouts/header.php";
                         class="px-3 py-1 <?= $sc_bg ?> <?= $sc_tx ?> text-[10px] font-bold rounded-full border flex items-center gap-1.5 uppercase">
                         <div class="w-1.5 h-1.5 rounded-full <?= $sc_dot ?> animate-pulse"></div>
                         <?= htmlspecialchars(ucwords($stat)) ?>
+                    </span>
+                    <span
+                        class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 text-[10px] font-extrabold rounded-full flex items-center gap-1 uppercase shadow-sm">
+                        <i class="ti ti-boxes text-emerald-500 text-xs"></i>
+                        <?= number_format($total_product_stock) ?> Units In Stock
                     </span>
                 </div>
 
@@ -430,6 +436,11 @@ require_once __DIR__ . "/layouts/header.php";
                                             <?php else: ?>
                                                 <span style="filter: blur(4px);">LKR 000</span>
                                             <?php endif; ?>
+                                        </span>
+                                        <span id="size-stock-badge-<?= htmlspecialchars($so) ?>"
+                                            class="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1 shadow-sm">
+                                            <i class="ti ti-box text-emerald-500 text-[10px]"></i>
+                                            <span id="size-stock-val-<?= htmlspecialchars($so) ?>">0</span> in stock
                                         </span>
                                         <span id="size-out-badge-<?= htmlspecialchars($so) ?>"
                                             class="hidden text-[9px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded uppercase tracking-widest border border-red-100">Out
@@ -859,6 +870,8 @@ require_once __DIR__ . "/layouts/header.php";
             const plusBtn = document.getElementById('size-plus-' + size);
             const outBadge = document.getElementById('size-out-badge-' + size);
             const priceWrapper = document.getElementById('size-price-wrapper-' + size);
+            const stockBadge = document.getElementById('size-stock-badge-' + size);
+            const stockVal = document.getElementById('size-stock-val-' + size);
 
             let variant = inventoryVariations.find(v => v.colour === color && v.size === size);
             let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
@@ -873,6 +886,7 @@ require_once __DIR__ . "/layouts/header.php";
                 if (plusBtn) { plusBtn.disabled = true; plusBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
                 if (outBadge) { outBadge.classList.remove('hidden'); }
                 if (priceWrapper) { priceWrapper.classList.add('hidden'); }
+                if (stockBadge) { stockBadge.classList.add('hidden'); }
                 // Reset selected quantity
                 if (selectedQuantities[color]) selectedQuantities[color][size] = 0;
             } else {
@@ -886,6 +900,8 @@ require_once __DIR__ . "/layouts/header.php";
                 if (plusBtn) { plusBtn.disabled = false; plusBtn.classList.remove('opacity-50', 'cursor-not-allowed'); }
                 if (outBadge) { outBadge.classList.add('hidden'); }
                 if (priceWrapper) { priceWrapper.classList.remove('hidden'); }
+                if (stockBadge) { stockBadge.classList.remove('hidden'); }
+                if (stockVal) { stockVal.textContent = qtyAvailable.toLocaleString(); }
             }
         });
 
