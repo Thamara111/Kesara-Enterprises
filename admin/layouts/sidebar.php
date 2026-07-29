@@ -163,7 +163,7 @@ if (isset($pdo)) {
         <!-- Supply Chain Section -->
         <div class="space-y-1 mb-4">
             <p class="px-5 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Supply Chain</p>
-            <a href="/admin-suppliers" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo ($current_page === 'suppliers' || $current_page === 'supplier_form') ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+            <a href="/admin-suppliers" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'suppliers' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                 <i class="ti ti-building-warehouse text-xl"></i>
                 Suppliers
             </a>

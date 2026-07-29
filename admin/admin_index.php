@@ -47,9 +47,9 @@ if (isset($_SESSION['admin_id'])) {
 
     // Matrix defining which views each administrative role is allowed to access
     $role_access = [
-        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
+        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
         'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries', 'trash'],
-        'supplier_manager' => ['dashboard', 'suppliers', 'supplier_form', 'purchase_orders', 'goods_received', 'login', 'inquiries'],
+        'supplier_manager' => ['dashboard', 'suppliers', 'purchase_orders', 'goods_received', 'login', 'inquiries'],
         'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries'],
         'example_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries']
     ];
@@ -107,11 +107,6 @@ $view_config = [
     'suppliers' => [
         'title' => 'Supplier Management | Kesara Enterprises',
         'description' => 'Manage supply chain partners and procurement.',
-        'show_sidebar' => true
-    ],
-    'supplier_form' => [
-        'title' => 'Supplier Form | Kesara Enterprises',
-        'description' => 'Add or edit supply chain partners.',
         'show_sidebar' => true
     ],
     'purchase_orders' => [
