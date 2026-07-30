@@ -596,7 +596,7 @@ require_once __DIR__ . "/layouts/header.php";
                         <button onclick="addToCart()" <?= $is_out_of_stock ? 'disabled' : '' ?>
                             class="<?= $is_out_of_stock ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-brand text-brand-light hover:bg-brand-dark active:scale-95 hover:-translate-y-px shadow-lg shadow-brand/20' ?> font-bold py-4 rounded-2xl transition-all transform flex items-center justify-center gap-2">
                             <i class="ti ti-shopping-cart-plus text-xl"></i>
-                            <?= $is_out_of_stock ? 'Out of Stock' : 'Add to Order' ?>
+                            <?= $is_out_of_stock ? 'Out of Stock' : 'Add to Cart' ?>
                         </button>
                         <button onclick="requestQuote()" class="bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl
                                    hover:bg-gray-50 hover:border-brand hover:text-brand transition-all
