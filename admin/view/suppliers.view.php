@@ -88,6 +88,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $admin_suppliers = [];
 if (isset($pdo) && $pdo !== null) {
     try {
+        /*
+        // TASK 09: Supplier Rating - STEP 1: Self-Healing DB
+        $checkRating = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'rating'");
+        if (!$checkRating->fetch()) {
+            $pdo->exec("ALTER TABLE suppliers ADD COLUMN rating DECIMAL(3,2) DEFAULT 5.00 AFTER status");
+        }
+
+        // TASK 09: Supplier Rating - STEP 2: Extract & Save Rating
+        $rating = isset($_POST['rating']) ? (float)$_POST['rating'] : 5.00;
+        */
+
         $stmt = $pdo->query("SELECT s.id, s.name, s.email, s.contact_person AS contact, s.phone, s.address AS addr, s.payment_terms AS terms, s.category AS cat, s.status, s.hold_reason, s.hold_since 
                              FROM suppliers s");
         $supps = $stmt->fetchAll();
@@ -296,6 +307,11 @@ foreach ($admin_suppliers as $s) {
                             <th class="px-4 py-3 rounded-l-xl w-64">Supplier Name</th>
                             <th class="px-4 py-3 w-40">Category</th>
                             <th class="px-4 py-3 w-40">Contact Person</th>
+
+                            <!-- TASK 09: Supplier Rating - STEP 4: Admin UI Table Rating Column (Commented out for later use)
+                            <th class="px-4 py-3 w-28 text-center">Performance Rating</th>
+                            -->
+
                             <th class="px-4 py-3 w-32">Lead Time</th>
                             <th class="px-4 py-3 text-right rounded-r-xl w-32">Status</th>
                         </tr>

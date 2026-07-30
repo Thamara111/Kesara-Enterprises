@@ -414,6 +414,9 @@ function closeCatFormPane() {
 // Intercept form submissions and route through our REST API
 document.getElementById('cat-form').addEventListener('submit', function(e) {
     e.preventDefault();
+    var submitBtn = this.querySelector('button[type="submit"]');
+    if (submitBtn) setButtonLoading(submitBtn, true);
+
     var formData = new FormData(this);
     var action = document.getElementById('f-action').value;
     var url = '/api/categories.php' + (action === 'delete' ? '?action=delete' : '');
@@ -430,10 +433,12 @@ document.getElementById('cat-form').addEventListener('submit', function(e) {
                 window.location.href = '/admin-categories';
             }, 3000);
         } else {
+            if (submitBtn) setButtonLoading(submitBtn, false);
             showToast(data.message || 'An error occurred.', 'error');
         }
     })
     .catch(err => {
+        if (submitBtn) setButtonLoading(submitBtn, false);
         console.error(err);
         showToast('Network error occurred.', 'error');
     });
@@ -441,6 +446,9 @@ document.getElementById('cat-form').addEventListener('submit', function(e) {
 
 function submitDelete() {
     uiConfirm("Are you sure you want to delete this category?", () => {
+        var deleteBtn = document.getElementById('btn-delete');
+        if (deleteBtn) setButtonLoading(deleteBtn, true, 'Deleting...');
+
         document.getElementById('f-action').value = 'delete';
         var formData = new FormData();
         formData.append('action', 'delete');
@@ -458,10 +466,12 @@ function submitDelete() {
                     window.location.href = '/admin-categories';
                 }, 3000);
             } else {
+                if (deleteBtn) setButtonLoading(deleteBtn, false);
                 showToast(data.message || 'An error occurred.', 'error');
             }
         })
         .catch(err => {
+            if (deleteBtn) setButtonLoading(deleteBtn, false);
             console.error(err);
             showToast('Network error occurred.', 'error');
         });

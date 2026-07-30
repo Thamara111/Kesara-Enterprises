@@ -389,7 +389,8 @@ function applyFilters() {
 // Initial render
 applyFilters();
 
-function updateStatus(id, status) {
+function updateStatus(id, status, btnElement) {
+    if (btnElement) setButtonLoading(btnElement, true);
     fetch('/api/admin_inquiries.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -401,12 +402,18 @@ function updateStatus(id, status) {
             showToast('Status updated!');
             setTimeout(() => window.location.reload(), 3000); // Reload to update badge colors
         } else {
+            if (btnElement) setButtonLoading(btnElement, false);
             showToast(data.message, 'error');
         }
+    })
+    .catch(err => {
+        if (btnElement) setButtonLoading(btnElement, false);
+        showToast('Network error updating status.', 'error');
     });
 }
 
-function assignInquiry(id, assigned_to) {
+function assignInquiry(id, assigned_to, selectElement) {
+    if (selectElement) selectElement.disabled = true;
     fetch('/api/admin_inquiries.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -414,11 +421,16 @@ function assignInquiry(id, assigned_to) {
     })
     .then(res => res.json())
     .then(data => {
+        if (selectElement) selectElement.disabled = false;
         if (data.status === 'success') {
             showToast('Inquiry assigned successfully!');
         } else {
             showToast(data.message, 'error');
         }
+    })
+    .catch(err => {
+        if (selectElement) selectElement.disabled = false;
+        showToast('Network error assigning inquiry.', 'error');
     });
 }
 

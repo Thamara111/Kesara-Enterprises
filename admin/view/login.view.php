@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
           <div id="warn-area"></div>
 
-          <button onclick="tryLogin()" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2 mt-4">
+          <button id="btn-admin-login" onclick="tryLogin(this)" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2 mt-4">
             <i class="ti ti-login text-xl"></i>
             Sign In to Control Panel
           </button>
@@ -172,11 +172,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   var locked = false;
   var countdownTimer = null;
 
-  function tryLogin() {
+  function setBtnLoader(btn, isLoading, text) {
+    if (typeof setButtonLoading === 'function') {
+      setButtonLoading(btn, isLoading, text);
+    } else {
+      if (!btn) return;
+      if (isLoading) {
+        btn.disabled = true;
+        if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
+        btn.innerHTML = `<i class="ti ti-loader animate-spin text-lg"></i> <span>${text || 'Processing...'}</span>`;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+      } else {
+        btn.disabled = false;
+        if (btn.dataset.originalHtml) btn.innerHTML = btn.dataset.originalHtml;
+        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+      }
+    }
+  }
+
+  function tryLogin(btnElement) {
     if (locked) return;
     var email = document.getElementById('email-input').value.trim();
     var pw = document.getElementById('pw-input').value;
     var warnArea = document.getElementById('warn-area');
+    var btn = btnElement || document.getElementById('btn-admin-login');
 
     if (!email || !pw) {
       warnArea.innerHTML = `
@@ -187,6 +206,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     `;
       return;
     }
+
+    setBtnLoader(btn, true, 'Signing In...');
 
     // Prepare URL-encoded form data
     var formData = new URLSearchParams();
@@ -212,6 +233,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         `;
         setTimeout(() => window.location.href = '/admin-dashboard', 1200);
       } else {
+        setBtnLoader(btn, false);
         attempts++;
         var remaining = 5 - attempts;
         
@@ -235,6 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     })
     .catch(err => {
+      setBtnLoader(btn, false);
       warnArea.innerHTML = `
         <div class="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-600">
           <i class="ti ti-alert-triangle text-xl shrink-0 mt-0.5"></i>

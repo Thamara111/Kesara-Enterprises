@@ -238,7 +238,7 @@ endif;
 
 <script>
     // Global helper for action buttons across the entire admin panel
-    function setButtonLoading(btn, isLoading) {
+    function setButtonLoading(btn, isLoading, customText) {
         if (typeof btn === 'string') btn = document.getElementById(btn);
         if (!btn) return;
         
@@ -247,7 +247,8 @@ endif;
             if (!btn.dataset.originalHtml) {
                 btn.dataset.originalHtml = btn.innerHTML;
             }
-            btn.innerHTML = `<i class="ti ti-loader animate-spin text-lg"></i> <span>Processing...</span>`;
+            var text = customText || btn.dataset.loadingText || 'Processing...';
+            btn.innerHTML = `<i class="ti ti-loader animate-spin text-lg"></i> <span>${text}</span>`;
             btn.classList.add('opacity-75', 'cursor-not-allowed');
         } else {
             btn.disabled = false;
@@ -260,15 +261,10 @@ endif;
 
     // Automatically handle loader for all standard forms
     document.addEventListener('submit', function(e) {
-        if (e.defaultPrevented) return;
         var form = e.target;
-        var submitBtn = form.querySelector('button[type="submit"]');
+        var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
         if (submitBtn) {
-            setTimeout(function() {
-                if (!e.defaultPrevented) {
-                    setButtonLoading(submitBtn, true);
-                }
-            }, 50);
+            setButtonLoading(submitBtn, true);
         }
     });
 </script>

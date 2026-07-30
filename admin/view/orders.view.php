@@ -8,16 +8,62 @@
 $admin_orders = [];
 if (isset($pdo) && $pdo !== null) {
     try {
+        /*
+        // STEP 1]: Extract Date Range Filter parameters
+        $filter_start_date = trim($_GET['start_date'] ?? '');
+        $filter_end_date = trim($_GET['end_date'] ?? '');
+        */
+
         // Self-heal: ensure deleted_at column exists in the orders table for soft deletes
         $chk = $pdo->query("SHOW COLUMNS FROM orders LIKE 'deleted_at'");
         if (!$chk->fetch())
             $pdo->exec("ALTER TABLE orders ADD COLUMN deleted_at DATETIME DEFAULT NULL");
 
-        // Fetch all active orders along with the associated customer's details
-        $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, o.payment_receipt, u.business_name AS company, u.first_name, u.last_name, u.email, u.address 
+        // Self-heal: ensure cancellation_reason column exists in the orders table
+        $chk_cancel = $pdo->query("SHOW COLUMNS FROM orders LIKE 'cancellation_reason'");
+        if (!$chk_cancel->fetch())
+            $pdo->exec("ALTER TABLE orders ADD COLUMN cancellation_reason VARCHAR(255) DEFAULT NULL AFTER status");
+
+        /*
+        // STEP 2]: Self-Healing DB - Auto-create index on orders(created_at) if missing
+        $checkDateIdx = $pdo->query("SHOW INDEX FROM orders WHERE Key_name = 'idx_orders_created_at'");
+        if (!$checkDateIdx || !$checkDateIdx->fetch()) {
+            $pdo->exec("CREATE INDEX idx_orders_created_at ON orders(created_at)");
+        }
+
+        // STEP 3]: Dynamically filter orders by created_at date range
+        $where_clauses = ["o.deleted_at IS NULL"];
+        $params = [];
+
+        if (!empty($filter_start_date)) {
+            $where_clauses[] = "o.created_at >= ?";
+            $params[] = $filter_start_date . ' 00:00:00';
+        }
+
+        if (!empty($filter_end_date)) {
+            $where_clauses[] = "o.created_at <= ?";
+            $params[] = $filter_end_date . ' 23:59:59';
+        }
+
+        $sql = "SELECT o.id, o.status, o.total_amount AS total, o.created_at, o.payment_receipt, 
+                       u.business_name AS company, u.first_name, u.last_name, u.email, u.address 
+                FROM orders o 
+                JOIN users u ON o.user_id = u.id 
+                WHERE " . implode(" AND ", $where_clauses) . " 
+                ORDER BY o.created_at DESC";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $orders_db = $stmt->fetchAll();
+        */
+
+
+        // Fetch all active orders along with the associated customer's details (newest first)
+        $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, o.payment_receipt, o.cancellation_reason, u.business_name AS company, u.first_name, u.last_name, u.email, u.address 
                              FROM orders o 
                              JOIN users u ON o.user_id = u.id 
-                             WHERE o.deleted_at IS NULL");
+                             WHERE o.deleted_at IS NULL 
+                             ORDER BY o.created_at DESC, o.id DESC");
         $orders_db = $stmt->fetchAll();
 
         // Process each order for display logic
@@ -126,7 +172,8 @@ if (isset($pdo) && $pdo !== null) {
                 'total' => number_format((float) $ord['total'], 2),
                 'items' => $items,
                 'timeline' => $timeline,
-                'paymentReceipt' => $ord['payment_receipt']
+                'paymentReceipt' => $ord['payment_receipt'],
+                'cancellationReason' => $ord['cancellation_reason'] ?? ''
             ];
         }
     } catch (\Exception $e) {
@@ -191,7 +238,7 @@ if (isset($pdo) && $pdo !== null) {
                 <h1 class="text-2xl font-bold text-gray-900">Orders</h1>
                 <p class="text-sm text-gray-500 mt-1">Manage and track customer orders.</p>
             </div>
-            
+
             <div class="flex items-center gap-6">
                 <!-- Stats Bar -->
                 <div class="flex gap-4">
@@ -226,7 +273,8 @@ if (isset($pdo) && $pdo !== null) {
                     <i class="ti ti-alert-triangle text-amber-600 text-lg flex-shrink-0 mt-0.5"></i>
                     <div>
                         <p class="text-sm font-bold text-amber-900">Pending Orders</p>
-                        <p class="text-xs text-amber-700 mt-1">You have <strong><?= $pending_orders ?></strong> orders awaiting verification in the queue.</p>
+                        <p class="text-xs text-amber-700 mt-1">You have <strong><?= $pending_orders ?></strong> orders
+                            awaiting verification in the queue.</p>
                     </div>
                 </div>
             </div>
@@ -236,17 +284,51 @@ if (isset($pdo) && $pdo !== null) {
         <div class="px-8 py-4 border-b border-gray-100 flex items-center justify-between">
             <!-- Status Tabs -->
             <div class="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
-                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-brand text-brand-light shadow-md shadow-brand/10 border border-transparent on" data-status="all">All</button>
-                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="pending">Verification Queue</button>
-                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="processing">Processing</button>
-                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="shipped">Shipped</button>
-                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="delivered">Delivered</button>
-                <button class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50" data-status="cancelled">Cancelled</button>
+                <button
+                    class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-brand text-brand-light shadow-md shadow-brand/10 border border-transparent on"
+                    data-status="all">All</button>
+                <button
+                    class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                    data-status="pending">Verification Queue</button>
+                <button
+                    class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                    data-status="processing">Processing</button>
+                <button
+                    class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                    data-status="shipped">Shipped</button>
+                <button
+                    class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                    data-status="delivered">Delivered</button>
+                <button
+                    class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
+                    data-status="cancelled">Cancelled</button>
             </div>
-            
+
             <div class="bg-gray-50/30 flex items-center gap-4">
+                <!-- STEP 4: Date Range Filter Pickers (Commented out for later use)]
+                <form method="GET" action="" class="flex items-center gap-2">
+                    <div
+                        class="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase">From:</span>
+                        <input type="date" name="start_date" value="<?= htmlspecialchars($filter_start_date ?? '') ?>"
+                            class="text-xs font-semibold text-gray-700 outline-none bg-transparent">
+                        <span class="text-[10px] font-bold text-gray-400 uppercase ml-1">To:</span>
+                        <input type="date" name="end_date" value="<?= htmlspecialchars($filter_end_date ?? '') ?>"
+                            class="text-xs font-semibold text-gray-700 outline-none bg-transparent">
+                    </div>
+                    <button type="submit"
+                        class="px-3 py-2 bg-gray-900 text-white text-xs font-bold rounded-xl hover:bg-brand transition-colors">
+                        Filter Date
+                    </button>
+                    <?php if (!empty($filter_start_date) || !empty($filter_end_date)): ?>
+                        <a href="?" class="text-xs font-bold text-brand hover:underline">Clear</a>
+                    <?php endif; ?>
+                </form>
+                -->
+
                 <div class="relative flex-1 group">
-                    <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors"></i>
+                    <i
+                        class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors"></i>
                     <input id="order-search" type="text" placeholder="Order ID or Business..."
                         class="w-full pl-11 pr-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all">
                 </div>
@@ -258,84 +340,90 @@ if (isset($pdo) && $pdo !== null) {
             </div>
         </div>
 
-            <!-- Order List Table -->
-            <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10" id="orders-list-container">
-                <div class="min-w-[800px] p-6 space-y-1">
-                    <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
-                        <thead>
-                            <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
-                                <th class="px-4 py-3 rounded-l-xl w-32">Order ID</th>
-                                <th class="px-4 py-3">Company</th>
-                                <th class="px-4 py-3">Status</th>
-                                <th class="px-4 py-3">Date</th>
-                                <th class="px-4 py-3 text-right rounded-r-xl">Price</th>
-                            </tr>
-                        </thead>
-                        <tbody id="order-list">
-                            <?php if (!empty($admin_orders)): ?>
-                                <?php foreach ($admin_orders as $idx => $o): ?>
-                                    <tr id="order-card-<?= $idx ?>"
-                                        class="order-card bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
-                                        data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($o['id']) ?>"
-                                        data-formatted-id="<?= htmlspecialchars($o['formattedId']) ?>"
-                                        data-status="<?= htmlspecialchars($o['status']) ?>"
-                                        data-badge="<?= htmlspecialchars($o['badge']) ?>"
-                                        data-badgetext="<?= htmlspecialchars($o['badgeText']) ?>"
-                                        data-company="<?= htmlspecialchars($o['company']) ?>"
-                                        data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
-                                        data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
-                                        data-address="<?= htmlspecialchars($o['address'] ?? '') ?>"
-                                        data-date="<?= htmlspecialchars($o['date']) ?>"
-                                        data-total="<?= htmlspecialchars($o['total']) ?>"
-                                        data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
-                                        data-timeline="<?= htmlspecialchars(json_encode($o['timeline'])) ?>"
-                                        data-payment-receipt="<?= htmlspecialchars($o['paymentReceipt'] ?? '') ?>"
-                                        onclick="selectOrder(this)">
-                                        <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30 whitespace-nowrap text-sm font-bold text-gray-900 group-hover:text-brand transition-colors w-32">
-                                            <?= htmlspecialchars($o['formattedId']) ?>
-                                        </td>
-                                        <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-bold text-gray-600 truncate max-w-[200px]">
-                                            <?= htmlspecialchars($o['company']) ?>
-                                        </td>
-                                        <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 whitespace-nowrap">
-                                            <span
-                                                class="px-2.5 py-1 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'VERIFICATION QUEUE', $o['badgeText'])) ?></span>
-                                        </td>
-                                        <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 whitespace-nowrap text-xs text-gray-500 font-medium">
-                                            <?= htmlspecialchars(explode(',', $o['date'])[0]) ?>
-                                        </td>
-                                        <td class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 whitespace-nowrap text-sm font-extrabold text-gray-950 text-right">LKR
-                                            <?= htmlspecialchars(explode('.', $o['total'])[0]) ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
+        <!-- Order List Table -->
+        <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10" id="orders-list-container">
+            <div class="min-w-[800px] p-6 space-y-1">
+                <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
+                    <thead>
+                        <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
+                            <th class="px-4 py-3 rounded-l-xl w-32">Order ID</th>
+                            <th class="px-4 py-3">Company</th>
+                            <th class="px-4 py-3">Status</th>
+                            <th class="px-4 py-3">Date</th>
+                            <th class="px-4 py-3 text-right rounded-r-xl">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody id="order-list">
+                        <?php if (!empty($admin_orders)): ?>
+                            <?php foreach ($admin_orders as $idx => $o): ?>
+                                <tr id="order-card-<?= $idx ?>"
+                                    class="order-card bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
+                                    data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($o['id']) ?>"
+                                    data-formatted-id="<?= htmlspecialchars($o['formattedId']) ?>"
+                                    data-status="<?= htmlspecialchars($o['status']) ?>"
+                                    data-badge="<?= htmlspecialchars($o['badge']) ?>"
+                                    data-badgetext="<?= htmlspecialchars($o['badgeText']) ?>"
+                                    data-company="<?= htmlspecialchars($o['company']) ?>"
+                                    data-clientname="<?= htmlspecialchars($o['clientName']) ?>"
+                                    data-clientemail="<?= htmlspecialchars($o['clientEmail']) ?>"
+                                    data-address="<?= htmlspecialchars($o['address'] ?? '') ?>"
+                                    data-date="<?= htmlspecialchars($o['date']) ?>"
+                                    data-total="<?= htmlspecialchars($o['total']) ?>"
+                                    data-items="<?= htmlspecialchars(json_encode($o['items'])) ?>"
+                                    data-timeline="<?= htmlspecialchars(json_encode($o['timeline'])) ?>"
+                                    data-payment-receipt="<?= htmlspecialchars($o['paymentReceipt'] ?? '') ?>"
+                                    data-cancellation-reason="<?= htmlspecialchars($o['cancellationReason'] ?? '') ?>"
+                                    onclick="selectOrder(this)">
+                                    <td
+                                        class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30 whitespace-nowrap text-sm font-bold text-gray-900 group-hover:text-brand transition-colors w-32">
+                                        <?= htmlspecialchars($o['formattedId']) ?>
+                                    </td>
+                                    <td
+                                        class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-bold text-gray-600 truncate max-w-[200px]">
+                                        <?= htmlspecialchars($o['company']) ?>
+                                    </td>
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 whitespace-nowrap">
+                                        <span
+                                            class="px-2.5 py-1 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'VERIFICATION QUEUE', $o['badgeText'])) ?></span>
+                                    </td>
+                                    <td
+                                        class="p-4 border-y border-gray-100 group-hover:border-brand/30 whitespace-nowrap text-xs text-gray-500 font-medium">
+                                        <?= htmlspecialchars(explode(',', $o['date'])[0]) ?>
+                                    </td>
+                                    <td
+                                        class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 whitespace-nowrap text-sm font-extrabold text-gray-950 text-right">
+                                        LKR
+                                        <?= htmlspecialchars(explode('.', $o['total'])[0]) ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
             </div>
-            <!-- Pagination Controls -->
-            <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white" id="pagination-controls">
-                <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
-                <div class="flex items-center gap-2" id="pagination-buttons">
-                    <!-- Buttons injected by JS -->
-                </div>
-            </div>
-        </div>        <div id="empty-state"
-                    class="flex-col items-center justify-center py-16 text-center <?= empty($admin_orders) ? 'flex' : 'hidden' ?>">
-                    <div class="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
-                        <i class="ti ti-search-off text-2xl text-gray-300"></i>
-                    </div>
-                    <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">No orders found</p>
-                    <p class="text-[11px] text-gray-300 mt-1">Try adjusting your filters</p>
-                </div>
-                </div>
+        </div>
+        <!-- Pagination Controls -->
+        <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white"
+            id="pagination-controls">
+            <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
+            <div class="flex items-center gap-2" id="pagination-buttons">
+                <!-- Buttons injected by JS -->
             </div>
         </div>
     </div>
+    <div id="empty-state"
+        class="flex-col items-center justify-center py-16 text-center <?= empty($admin_orders) ? 'flex' : 'hidden' ?>">
+        <div class="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
+            <i class="ti ti-search-off text-2xl text-gray-300"></i>
+        </div>
+        <p class="text-xs font-bold text-gray-400 uppercase tracking-widest">No orders found</p>
+        <p class="text-[11px] text-gray-300 mt-1">Try adjusting your filters</p>
+    </div>
 
     <!-- Backdrop (all screen sizes) -->
-    <div id="order-detail-backdrop" class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300" onclick="closeOrderDetailPane()"></div>
+    <div id="order-detail-backdrop"
+        class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300"
+        onclick="closeOrderDetailPane()"></div>
 
     <!-- RIGHT: ORDER PROFILE & DETAIL -->
     <div id="order-detail-pane"
@@ -374,6 +462,25 @@ if (isset($pdo) && $pdo !== null) {
                     <p id="d-email" class="text-xs text-gray-400 font-semibold mt-0.5">&mdash;</p>
                 </div>
             </div>
+
+            <!-- Cancellation Details Section -->
+            <div id="d-cancellation-reason-container" class="space-y-3 hidden">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cancellation Details</h3>
+                <div class="bg-red-50/60 border border-red-200/60 rounded-3xl p-5 text-xs text-red-900">
+                    <p class="font-bold flex items-center gap-2 text-red-950">
+                        <i class="ti ti-circle-x text-base text-red-600"></i> Cancellation Reason / Note:
+                    </p>
+                    <p id="d-cancellation-reason" class="mt-2 pl-6 font-semibold whitespace-pre-line text-red-800">&mdash;</p>
+                </div>
+            </div>
+            <!-- [VIVA TASK 08 - STEP 4: Admin UI Order Detail Pane - Estimated Delivery Date Row (Commented out for later use)]
+            <div id="d-est-delivery-container" class="flex items-center justify-between p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl text-xs">
+                <span class="font-bold text-indigo-900 flex items-center gap-1.5">
+                    <i class="ti ti-truck font-normal text-indigo-600"></i> Est. Delivery Date:
+                </span>
+                <span id="d-est-delivery" class="font-extrabold text-indigo-700">&mdash;</span>
+            </div>
+            -->
 
             <!-- Payment Receipt Section -->
             <div id="d-receipt-container" class="space-y-4 hidden">
@@ -642,7 +749,8 @@ if (isset($pdo) && $pdo !== null) {
         <!-- 1. Area Selection -->
         <div class="space-y-1.5">
             <label class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                <span class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">1</span>
+                <span
+                    class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">1</span>
                 Select Target Area / Zone <span class="text-red-500">*</span>
             </label>
             <select id="orders-area-select" onchange="filterOrdersDriversByArea()"
@@ -662,7 +770,8 @@ if (isset($pdo) && $pdo !== null) {
         <!-- 2. Assign Driver (Filtered by Area) -->
         <div class="space-y-1.5">
             <label class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                <span class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">2</span>
+                <span
+                    class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">2</span>
                 Assign to Driver <span class="text-red-500">*</span>
             </label>
             <select id="orders-driver-select" onchange="updateOrdersDriverInfo()"
@@ -670,7 +779,8 @@ if (isset($pdo) && $pdo !== null) {
                 <option value="">Select driver for target area...</option>
                 <?php foreach ($available_drivers as $d): ?>
                     <option value="<?= $d['id'] ?>" data-area="<?= htmlspecialchars($d['assigned_area']) ?>">
-                        <?= htmlspecialchars($d['name']) ?> — <?= ucfirst($d['vehicle_type']) ?> (<?= htmlspecialchars($d['assigned_area']) ?>)
+                        <?= htmlspecialchars($d['name']) ?> — <?= ucfirst($d['vehicle_type']) ?>
+                        (<?= htmlspecialchars($d['assigned_area']) ?>)
                     </option>
                 <?php endforeach; ?>
                 <?php if (empty($available_drivers)): ?>
@@ -701,31 +811,80 @@ if (isset($pdo) && $pdo !== null) {
         <!-- 3. Target Order & Address Preview Card -->
         <div class="space-y-1.5">
             <label class="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                <span class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">3</span>
+                <span
+                    class="w-5 h-5 rounded-full bg-brand/10 text-brand text-[11px] flex items-center justify-center font-bold">3</span>
                 Target Delivery Destination <span class="text-red-500">*</span>
             </label>
-            <div id="orders-address-preview" class="p-3.5 bg-brand/5 border border-brand/20 rounded-2xl text-xs space-y-1.5">
+            <div id="orders-address-preview"
+                class="p-3.5 bg-brand/5 border border-brand/20 rounded-2xl text-xs space-y-1.5">
                 <div class="flex items-center gap-2 font-bold text-brand-dark">
                     <i class="ti ti-map-pin text-brand text-base"></i>
                     <span id="orders-preview-company">Order Delivery Destination Address</span>
                 </div>
-                <p id="orders-preview-address" class="text-gray-600 pl-6 text-[11px] leading-relaxed">Select an order to view its delivery address.</p>
+                <p id="orders-preview-address" class="text-gray-600 pl-6 text-[11px] leading-relaxed">Select an order to
+                    view its delivery address.</p>
             </div>
         </div>
 
         <!-- Notes -->
         <div class="space-y-1.5">
             <label class="text-xs font-bold text-gray-500">Notes for Driver</label>
-            <textarea id="orders-driver-notes" rows="2" placeholder="e.g. Call ahead to customer — gate entry required..."
+            <textarea id="orders-driver-notes" rows="2"
+                placeholder="e.g. Call ahead to customer — gate entry required..."
                 class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-sm font-semibold text-gray-850 focus:bg-white focus:border-brand/20 focus:ring-2 focus:ring-brand/10 transition-all outline-none resize-none"></textarea>
         </div>
 
         <!-- Action buttons -->
         <div class="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100">
-            <button class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
+            <button
+                class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all"
                 onclick="closeAssignModalFromOrders()">Cancel</button>
-            <button class="px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 shadow-lg shadow-brand/10 transition-all"
+            <button
+                class="px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 shadow-lg shadow-brand/10 transition-all"
                 onclick="dispatchAssignmentFromOrders()">Create &amp; Dispatch ↗</button>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Order Modal -->
+<div id="cancel-order-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-gray-100 space-y-6 transform transition-all scale-100">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center border border-red-100">
+                    <i class="ti ti-alert-triangle text-2xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-gray-900">Cancel Order</h3>
+                    <p id="cancel-order-ref" class="text-xs font-bold text-red-600 mt-0.5">Order Reference</p>
+                </div>
+            </div>
+            <button onclick="closeCancelOrderModal()" class="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-all">
+                <i class="ti ti-x text-lg"></i>
+            </button>
+        </div>
+
+        <div class="space-y-2">
+            <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                Cancellation Reason / Note to Customer <span class="text-red-500">*</span>
+            </label>
+            <textarea id="cancel-order-reason" rows="4" required
+                placeholder="Please state the reason for cancellation (e.g., item out of stock, customer requested cancellation, invalid delivery details...)"
+                class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-xs font-semibold text-gray-850 outline-none focus:bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/10 transition-all resize-none"></textarea>
+            <p id="cancel-modal-error" class="hidden text-xs font-bold text-red-600 flex items-center gap-1 mt-1">
+                <i class="ti ti-alert-circle"></i> Please enter a cancellation note.
+            </p>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+            <button type="button" onclick="closeCancelOrderModal()"
+                class="px-5 py-3 bg-white border border-gray-200 text-gray-700 font-bold rounded-2xl text-xs hover:bg-gray-50 transition-all">
+                Close
+            </button>
+            <button type="button" id="btn-confirm-cancel-order" onclick="submitOrderCancellation()"
+                class="px-6 py-3 bg-red-600 text-white font-bold rounded-2xl text-xs hover:bg-red-700 shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2">
+                <span>Confirm Cancellation</span>
+            </button>
         </div>
     </div>
 </div>
@@ -798,6 +957,17 @@ if (isset($pdo) && $pdo !== null) {
         } else {
             receiptContainer.classList.add('hidden');
         }
+
+        // Render Cancellation Reason
+        var cancelContainer = document.getElementById('d-cancellation-reason-container');
+        var cancelReasonEl = document.getElementById('d-cancellation-reason');
+        if (el.dataset.status.toLowerCase() === 'cancelled' && el.dataset.cancellationReason && el.dataset.cancellationReason.trim() !== '') {
+            if (cancelContainer) cancelContainer.classList.remove('hidden');
+            if (cancelReasonEl) cancelReasonEl.textContent = el.dataset.cancellationReason;
+        } else if (cancelContainer) {
+            cancelContainer.classList.add('hidden');
+        }
+
         renderOrderDetails(el);
     }
 
@@ -906,18 +1076,35 @@ if (isset($pdo) && $pdo !== null) {
         `;
         } else if (status_lower === 'assigned') {
             actionContainer.innerHTML = `
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="updateStatus(${oid}, 'shipped')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Dispatch Cargo</button>
-                <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
+            <div class="p-3 bg-purple-50 border border-purple-100 rounded-2xl text-center">
+                <p class="text-xs text-purple-700 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="ti ti-truck-delivery text-base"></i> Driver Assigned — Shipping Controlled via Driver Portal
+                </p>
             </div>
         `;
         } else if (status_lower === 'shipped') {
             actionContainer.innerHTML = `
-            <button onclick="updateStatus(${oid}, 'delivered')" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Confirm Delivery</button>
+            <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-center">
+                <p class="text-xs text-indigo-700 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="ti ti-truck text-base"></i> Cargo In Transit — Delivery Managed by Driver
+                </p>
+            </div>
+        `;
+        } else if (status_lower === 'delivered') {
+            actionContainer.innerHTML = `
+            <div class="p-3 bg-green-50 border border-green-100 rounded-2xl text-center">
+                <p class="text-xs text-green-700 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="ti ti-circle-check text-base"></i> Order Delivered
+                </p>
+            </div>
         `;
         } else {
             actionContainer.innerHTML = `
-            <p class="text-xs text-gray-400 font-medium text-center py-2 uppercase tracking-wider"><i class="ti ti-lock mr-1"></i> Order Closed (${el.dataset.status})</p>
+            <div class="p-3 bg-gray-50 border border-gray-100 rounded-2xl text-center">
+                <p class="text-xs text-gray-400 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="ti ti-lock text-base"></i> Order Closed (${el.dataset.status})
+                </p>
+            </div>
         `;
         }
     }
@@ -950,7 +1137,7 @@ if (isset($pdo) && $pdo !== null) {
         info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
 
         var html = '';
-        
+
         // Prev button
         var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
         html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
@@ -960,8 +1147,8 @@ if (isset($pdo) && $pdo !== null) {
             if (i === currentPage) {
                 html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
             } else if (
-                i === 1 || 
-                i === totalPages || 
+                i === 1 ||
+                i === totalPages ||
                 (i >= currentPage - 1 && i <= currentPage + 1)
             ) {
                 html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
@@ -1107,13 +1294,104 @@ if (isset($pdo) && $pdo !== null) {
         }, duration);
     }
 
-    function updateStatus(id, status) {
+    let pendingCancelOrderId = null;
+    let pendingCancelBtnElement = null;
+
+    function openCancelOrderModal(id, btnElement) {
+        pendingCancelOrderId = id;
+        pendingCancelBtnElement = btnElement;
+
+        const orderCard = document.querySelector(`.order-card[data-id="${id}"]`);
+        const refText = orderCard ? orderCard.dataset.formattedId : `KE-2025-${String(id).padStart(5, '0')}`;
+
+        const refEl = document.getElementById('cancel-order-ref');
+        if (refEl) refEl.textContent = `Order ${refText}`;
+        
+        const reasonInput = document.getElementById('cancel-order-reason');
+        if (reasonInput) reasonInput.value = '';
+        
+        const errEl = document.getElementById('cancel-modal-error');
+        if (errEl) errEl.classList.add('hidden');
+
+        const modal = document.getElementById('cancel-order-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+    }
+
+    function closeCancelOrderModal() {
+        pendingCancelOrderId = null;
+        pendingCancelBtnElement = null;
+
+        const modal = document.getElementById('cancel-order-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    }
+
+    function submitOrderCancellation() {
+        if (!pendingCancelOrderId) return;
+
+        const reasonInput = document.getElementById('cancel-order-reason');
+        const reason = reasonInput ? reasonInput.value.trim() : '';
+        const errEl = document.getElementById('cancel-modal-error');
+        const confirmBtn = document.getElementById('btn-confirm-cancel-order');
+
+        if (!reason) {
+            if (errEl) {
+                errEl.classList.remove('hidden');
+                errEl.innerHTML = `<i class="ti ti-alert-circle"></i> Please enter a cancellation reason for the customer.`;
+            }
+            if (reasonInput) reasonInput.focus();
+            return;
+        }
+
+        if (errEl) errEl.classList.add('hidden');
+        if (confirmBtn) setButtonLoading(confirmBtn, true, 'Cancelling...');
+
+        fetch('/api/orders.php?action=update_status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: pendingCancelOrderId,
+                status: 'cancelled',
+                note: reason,
+                cancellation_reason: reason
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (confirmBtn) setButtonLoading(confirmBtn, false);
+            if (data.status === 'success') {
+                closeCancelOrderModal();
+                showToast('Order cancelled and notification email sent to customer.', 'error');
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                showToast(data.message || 'Error cancelling order.', 'error');
+            }
+        })
+        .catch(err => {
+            if (confirmBtn) setButtonLoading(confirmBtn, false);
+            console.error(err);
+            showToast('Network error cancelling order.', 'error');
+        });
+    }
+
+    function updateStatus(id, status, btnElement) {
+        if (status === 'cancelled') {
+            openCancelOrderModal(id, btnElement);
+            return;
+        }
+
         var labels = {
             processing: 'Payment accepted — order is now processing.',
             shipped: 'Order dispatched and marked as shipped.',
-            delivered: 'Delivery confirmed successfully.',
-            cancelled: 'Order has been cancelled.'
+            delivered: 'Delivery confirmed successfully.'
         };
+
+        if (btnElement) setButtonLoading(btnElement, true);
 
         fetch('/api/orders.php?action=update_status', {
             method: 'POST',
@@ -1123,26 +1401,30 @@ if (isset($pdo) && $pdo !== null) {
             .then(res => res.json())
             .then(data => {
                 if (data.status === 'success') {
-                    var variant = status === 'cancelled' ? 'error' : 'success';
-                    showToast(labels[status] || `Status updated to ${status}.`, variant);
+                    showToast(labels[status] || `Status updated to ${status}.`, 'success');
                     setTimeout(() => window.location.reload(), 3000);
                 } else {
+                    if (btnElement) setButtonLoading(btnElement, false);
                     showToast(data.message || 'Error updating status', 'error');
                 }
             })
             .catch(err => {
+                if (btnElement) setButtonLoading(btnElement, false);
                 console.error(err);
                 showToast('Network error updating status.', 'error');
             });
     }
 
-    function dispatchOrder(oid) {
+    function dispatchOrder(oid, btnElement) {
         var driverSelect = document.getElementById('assign-driver-select');
         var driverId = driverSelect ? driverSelect.value : '';
         if (!driverId) {
             showToast('Please select a driver to dispatch this cargo.', 'error');
             return;
         }
+
+        var btn = btnElement || document.querySelector('button[onclick*="dispatchOrder"]');
+        if (btn) setButtonLoading(btn, true, 'Dispatching...');
 
         fetch('/api/delivery.php?action=create_assignment', {
             method: 'POST',
@@ -1155,10 +1437,12 @@ if (isset($pdo) && $pdo !== null) {
                     showToast('Order dispatched and delivery assignment created!', 'success');
                     setTimeout(() => window.location.reload(), 3000);
                 } else {
+                    if (btn) setButtonLoading(btn, false);
                     showToast(data.message || 'Error creating assignment', 'error');
                 }
             })
             .catch(err => {
+                if (btn) setButtonLoading(btn, false);
                 console.error(err);
                 showToast('Network error creating assignment.', 'error');
             });

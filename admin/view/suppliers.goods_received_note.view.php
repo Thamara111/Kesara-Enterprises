@@ -159,10 +159,12 @@ if ($po_id > 0 && isset($pdo) && $pdo !== null) {
         if ($po_data) {
             // Fetch PO items
             $item_stmt = $pdo->prepare("SELECT poi.id, poi.product_id, poi.item_name, poi.qty_ordered, poi.qty_received, poi.unit_cost,
-                                               inv.quantity AS inv_before, inv.restock_min AS threshold
+                                               COALESCE(SUM(inv.quantity), 0) AS inv_before, 
+                                               COALESCE(MAX(inv.restock_min), 100) AS threshold
                                         FROM purchase_order_items poi
                                         LEFT JOIN inventory inv ON inv.product_id = poi.product_id
-                                        WHERE poi.po_id = ?");
+                                        WHERE poi.po_id = ?
+                                        GROUP BY poi.id, poi.product_id, poi.item_name, poi.qty_ordered, poi.qty_received, poi.unit_cost");
             $item_stmt->execute([$po_id]);
             $po_items = $item_stmt->fetchAll();
             
@@ -192,12 +194,13 @@ if (!empty($po_items)) {
     }
 }
 
-$po_num = $po_data ? 'PO-2025-' . str_pad($po_data['id'], 4, '0', STR_PAD_LEFT) : 'PO-2025-0000';
+$po_year = ($po_data && !empty($po_data['ordered_at'])) ? date('Y', strtotime($po_data['ordered_at'])) : date('Y');
+$po_num = $po_data ? 'PO-' . $po_year . '-' . str_pad($po_data['id'], 4, '0', STR_PAD_LEFT) : 'PO-' . date('Y') . '-0000';
 $po_supplier = $po_data ? htmlspecialchars($po_data['supplier_name']) : 'N/A';
-$po_raised = $po_data ? date('d M Y', strtotime($po_data['ordered_at'])) : 'N/A';
+$po_raised = ($po_data && !empty($po_data['ordered_at'])) ? date('d M Y', strtotime($po_data['ordered_at'])) : 'N/A';
 $po_total_val = $po_data ? (float)$po_data['total'] : 0.00;
 $po_value = 'LKR ' . number_format($po_total_val, 2);
-$grn_ref = 'GRN-2025-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
+$grn_ref = 'GRN-' . $po_year . '-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B';
 ?>
 
 <?php if (!empty($error_msg)): ?>

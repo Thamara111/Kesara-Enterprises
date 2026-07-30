@@ -187,7 +187,8 @@ function switchTrashTab(tabName, btn) {
     btn.classList.add('border-brand', 'text-brand');
 }
 
-function restoreItem(table, id) {
+function restoreItem(table, id, btnElement) {
+    if (btnElement) setButtonLoading(btnElement, true, 'Restoring...');
     fetch('/api/trash.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -199,7 +200,14 @@ function restoreItem(table, id) {
             showToast('Item restored successfully.', 'success');
             setTimeout(() => location.reload(), 3000);
         }
-        else showToast('Error: ' + data.message, 'error');
+        else {
+            if (btnElement) setButtonLoading(btnElement, false);
+            showToast('Error: ' + data.message, 'error');
+        }
+    })
+    .catch(err => {
+        if (btnElement) setButtonLoading(btnElement, false);
+        showToast('Network error occurred.', 'error');
     });
 }
 
@@ -228,6 +236,9 @@ function closeHardDeleteModal() {
 function executeHardDelete() {
     var table = document.getElementById('hd-table').value;
     var id = document.getElementById('hd-id').value;
+    var btn = document.querySelector('#hard-delete-modal button.bg-red-500');
+    if (btn) setButtonLoading(btn, true, 'Deleting...');
+
     fetch('/api/trash.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -239,7 +250,14 @@ function executeHardDelete() {
             showToast('Item permanently deleted.', 'success');
             setTimeout(() => location.reload(), 3000);
         }
-        else showToast('Error: ' + data.message, 'error');
+        else {
+            if (btn) setButtonLoading(btn, false);
+            showToast('Error: ' + data.message, 'error');
+        }
+    })
+    .catch(err => {
+        if (btn) setButtonLoading(btn, false);
+        showToast('Network error occurred.', 'error');
     });
 }
 </script>

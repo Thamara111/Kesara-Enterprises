@@ -13,6 +13,14 @@ $suspended_count = 0;
 
 if (isset($pdo) && $pdo !== null) {
     try {
+        /*
+        // [VIVA TASK 06 - STEP 1: Self-Healing DB]: Auto-create credit_limit column in users table if missing
+        $checkCredit = $pdo->query("SHOW COLUMNS FROM users LIKE 'credit_limit'");
+        if (!$checkCredit->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN credit_limit DECIMAL(10,2) DEFAULT 0.00 AFTER status");
+        }
+        */
+
         // Fetch all users to display in the customer list
         $stmt = $pdo->query("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.phone AS whatsapp_number, u.business_name AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
                              FROM users u");
@@ -310,10 +318,21 @@ if (empty($admin_customers)) {
                 <div class="grid grid-cols-[80px_1fr] gap-x-2 gap-y-3 text-xs font-medium">
                     <span class="text-gray-400">BR Number</span>
                     <span class="text-gray-900" id="d-br">&mdash;</span>
+
+                    <!-- [VIVA TASK 05 - STEP 4: Admin UI Customer Profile - Display Tax Identification Number (TIN)
+                    <span class="text-gray-400">TIN Number</span>
+                    <span class="text-gray-900 font-bold" id="d-tin">&mdash;</span>
+                    -->
+
                     <span class="text-gray-400">Type</span>
                     <span class="text-gray-900" id="d-type">&mdash;</span>
                     <span class="text-gray-400">Address</span>
                     <span class="text-gray-900 leading-relaxed" id="d-address">&mdash;</span>
+
+                    <!-- [VIVA TASK 06 - STEP 2: Admin UI Customer Profile - Display Approved Credit Limit 
+                    <span class="text-gray-400">Credit Limit</span>
+                    <span class="text-brand font-bold" id="d-credit">&mdash;</span>
+                    -->
                 </div>
             </div>
 

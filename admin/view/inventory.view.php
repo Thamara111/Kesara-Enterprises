@@ -8,6 +8,33 @@
 $rows = [];
 if (isset($pdo) && $pdo !== null) {
     try {
+        /*
+        // STEP 1: Backend GET Inputs]: Extract stock status filter parameter
+        $filter_stock_status = trim($_GET['stock_status'] ?? ''); // Options: 'low_stock', 'critical', 'out_of_stock', 'in_stock'
+
+        // STEP 2: Self-Healing Database]: Auto-create composite index on inventory(quantity, restock_min)
+        $checkStockIdx = $pdo->query("SHOW INDEX FROM inventory WHERE Key_name = 'idx_inventory_stock_thresh'");
+        if (!$checkStockIdx || !$checkStockIdx->fetch()) {
+            $pdo->exec("CREATE INDEX idx_inventory_stock_thresh ON inventory(quantity, restock_min)");
+        }
+
+        // STEP 3: Dynamic SQL Query]: Filter inventory items by restock threshold status
+        $where_stock = ["p.deleted_at IS NULL"];
+        if ($filter_stock_status === 'low_stock' || $filter_stock_status === 'critical') {
+            $where_stock[] = "i.quantity <= i.restock_min AND i.quantity > 0";
+        } elseif ($filter_stock_status === 'out_of_stock') {
+            $where_stock[] = "i.quantity = 0";
+        } elseif ($filter_stock_status === 'in_stock') {
+            $where_stock[] = "i.quantity > i.restock_min";
+        }
+
+        $sql_stock = "SELECT i.id, i.product_id, i.size, i.colour, i.quantity AS stock, i.restock_min AS thresh, p.name AS product_name, p.sku 
+                      FROM inventory i 
+                      JOIN products p ON i.product_id = p.id 
+                      WHERE " . implode(" AND ", $where_stock) . " 
+                      ORDER BY i.quantity ASC";
+        */
+        
         $stmt = $pdo->query("SELECT i.id, i.product_id, i.size, i.colour, i.quantity AS stock, i.restock_min AS thresh, p.name AS product_name, p.sku 
                              FROM inventory i 
                              JOIN products p ON i.product_id = p.id");
@@ -38,7 +65,7 @@ if (isset($pdo) && $pdo !== null) {
                 'logs' => $item_logs
             ];
         }
-        
+
         $all_products = array_unique(array_column($rows, 'product_name'));
         sort($all_products);
     } catch (\Exception $e) {
@@ -60,11 +87,11 @@ foreach ($rows as $r) {
     if ($r['thresh'] > 0) {
         $p = min(100, (int) round(($r['stock'] / $r['thresh']) * 100));
     }
-    if ($r['stock'] <= 50) {
+    if ($r['stock'] === 0) {
         $out_of_stock_count++;
-    } elseif ($p <= 50) {
+    } elseif ($p <= 15 || $r['stock'] <= 5) {
         $critical_count++;
-    } elseif ($p <= 75) {
+    } elseif ($r['stock'] <= $r['thresh']) {
         $low_stock_count++;
     }
 }
@@ -121,12 +148,13 @@ if ($pressure_count > 0) {
                         <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Out of Stock</p>
                     </div>
                 </div>
-                
+
                 <div class="flex items-center gap-3 border-l border-gray-100 pl-6">
                     <?php if ($pressure_count > 0): ?>
                         <?php if (!empty($should_trigger_alert)): ?>
                             <!-- Alert UI handled by JS -->
-                            <div id="inv-alert-badge" class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold text-gray-500">
+                            <div id="inv-alert-badge"
+                                class="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs font-bold text-gray-500">
                                 <i class="ti ti-loader animate-spin text-base"></i>
                                 <span>Checking alert...</span>
                             </div>
@@ -157,6 +185,15 @@ if ($pressure_count > 0) {
 
 
         <div class="flex items-center justify-between px-8 py-4">
+            <!-- [VIVA TASK 04 - STEP 4: Server-Side Stock Status Link Chips (Commented out for later use)]
+            <div class="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
+                <a href="?" class="chip <?= empty($filter_stock_status) ? 'on' : '' ?>">All</a>
+                <a href="?stock_status=low_stock" class="chip <?= ($filter_stock_status ?? '') === 'low_stock' ? 'on' : '' ?>">Low Stock / Critical</a>
+                <a href="?stock_status=out_of_stock" class="chip <?= ($filter_stock_status ?? '') === 'out_of_stock' ? 'on' : '' ?>">Out of Stock</a>
+                <a href="?stock_status=in_stock" class="chip <?= ($filter_stock_status ?? '') === 'in_stock' ? 'on' : '' ?>">Healthy Stock</a>
+            </div>
+            -->
+
             <!-- Tabs -->
             <div class="flex flex-nowrap gap-2 overflow-x-auto no-scrollbar">
                 <button class="chip on" onclick="chipFilter(this)">All</button>
@@ -176,8 +213,8 @@ if ($pressure_count > 0) {
                 <select id="product-filter" onchange="currentPage=1;applyFilters()"
                     class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm font-medium transition-all max-w-xs">
                     <option value="">All products</option>
-                    <?php if(!empty($all_products)): ?>
-                        <?php foreach($all_products as $pname): ?>
+                    <?php if (!empty($all_products)): ?>
+                        <?php foreach ($all_products as $pname): ?>
                             <option value="<?= htmlspecialchars($pname) ?>"><?= htmlspecialchars($pname) ?></option>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -187,7 +224,7 @@ if ($pressure_count > 0) {
 
 
         <!-- List Header -->
-        <div
+        <!-- <div
             class="px-8 py-3 bg-gray-50/50 grid grid-cols-[minmax(200px,2fr)_60px_70px_80px_1fr_100px] gap-4 border-b border-gray-100 text-[10px] font-bold text-gray-400 uppercase tracking-wider items-center">
             <span>Product / Variant</span>
             <span class="text-center">Size</span>
@@ -195,7 +232,7 @@ if ($pressure_count > 0) {
             <span class="text-center">Min</span>
             <span class="text-center">Health</span>
             <span class="text-right">Status</span>
-        </div>
+        </div> -->
 
         <!-- List -->
         <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10" id="inv-list-container">
@@ -214,7 +251,8 @@ if ($pressure_count > 0) {
                     <tbody id="inv-list">
                         <?php if (empty($rows)): ?>
                             <tr id="empty-state">
-                                <td colspan="6" class="text-xs text-gray-400 text-center py-10 italic">No variants match this filter.</td>
+                                <td colspan="6" class="text-xs text-gray-400 text-center py-10 italic">No variants match
+                                    this filter.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($rows as $idx => $r): ?>
@@ -223,24 +261,27 @@ if ($pressure_count > 0) {
                                 if ($r['thresh'] > 0) {
                                     $p = min(100, (int) round(($r['stock'] / $r['thresh']) * 100));
                                 }
-                                $status = $r['stock'] <= 50 ? 'Out of stock' : ($p <= 50 ? 'Critical' : ($p <= 75 ? 'Low stock' : 'In stock'));
-                                $stockColor = $r['stock'] <= 50 ? '#6B7280' : ($p <= 50 ? '#791F1F' : ($p <= 75 ? '#633806' : '#111827'));
-                                $barColor = $r['stock'] <= 50 ? '#9CA3AF' : ($p <= 50 ? '#E24B4A' : ($p <= 75 ? '#EF9F27' : '#1D9E75'));
-                                $badgeClass = $r['stock'] <= 50 ? 'bg-gray-100 text-gray-500 border-gray-200' : ($p <= 50 ? 'bg-red-100 text-red-700' : ($p <= 75 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
-                                $badgeText = $r['stock'] <= 50 ? 'Out of stock' : ($p <= 50 ? 'Critical' : ($p <= 75 ? 'Low stock' : 'In stock'));
+                                $status = $r['stock'] === 0 ? 'Out of stock' : ($p <= 15 || $r['stock'] <= 5 ? 'Critical' : ($r['stock'] <= $r['thresh'] ? 'Low stock' : 'In stock'));
+                                $stockColor = $r['stock'] === 0 ? '#6B7280' : ($p <= 15 || $r['stock'] <= 5 ? '#791F1F' : ($r['stock'] <= $r['thresh'] ? '#633806' : '#111827'));
+                                $barColor = $r['stock'] === 0 ? '#9CA3AF' : ($p <= 15 || $r['stock'] <= 5 ? '#E24B4A' : ($r['stock'] <= $r['thresh'] ? '#EF9F27' : '#1D9E75'));
+                                $badgeClass = $r['stock'] === 0 ? 'bg-gray-100 text-gray-500 border-gray-200' : ($p <= 15 || $r['stock'] <= 5 ? 'bg-red-100 text-red-700' : ($r['stock'] <= $r['thresh'] ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'));
+                                $badgeText = $r['stock'] === 0 ? 'Out of stock' : ($p <= 15 || $r['stock'] <= 5 ? 'Critical' : ($r['stock'] <= $r['thresh'] ? 'Low stock' : 'In stock'));
                                 ?>
                                 <tr id="inv-row-<?= $idx ?>"
                                     class="inv-row bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
                                     data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($r['id']) ?>"
                                     data-product="<?= htmlspecialchars($r['product_name']) ?>"
-                                    data-name="<?= htmlspecialchars($r['name']) ?>" data-sku="<?= htmlspecialchars($r['sku']) ?>"
+                                    data-name="<?= htmlspecialchars($r['name']) ?>"
+                                    data-sku="<?= htmlspecialchars($r['sku']) ?>"
                                     data-stock="<?= htmlspecialchars($r['stock']) ?>"
-                                    data-thresh="<?= htmlspecialchars($r['thresh']) ?>" data-status="<?= htmlspecialchars($status) ?>"
+                                    data-thresh="<?= htmlspecialchars($r['thresh']) ?>"
+                                    data-status="<?= htmlspecialchars($status) ?>"
                                     data-logs="<?= htmlspecialchars(json_encode($r['logs'])) ?>" onclick="selectRow(this)">
-                                    
+
                                     <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30">
                                         <div class="flex flex-col justify-center">
-                                            <p class="text-sm font-bold text-gray-900 leading-tight truncate group-hover:text-brand transition-colors">
+                                            <p
+                                                class="text-sm font-bold text-gray-900 leading-tight truncate group-hover:text-brand transition-colors">
                                                 <?= htmlspecialchars(implode(' · ', array_slice(explode(' · ', $r['name']), 0, 2))) ?>
                                             </p>
                                             <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">
@@ -248,29 +289,36 @@ if ($pressure_count > 0) {
                                             </p>
                                         </div>
                                     </td>
-                                    
+
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
-                                        <div class="flex items-center justify-center text-xs font-bold text-gray-500 bg-gray-100/50 rounded-lg h-8 px-2 mx-auto w-max">
+                                        <div
+                                            class="flex items-center justify-center text-xs font-bold text-gray-500 bg-gray-100/50 rounded-lg h-8 px-2 mx-auto w-max">
                                             <?= htmlspecialchars($r['size']) ?>
                                         </div>
                                     </td>
-                                    
-                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 stock-val text-center text-sm font-black" style="color: <?= $stockColor ?>">
+
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 stock-val text-center text-sm font-black"
+                                        style="color: <?= $stockColor ?>">
                                         <?= htmlspecialchars($r['stock']) ?>
                                     </td>
-                                    
-                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-center text-xs font-bold text-gray-400">
+
+                                    <td
+                                        class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-center text-xs font-bold text-gray-400">
                                         <?= htmlspecialchars($r['thresh']) ?>
                                     </td>
-                                    
+
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
-                                        <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[200px] mx-auto">
-                                            <div class="bar-val h-full rounded-full transition-all duration-500" style="width: <?= $p ?>%; background-color: <?= $barColor ?>"></div>
+                                        <div
+                                            class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[200px] mx-auto">
+                                            <div class="bar-val h-full rounded-full transition-all duration-500"
+                                                style="width: <?= $p ?>%; background-color: <?= $barColor ?>"></div>
                                         </div>
                                     </td>
-                                    
-                                    <td class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
-                                        <span class="badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest <?= $badgeClass ?> border border-transparent shadow-sm whitespace-nowrap">
+
+                                    <td
+                                        class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
+                                        <span
+                                            class="badge-val px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest <?= $badgeClass ?> border border-transparent shadow-sm whitespace-nowrap">
                                             <?= $badgeText ?>
                                         </span>
                                     </td>
@@ -282,7 +330,8 @@ if ($pressure_count > 0) {
             </div>
         </div>
         <!-- Pagination Controls -->
-        <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white z-10" id="pagination-controls">
+        <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white z-10"
+            id="pagination-controls">
             <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
             <div class="flex items-center gap-2" id="pagination-buttons">
                 <!-- JS injected here -->
@@ -431,14 +480,17 @@ if ($pressure_count > 0) {
         white-space: nowrap;
         flex-shrink: 0;
     }
+
     .chip:hover {
         background-color: #F3F4F6;
     }
+
     .chip.on {
         background-color: transparent !important;
         border-color: transparent !important;
         color: #111827 !important;
     }
+
     /* We handle .on manually in chipFilter by removing the active classes */
 
     .chip:hover {
@@ -465,13 +517,13 @@ if ($pressure_count > 0) {
 <script>
     var selEl = null;
 
-    function pct(s, t) { return Math.min(100, Math.round(s / t * 100)); }
-    function barColor(s, p) { return s <= 50 ? '#9CA3AF' : p <= 50 ? '#E24B4A' : p <= 75 ? '#EF9F27' : '#1D9E75'; }
-    function stockColor(s, p) { return s <= 50 ? '#6B7280' : p <= 50 ? '#791F1F' : p <= 75 ? '#633806' : '#111827'; }
-    function statusText(s, p) { return s <= 50 ? 'Out of stock — cannot fulfil orders' : p <= 50 ? `${p}% of threshold — restock urgently` : p <= 75 ? `${p}% of threshold — restock soon` : `${p}% of threshold — healthy`; }
-    function statusColor(s, p) { return s <= 50 ? '#6B7280' : p <= 50 ? '#791F1F' : p <= 75 ? '#633806' : '#085041'; }
-    function badgeClass(s, p) { return s <= 50 ? 'bg-gray-100 text-gray-500 border-gray-200' : p <= 50 ? 'bg-red-100 text-red-700' : p <= 75 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'; }
-    function badgeText(s, p) { return s <= 50 ? 'Out of stock' : p <= 50 ? 'Critical' : p <= 75 ? 'Low stock' : 'In stock'; }
+    function pct(s, t) { return t > 0 ? Math.min(100, Math.round(s / t * 100)) : 0; }
+    function barColor(s, p, t) { var thresh = t || 100; return s === 0 ? '#9CA3AF' : (p <= 15 || s <= 5) ? '#E24B4A' : (s <= thresh) ? '#EF9F27' : '#1D9E75'; }
+    function stockColor(s, p, t) { var thresh = t || 100; return s === 0 ? '#6B7280' : (p <= 15 || s <= 5) ? '#791F1F' : (s <= thresh) ? '#633806' : '#111827'; }
+    function statusText(s, p, t) { var thresh = t || 100; return s === 0 ? 'Out of stock — cannot fulfil orders' : (p <= 15 || s <= 5) ? `${p}% of threshold — restock urgently` : (s <= thresh) ? `${p}% of threshold — restock soon` : `${p}% of threshold — healthy`; }
+    function statusColor(s, p, t) { var thresh = t || 100; return s === 0 ? '#6B7280' : (p <= 15 || s <= 5) ? '#791F1F' : (s <= thresh) ? '#633806' : '#085041'; }
+    function badgeClass(s, p, t) { var thresh = t || 100; return s === 0 ? 'bg-gray-100 text-gray-500 border-gray-200' : (p <= 15 || s <= 5) ? 'bg-red-100 text-red-700' : (s <= thresh) ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'; }
+    function badgeText(s, p, t) { var thresh = t || 100; return s === 0 ? 'Out of stock' : (p <= 15 || s <= 5) ? 'Critical' : (s <= thresh) ? 'Low stock' : 'In stock'; }
 
     var activeFilter = 'All';
     var currentPage = 1;
@@ -498,7 +550,7 @@ if ($pressure_count > 0) {
         info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
 
         var html = '';
-        
+
         // Prev button
         var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
         html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
@@ -508,8 +560,8 @@ if ($pressure_count > 0) {
             if (i === currentPage) {
                 html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
             } else if (
-                i === 1 || 
-                i === totalPages || 
+                i === 1 ||
+                i === totalPages ||
                 (i >= currentPage - 1 && i <= currentPage + 1)
             ) {
                 html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
@@ -529,12 +581,12 @@ if ($pressure_count > 0) {
         var visibleRows = [];
         var searchVal = (document.getElementById('search-input').value || '').toLowerCase();
         var prodFilter = document.getElementById('product-filter').value;
-        
+
         document.querySelectorAll('.inv-row').forEach(r => {
             var stock = parseInt(r.dataset.stock);
             var thresh = parseInt(r.dataset.thresh);
             var p = pct(stock, thresh);
-            var status = stock <= 50 ? 'Out of stock' : p <= 50 ? 'Critical' : p <= 75 ? 'Low stock' : 'In stock';
+            var status = stock === 0 ? 'Out of stock' : (p <= 15 || stock <= 5) ? 'Critical' : (stock <= thresh) ? 'Low stock' : 'In stock';
             var rowName = (r.dataset.name || '').toLowerCase();
             var rowSku = (r.dataset.sku || '').toLowerCase();
             var rowProd = r.dataset.product || '';
@@ -576,7 +628,7 @@ if ($pressure_count > 0) {
 
         var list = document.getElementById('inv-list');
         visibleRows.forEach(r => list.appendChild(r));
-        
+
         var list = document.getElementById('inv-list');
         var emptyState = document.getElementById('empty-state');
         if (emptyState) emptyState.remove();
@@ -587,9 +639,9 @@ if ($pressure_count > 0) {
             tr.innerHTML = '<td colspan="6" class="text-xs text-gray-400 text-center py-10 italic">No variants match this filter.</td>';
             list.appendChild(tr);
         }
-        
+
         renderPagination(totalItems, totalPages);
-        
+
         if (totalItems > 0) {
             var firstVisible = Array.from(document.querySelectorAll('.inv-row')).find(r => r.style.display !== 'none');
             if (firstVisible) selectRow(firstVisible, false);
@@ -651,7 +703,7 @@ if ($pressure_count > 0) {
 
     document.getElementById('adj-qty').addEventListener('input', updatePreview);
 
-    function applyAdj() {
+    function applyAdj(btnElement) {
         var t = document.getElementById('adj-type').value;
         var q = parseInt(document.getElementById('adj-qty').value) || 0;
         var note = document.getElementById('adj-note').value || 'Manual adjustment';
@@ -660,6 +712,10 @@ if ($pressure_count > 0) {
         var newStock = t === 'add' ? prev + q : t === 'remove' ? Math.max(0, prev - q) : q;
         var diff = newStock - prev;
         var sign = diff >= 0 ? '+' : '';
+        
+        var btn = btnElement || document.querySelector('#detail-pane button[onclick*="applyAdj"]');
+        if (btn) setButtonLoading(btn, true);
+
         fetch('/api/admin_inventory.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -672,6 +728,7 @@ if ($pressure_count > 0) {
                 newStock: newStock
             })
         }).then(r => r.json()).then(data => {
+            if (btn) setButtonLoading(btn, false);
             if (data.status === 'success') {
                 showToast('Stock adjusted successfully.', 'success');
 
@@ -708,12 +765,18 @@ if ($pressure_count > 0) {
             } else {
                 showToast(data.message || 'Error updating stock.', 'error');
             }
-        }).catch(() => showToast('Network error.', 'error'));
+        }).catch(() => {
+            if (btn) setButtonLoading(btn, false);
+            showToast('Network error.', 'error');
+        });
     }
 
-    function saveThresh() {
+    function saveThresh(btnElement) {
         if (!selEl) return;
         var thresh = parseInt(document.getElementById('thresh-input').value) || 0;
+
+        var btn = btnElement || document.querySelector('#detail-pane button[onclick*="saveThresh"]');
+        if (btn) setButtonLoading(btn, true);
 
         fetch('/api/admin_inventory.php', {
             method: 'POST',
@@ -724,6 +787,7 @@ if ($pressure_count > 0) {
                 thresh: thresh
             })
         }).then(r => r.json()).then(data => {
+            if (btn) setButtonLoading(btn, false);
             if (data.status === 'success') {
                 showToast('Threshold updated successfully.', 'success');
                 selEl.dataset.thresh = thresh;
@@ -743,7 +807,10 @@ if ($pressure_count > 0) {
             } else {
                 showToast(data.message || 'Error updating threshold.', 'error');
             }
-        }).catch(() => showToast('Network error.', 'error'));
+        }).catch(() => {
+            if (btn) setButtonLoading(btn, false);
+            showToast('Network error.', 'error');
+        });
     }
 
     function selectRow(el, openDrawer = true) {
@@ -803,27 +870,27 @@ if ($pressure_count > 0) {
     closeAdjPane();
 
     <?php if (!empty($should_trigger_alert)): ?>
-    fetch('/api/inventory_warning.php', { method: 'POST' })
-    .then(r => r.json())
-    .then(data => {
-        var badge = document.getElementById('inv-alert-badge');
-        if (badge) {
-            if (data.status === 'success' || data.status === 'partial') {
-                badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-700';
-                badge.innerHTML = '<i class="ti ti-circle-check text-base"></i><span>Alert sent &middot; <?= htmlspecialchars($auto_alert_time ?? '') ?></span>';
-            } else {
-                badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600';
-                badge.innerHTML = '<i class="ti ti-alert-circle text-base"></i><span>Alert failed</span>';
-                badge.title = data.message || 'Unknown error';
-            }
-        }
-    }).catch(err => {
-        var badge = document.getElementById('inv-alert-badge');
-        if (badge) {
-            badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600';
-            badge.innerHTML = '<i class="ti ti-alert-circle text-base"></i><span>Alert failed</span>';
-        }
-    });
+        fetch('/api/inventory_warning.php', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                var badge = document.getElementById('inv-alert-badge');
+                if (badge) {
+                    if (data.status === 'success' || data.status === 'partial') {
+                        badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-700';
+                        badge.innerHTML = '<i class="ti ti-circle-check text-base"></i><span>Alert sent &middot; <?= htmlspecialchars($auto_alert_time ?? '') ?></span>';
+                    } else {
+                        badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600';
+                        badge.innerHTML = '<i class="ti ti-alert-circle text-base"></i><span>Alert failed</span>';
+                        badge.title = data.message || 'Unknown error';
+                    }
+                }
+            }).catch(err => {
+                var badge = document.getElementById('inv-alert-badge');
+                if (badge) {
+                    badge.className = 'flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 text-xs font-bold text-red-600';
+                    badge.innerHTML = '<i class="ti ti-alert-circle text-base"></i><span>Alert failed</span>';
+                }
+            });
     <?php endif; ?>
 
 </script>
