@@ -91,6 +91,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $error_msg = "Database Error: " . $e->getMessage();
         }
     }
+
+    if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
+        header('Content-Type: application/json');
+        if (!empty($error_msg)) {
+            echo json_encode(['status' => 'error', 'message' => $error_msg]);
+        } else {
+            echo json_encode(['status' => 'success', 'message' => $success_msg]);
+        }
+        exit;
+    }
+
+    if (empty($error_msg) && !empty($success_msg)) {
+        $_SESSION['flash_success'] = $success_msg;
+        header("Location: " . $_SERVER['REQUEST_URI']);
+        exit;
+    }
+}
+
+if (!empty($_SESSION['flash_success'])) {
+    $success_msg = $_SESSION['flash_success'];
+    unset($_SESSION['flash_success']);
 }
 
 $admin_drivers = [];
@@ -350,17 +371,8 @@ foreach ($admin_drivers as $d) {
                                 <p class="text-xs text-gray-600 mt-1 italic">"<?= htmlspecialchars($leave['reason']) ?>"</p>
                             </div>
                             <div class="flex gap-2">
-                                <form method="POST" class="inline">
-                                    <input type="hidden" name="action" value="approve_leave">
-                                    <input type="hidden" name="leave_id" value="<?= $leave['id'] ?>">
-                                    <input type="hidden" name="personnel_id" value="<?= $leave['personnel_id'] ?>">
-                                    <button type="submit" class="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition-colors">Approve</button>
-                                </form>
-                                <form method="POST" class="inline">
-                                    <input type="hidden" name="action" value="reject_leave">
-                                    <input type="hidden" name="leave_id" value="<?= $leave['id'] ?>">
-                                    <button type="submit" class="px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-colors">Deny</button>
-                                </form>
+                                <button type="button" onclick="handleLeaveAction(this, 'approve_leave', <?= $leave['id'] ?>, <?= $leave['personnel_id'] ?>)" class="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition-colors">Approve</button>
+                                <button type="button" onclick="handleLeaveAction(this, 'reject_leave', <?= $leave['id'] ?>, 0)" class="px-3 py-1.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-bold transition-colors">Deny</button>
                             </div>
                         </div>
                     <?php endforeach; ?>
@@ -1025,14 +1037,103 @@ foreach ($admin_drivers as $d) {
         document.getElementById('driverModal').classList.remove('flex');
     }
 
+    function handleLeaveAction(btn, action, leaveId, personnelId) {
+        if (typeof setButtonLoading === 'function') {
+            setButtonLoading(btn, true);
+        } else {
+            btn.disabled = true;
+            btn.innerHTML = `<i class="ti ti-loader animate-spin text-sm"></i> <span>Processing...</span>`;
+        }
+
+        const formData = new FormData();
+        formData.append('action', action);
+        formData.append('leave_id', leaveId);
+        if (personnelId) {
+            formData.append('personnel_id', personnelId);
+        }
+
+        fetch(window.location.href, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (typeof showToast === 'function') {
+                    showToast(data.message || 'Leave request updated successfully.', 'success');
+                }
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast(data.message || 'Error processing leave request.', 'error');
+                }
+                if (typeof setButtonLoading === 'function') {
+                    setButtonLoading(btn, false);
+                } else {
+                    btn.disabled = false;
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Leave action error:', err);
+            window.location.reload();
+        });
+    }
+
     function toggleDriverStatus() {
         if (currentSelectedDriver) {
             uiConfirm(`Are you sure you want to change the status of ${currentSelectedDriver.name}?`, () => {
-                document.getElementById('toggleDriverIdInput').value = currentSelectedDriver.id;
-                document.getElementById('statusActionForm').submit();
+                const formData = new FormData();
+                formData.append('action', 'toggle_driver_status');
+                formData.append('driver_id', currentSelectedDriver.id);
+
+                fetch(window.location.href, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    body: formData
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        if (typeof showToast === 'function') showToast(data.message, 'success');
+                        setTimeout(() => window.location.reload(), 500);
+                    } else {
+                        if (typeof showToast === 'function') showToast(data.message || 'Error updating status', 'error');
+                    }
+                })
+                .catch(() => window.location.reload());
             });
         }
     }
+
+    document.getElementById('driverForm')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const submitBtn = this.querySelector('button[type="submit"]');
+        if (typeof setButtonLoading === 'function') setButtonLoading(submitBtn, true);
+
+        const formData = new FormData(this);
+        fetch(window.location.href, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (typeof showToast === 'function') showToast(data.message, 'success');
+                setTimeout(() => window.location.reload(), 500);
+            } else {
+                if (typeof showToast === 'function') showToast(data.message || 'Error saving personnel', 'error');
+                if (typeof setButtonLoading === 'function') setButtonLoading(submitBtn, false);
+            }
+        })
+        .catch(() => window.location.reload());
+    });
 
     // Initial Render
     applyFilters();
