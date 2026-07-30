@@ -95,9 +95,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $end_date = $_POST['end_date'] ?? '';
         $reason = trim($_POST['reason'] ?? '');
         $driver_id = $_SESSION['driver_id'] ?? null;
+        $today = date('Y-m-d');
         
         if ($driver_id && !empty($start_date) && !empty($end_date) && !empty($reason)) {
-            if ($pdo) {
+            if ($start_date < $today) {
+                $error_message = "Start date cannot be in the past.";
+            } elseif ($end_date < $start_date) {
+                $error_message = "End date cannot be before start date.";
+            } elseif ($pdo) {
                 try {
                     $stmt = $pdo->prepare("INSERT INTO driver_leaves (personnel_id, start_date, end_date, reason, status) VALUES (?, ?, ?, ?, 'pending')");
                     $stmt->execute([$driver_id, $start_date, $end_date, $reason]);
@@ -332,7 +337,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Licence Expiry</label>
-                    <input type="date" name="licence_expiry" required class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <input type="date" name="licence_expiry" required min="<?= date('Y-m-d') ?>" class="w-full px-4 py-2.5 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
                 </div>
             </div>
             <div class="grid grid-cols-2 gap-3">
@@ -658,9 +663,9 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
             <div>
                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Date Range</label>
                 <div class="flex items-center gap-2">
-                    <input type="date" name="start_date" required class="w-full px-3 py-2.5 bg-gray-50 border border-transparent rounded-xl text-[11px] font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <input type="date" id="leave_start_date" name="start_date" required min="<?= date('Y-m-d') ?>" onchange="updateLeaveEndDateMin()" class="w-full px-3 py-2.5 bg-gray-50 border border-transparent rounded-xl text-[11px] font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
                     <span class="text-gray-400 font-bold">-</span>
-                    <input type="date" name="end_date" required class="w-full px-3 py-2.5 bg-gray-50 border border-transparent rounded-xl text-[11px] font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <input type="date" id="leave_end_date" name="end_date" required min="<?= date('Y-m-d') ?>" class="w-full px-3 py-2.5 bg-gray-50 border border-transparent rounded-xl text-[11px] font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
                 </div>
             </div>
             <div>
@@ -1134,7 +1139,37 @@ function closePickupModal() {
     pendingDepartStopNum = null;
 }
 
+function updateLeaveEndDateMin() {
+    const today = new Date().toISOString().split('T')[0];
+    const startDateInput = document.getElementById('leave_start_date');
+    const endDateInput = document.getElementById('leave_end_date');
+    if (startDateInput && endDateInput) {
+        const minVal = startDateInput.value && startDateInput.value >= today ? startDateInput.value : today;
+        endDateInput.min = minVal;
+        if (endDateInput.value && endDateInput.value < minVal) {
+            endDateInput.value = minVal;
+        }
+    }
+}
+
 function openDayOffModal() {
+    const today = new Date().toISOString().split('T')[0];
+    const startDateInput = document.getElementById('leave_start_date');
+    const endDateInput = document.getElementById('leave_end_date');
+    
+    if (startDateInput) {
+        startDateInput.min = today;
+        if (!startDateInput.value || startDateInput.value < today) {
+            startDateInput.value = today;
+        }
+    }
+    if (endDateInput) {
+        endDateInput.min = startDateInput ? (startDateInput.value || today) : today;
+        if (!endDateInput.value || endDateInput.value < endDateInput.min) {
+            endDateInput.value = endDateInput.min;
+        }
+    }
+
     const modal = document.getElementById('day-off-modal');
     modal.classList.remove('opacity-0', 'pointer-events-none');
     modal.classList.add('opacity-100');
