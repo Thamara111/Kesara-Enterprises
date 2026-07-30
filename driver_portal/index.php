@@ -175,10 +175,12 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
             $lat = 6.9000 + (($hash % 100) - 50) / 1000.0;
             $lng = 79.8700 + ((intval($hash / 100) % 100) - 50) / 1000.0;
             
+            $delivery_note = !empty($row['notes']) ? $row['notes'] : 'Please deliver to warehouse entrance. Contact representative upon arrival.';
             $grouped[$key]['stops'][] = [
                 'num' => count($grouped[$key]['stops']) + 1,
                 'name' => 'KE-2025-' . str_pad($row['order_id'], 5, '0', STR_PAD_LEFT) . ' · ' . htmlspecialchars($row['company']),
                 'addr' => htmlspecialchars($row['company_address']),
+                'note' => htmlspecialchars($delivery_note),
                 'status' => $status_text,
                 'lat' => $lat,
                 'lng' => $lng
@@ -233,6 +235,9 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
     <link href="/dist/output.css" rel="stylesheet">
     <!-- Tabler Icons -->
     <link rel="stylesheet" href="/assets/tabler-icons.min.css">
+    <!-- Leaflet.js Map Assets -->
+    <link rel="stylesheet" href="/assets/leaflet.css" />
+    <script src="/assets/leaflet.js"></script>
     
     <style>
         body {
@@ -288,7 +293,10 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
             </div>
             <div>
                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Password</label>
-                <input type="password" name="password" required placeholder="••••••••" class="w-full px-4 py-3 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                <div class="relative">
+                    <input type="password" id="driver-login-password" name="password" required placeholder="••••••••" class="w-full pl-4 pr-10 py-3 bg-gray-50 border border-transparent rounded-xl text-xs font-bold text-gray-750 outline-none focus:bg-white focus:border-brand/20 transition-all">
+                    <i class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-base cursor-pointer toggle-password-btn" data-target="driver-login-password"></i>
+                </div>
             </div>
             <button type="submit" class="w-full bg-brand text-brand-light font-bold py-4 rounded-xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest mt-2">Log In</button>
             <p class="text-xs text-center text-gray-500 font-semibold mt-3">
@@ -395,7 +403,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
                     <span id="active-run-badge" class="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border">Active</span>
                 </div>
                 
-                <!-- Progress Line -->
+                <!-- Delivery Progress Line -->
                 <div class="space-y-1.5">
                     <div class="flex justify-between text-[10px] font-semibold text-gray-500">
                         <span>Delivery progress</span>
@@ -403,6 +411,19 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
                     </div>
                     <div class="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
                         <div id="active-run-progress-bar" class="h-full bg-brand rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Driver Interactive Trip Map Canvas -->
+                <div class="space-y-1.5">
+                    <div class="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                        <span>Active Trip Map</span>
+                        <span id="drv-map-status" class="text-brand font-bold flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Live Route
+                        </span>
+                    </div>
+                    <div class="relative w-full h-52 rounded-2xl overflow-hidden border border-gray-200 shadow-inner bg-gray-50">
+                        <div id="driver-trip-map" class="w-full h-full z-0"></div>
                     </div>
                 </div>
 
@@ -545,7 +566,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
 
 <!-- Pickup Confirmation Modal -->
 <div id="pickup-modal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300">
-    <div class="bg-white w-full max-w-[380px] rounded-t-3xl p-6 space-y-5 transform translate-y-full transition-all duration-300">
+    <div class="bg-white w-full max-w-4xl rounded-t-3xl p-6 space-y-5 transform translate-y-full transition-all duration-300">
         <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto"></div>
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-2xl bg-brand-light flex items-center justify-center flex-shrink-0">
@@ -577,6 +598,44 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
                 <i class="ti ti-truck-delivery mr-1"></i>Depart Now
             </button>
         </div>
+    </div>
+</div>
+
+<!-- Customer Delivery Note Pop-up Modal -->
+<div id="note-modal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300 p-4">
+    <div class="bg-white w-full max-w-4xl rounded-t-3xl sm:rounded-3xl p-6 space-y-5 transform translate-y-full sm:translate-y-0 sm:scale-95 transition-all duration-300 shadow-2xl">
+        <div class="w-12 h-1 bg-gray-200 rounded-full mx-auto sm:hidden"></div>
+        
+        <div class="flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 flex-shrink-0">
+                    <i class="ti ti-note text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-gray-900">Customer Delivery Note</h3>
+                    <p id="note-modal-stop-name" class="text-xs font-bold text-gray-500 mt-0.5"></p>
+                </div>
+            </div>
+            <button onclick="closeNoteModal()" class="p-1.5 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-100 transition-all">
+                <i class="ti ti-x text-lg"></i>
+            </button>
+        </div>
+
+        <div class="p-4 bg-amber-50/80 border border-amber-150 rounded-2xl space-y-2">
+            <p class="text-[10px] font-bold text-amber-800 uppercase tracking-widest flex items-center gap-1">
+                <i class="ti ti-file-description text-xs"></i> Special Delivery Instructions
+            </p>
+            <p id="note-modal-content" class="text-sm font-semibold text-gray-900 leading-relaxed font-sans italic"></p>
+        </div>
+
+        <div class="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-1">
+            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Destination Address</p>
+            <p id="note-modal-addr" class="text-xs font-bold text-gray-700"></p>
+        </div>
+
+        <button onclick="closeNoteModal()" class="w-full py-3.5 bg-gray-900 text-white font-bold rounded-xl text-xs hover:bg-brand transition-all shadow-md">
+            Got it, Close
+        </button>
     </div>
 </div>
 
@@ -882,27 +941,140 @@ function renderDashboard() {
             }
         }
         
+        const noteText = s.note || 'Please deliver to warehouse entrance. Contact representative upon arrival.';
+        const noteCallout = `
+            <div onclick="openNoteModal(${s.num})" class="mt-2.5 p-2 bg-amber-50/90 hover:bg-amber-100/90 border border-amber-150 rounded-xl flex items-center justify-between gap-2 text-[10px] text-amber-900 cursor-pointer transition-all hover:scale-[1.01] shadow-sm group">
+                <div class="flex items-start gap-2 min-w-0">
+                    <i class="ti ti-note text-amber-600 text-sm shrink-0 mt-0.5"></i>
+                    <div class="min-w-0">
+                        <span class="font-bold text-amber-950 block text-[9px] uppercase tracking-wider flex items-center gap-1">
+                            Customer Delivery Note <i class="ti ti-click text-amber-600"></i>
+                        </span>
+                        <span class="font-medium text-gray-700 italic block mt-0.5 font-sans truncate max-w-[210px]">"${noteText}"</span>
+                    </div>
+                </div>
+                <i class="ti ti-arrows-maximize text-amber-700 text-xs shrink-0 bg-white/90 p-1 rounded-lg border border-amber-200 group-hover:scale-110 transition-transform"></i>
+            </div>
+        `;
+
         return `
             <div class="bg-white p-4 rounded-2xl border ${cardBorder} shadow-sm space-y-2">
                 <div class="flex justify-between items-start">
-                    <div class="flex items-start gap-3">
-                        <div class="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-700 mt-0.5">${s.num}</div>
-                        <div>
-                            <h4 class="text-xs font-bold text-gray-900">${s.name}</h4>
+                    <div class="flex items-start gap-3 min-w-0 flex-1 pr-2">
+                        <div class="w-6 h-6 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-700 mt-0.5 shrink-0">${s.num}</div>
+                        <div class="min-w-0 flex-1">
+                            <h4 class="text-xs font-bold text-gray-900 truncate">${s.name}</h4>
                             <p class="text-[11px] text-gray-500 mt-0.5">${s.addr}</p>
+                            ${noteCallout}
                         </div>
                     </div>
-                    <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${badgeStyle}">${s.status}</span>
+                    <span class="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border shrink-0 ${badgeStyle}">${s.status}</span>
                 </div>
                 ${actionsHtml}
             </div>
         `;
     }).join('');
     
-    // Sync HUD coordinates
+    // Sync HUD coordinates & Trip Map
     if (activeRun.sim_coords) {
         document.getElementById('sim-coords-text').textContent = `${activeRun.sim_coords[0].toFixed(5)}, ${activeRun.sim_coords[1].toFixed(5)}`;
     }
+
+    updateDriverTripMap();
+}
+
+// ── Driver Trip Map Leaflet Renderer ──────────────────────────────────────
+var driverMap = null;
+var driverWhMarker = null;
+var driverStopMarkers = [];
+var driverVehicleMarker = null;
+var driverPolyline = null;
+
+function updateDriverTripMap() {
+    var mapEl = document.getElementById('driver-trip-map');
+    if (!mapEl || !activeRun) return;
+
+    var whCoords = getWarehouseCoords(activeRun.zone || 'Colombo');
+
+    if (!driverMap) {
+        driverMap = L.map('driver-trip-map', { zoomControl: false }).setView(whCoords, 12);
+        L.control.zoom({ position: 'bottomright' }).addTo(driverMap);
+
+        var offlineGridSvg = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" fill="%23f8fafc"/><path d="M0 64h256M0 128h256M0 192h256M64 0v256M128 0v256M192 0v256" stroke="%23e2e8f0" stroke-width="1"/><text x="12" y="24" fill="%23cbd5e1" font-family="sans-serif" font-size="9" font-weight="bold">OFFLINE GRID</text></svg>';
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20,
+            errorTileUrl: offlineGridSvg
+        }).addTo(driverMap);
+
+        function createDivIcon(iconClass, bgClass) {
+            return L.divIcon({
+                className: 'custom-driver-map-marker',
+                html: `<div class="w-8 h-8 rounded-full ${bgClass} border-2 border-white shadow-lg flex items-center justify-center text-white font-bold text-xs transform transition-all hover:scale-110">
+                         <i class="ti ${iconClass}"></i>
+                       </div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+        }
+        window.driverWhIcon = createDivIcon('ti-building-warehouse', 'bg-emerald-600');
+        window.driverDestIcon = createDivIcon('ti-map-pin', 'bg-red-600');
+        window.driverTruckIcon = createDivIcon('ti-truck', 'bg-brand');
+    }
+
+    // Clear previous markers
+    if (driverWhMarker) driverMap.removeLayer(driverWhMarker);
+    driverStopMarkers.forEach(m => driverMap.removeLayer(m));
+    driverStopMarkers = [];
+    if (driverVehicleMarker) driverMap.removeLayer(driverVehicleMarker);
+    if (driverPolyline) driverMap.removeLayer(driverPolyline);
+
+    // Add Warehouse Origin Marker
+    driverWhMarker = L.marker(whCoords, { icon: window.driverWhIcon })
+        .addTo(driverMap)
+        .bindPopup('<b>Central Warehouse</b><br>Dispatch Depot');
+
+    var routePoints = [whCoords];
+    var bounds = L.latLngBounds([whCoords]);
+
+    (activeRun.stops || []).forEach(s => {
+        if (!s.lat || !s.lng) {
+            var hash = 0;
+            for (var i = 0; i < (s.name || '').length; i++) hash = s.name.charCodeAt(i) + ((hash << 5) - hash);
+            s.lat = whCoords[0] + ((Math.abs(hash) % 80) - 40) / 1000.0;
+            s.lng = whCoords[1] + ((Math.abs(hash * 3) % 80) - 40) / 1000.0;
+        }
+        var pt = [s.lat, s.lng];
+        routePoints.push(pt);
+        bounds.extend(pt);
+
+        var m = L.marker(pt, { icon: window.driverDestIcon })
+            .addTo(driverMap)
+            .bindPopup(`<b>Stop ${s.num}: ${s.name}</b><br>${s.addr}<br>Status: ${s.status}`);
+        driverStopMarkers.push(m);
+    });
+
+    // Add Current Vehicle Position Marker
+    var currentPos = activeRun.sim_coords || whCoords;
+    driverVehicleMarker = L.marker(currentPos, { icon: window.driverTruckIcon })
+        .addTo(driverMap)
+        .bindPopup(`<b>My Location</b><br>Vehicle: ${activeRun.vehicle}`);
+    bounds.extend(currentPos);
+
+    driverPolyline = L.polyline(routePoints, {
+        color: '#002B49',
+        weight: 3.5,
+        dashArray: '5, 8',
+        opacity: 0.85
+    }).addTo(driverMap);
+
+    driverMap.fitBounds(bounds, { padding: [30, 30] });
+
+    setTimeout(() => {
+        if (driverMap) driverMap.invalidateSize();
+    }, 200);
 }
 
 // Extract numeric order ID from stop name "KE-2025-00123 · Company"
@@ -978,6 +1150,42 @@ function closeDayOffModal() {
     const panel = modal.querySelector('div');
     panel.classList.add('translate-y-full');
     panel.classList.remove('translate-y-0');
+}
+
+// Customer Delivery Note Modal Helpers
+function openNoteModal(stopNum) {
+    if (!activeRun || !activeRun.stops) return;
+    const stop = activeRun.stops.find(s => s.num === stopNum);
+    if (!stop) return;
+
+    const noteText = stop.note || 'Please deliver to warehouse entrance. Contact representative upon arrival.';
+    document.getElementById('note-modal-stop-name').textContent = stop.name || '';
+    document.getElementById('note-modal-content').textContent = `"${noteText}"`;
+    document.getElementById('note-modal-addr').textContent = stop.addr || '';
+
+    const modal = document.getElementById('note-modal');
+    if (!modal) return;
+    modal.classList.remove('opacity-0', 'pointer-events-none');
+    modal.classList.add('opacity-100');
+
+    const panel = modal.querySelector('div');
+    if (panel) {
+        panel.classList.remove('translate-y-full', 'sm:scale-95');
+        panel.classList.add('translate-y-0', 'sm:scale-100');
+    }
+}
+
+function closeNoteModal() {
+    const modal = document.getElementById('note-modal');
+    if (!modal) return;
+    modal.classList.add('opacity-0', 'pointer-events-none');
+    modal.classList.remove('opacity-100');
+
+    const panel = modal.querySelector('div');
+    if (panel) {
+        panel.classList.add('translate-y-full', 'sm:scale-95');
+        panel.classList.remove('translate-y-0', 'sm:scale-100');
+    }
 }
 
 function confirmPickup() {
@@ -1479,8 +1687,45 @@ window.checkDriverPasswordStrength = function(password) {
     }
 };
 
+// Button Loading Indicator Helper
+function setButtonLoading(btn, isLoading, customText = '') {
+    if (!btn) return;
+    if (isLoading) {
+        if (!btn.dataset.originalHtml) {
+            btn.dataset.originalHtml = btn.innerHTML;
+        }
+        const text = customText || 'Processing...';
+        btn.innerHTML = `<i class="ti ti-loader animate-spin text-sm mr-2"></i> <span>${text}</span>`;
+        btn.disabled = true;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+    } else {
+        if (btn.dataset.originalHtml) {
+            btn.innerHTML = btn.dataset.originalHtml;
+            delete btn.dataset.originalHtml;
+        }
+        btn.disabled = false;
+        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+    }
+}
+
 // Init on Load
 document.addEventListener('DOMContentLoaded', () => {
+    const loginForm = document.getElementById('auth-login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            const btn = loginForm.querySelector('button[type="submit"]');
+            if (btn) setButtonLoading(btn, true, 'Logging In...');
+        });
+    }
+
+    const regForm = document.getElementById('auth-register-form');
+    if (regForm) {
+        regForm.addEventListener('submit', (e) => {
+            const btn = regForm.querySelector('button[type="submit"]');
+            if (btn) setButtonLoading(btn, true, 'Submitting Request...');
+        });
+    }
+
     renderApp();
 <?php if (!empty($leave_notifications)): ?>
         <?php foreach ($leave_notifications as $notif): ?>
