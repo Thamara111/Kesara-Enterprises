@@ -12,15 +12,26 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $is_logged_in = isset($_SESSION['user_id']);
 $buyer_approved = false;
+$user_full_name = '';
+$user_business = '';
+$user_phone = '';
+$user_email = '';
 
 if ($is_logged_in && isset($pdo)) {
     try {
-        $auth_stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? LIMIT 1");
+        $auth_stmt = $pdo->prepare("SELECT first_name, last_name, email, phone, business_name, status FROM users WHERE id = ? LIMIT 1");
         $auth_stmt->execute([$_SESSION['user_id']]);
         $auth_user = $auth_stmt->fetch();
 
-        if ($auth_user && $auth_user['status'] === 'approved') {
-            $buyer_approved = true;
+        if ($auth_user) {
+            $user_full_name = trim(($auth_user['first_name'] ?? '') . ' ' . ($auth_user['last_name'] ?? ''));
+            $user_business = $auth_user['business_name'] ?? '';
+            $user_phone = $auth_user['phone'] ?? '';
+            $user_email = $auth_user['email'] ?? '';
+
+            if ($auth_user['status'] === 'approved') {
+                $buyer_approved = true;
+            }
         }
     } catch (\Exception $e) {
         // Fail closed — treat as not authorized on DB error
@@ -1116,6 +1127,7 @@ require_once __DIR__ . "/layouts/header.php";
                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Contact Name
                     *</label>
                 <input type="text" id="quoteName" required placeholder="e.g. Kamal Perera"
+                    value="<?= htmlspecialchars($user_full_name) ?>"
                     class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
             </div>
             <div class="grid grid-cols-2 gap-4">
@@ -1123,6 +1135,7 @@ require_once __DIR__ . "/layouts/header.php";
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Business
                         Name</label>
                     <input type="text" id="quoteBusiness" placeholder="e.g. ABC Retailers"
+                        value="<?= htmlspecialchars($user_business) ?>"
                         class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                 </div>
                 <div>
@@ -1132,6 +1145,7 @@ require_once __DIR__ . "/layouts/header.php";
                         title="Phone number must start with 0 and contain exactly 10 digits"
                         oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
                         placeholder="e.g. 0771234567"
+                        value="<?= htmlspecialchars($user_phone) ?>"
                         class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
                 </div>
             </div>
@@ -1140,6 +1154,7 @@ require_once __DIR__ . "/layouts/header.php";
                     *</label>
                 <input type="email" id="quoteEmail" required pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
                     placeholder="e.g. contact@business.com"
+                    value="<?= htmlspecialchars($user_email) ?>"
                     class="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl text-sm font-semibold outline-none focus:ring-2 focus:ring-brand/20">
             </div>
             <div>
