@@ -84,8 +84,12 @@ function validateOrderItems(PDO $pdo, array $items): array {
             continue;
         }
 
-        // Compare the total aggregated quantity against the database Minimum Order Quantity
-        $moq = (int)$product['moq'];
+        // Fetch minimum order quantity from pricing tiers if available, or fall back to products table
+        $tier_stmt = $pdo->prepare("SELECT min_qty FROM pricing_tiers WHERE product_id = ? ORDER BY min_qty ASC LIMIT 1");
+        $tier_stmt->execute([$pid]);
+        $first_tier = $tier_stmt->fetch(PDO::FETCH_ASSOC);
+        $moq = (!empty($first_tier) && isset($first_tier['min_qty'])) ? (int)$first_tier['min_qty'] : (int)$product['moq'];
+
         if ($total_qty < $moq) {
             $errors[] = "{$product['name']} (ID: {$pid}) failed MOQ validation: ordered {$total_qty} total, but minimum is {$moq}.";
         }

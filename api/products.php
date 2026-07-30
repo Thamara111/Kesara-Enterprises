@@ -113,12 +113,13 @@ if ($method === 'GET') {
                 $effective_price = $is_discount_active ? round($base_price * (1 - ($discount_val / 100)), 2) : $base_price;
 
                 // Construct the structured response array for this specific product
+                $effective_product_moq = !empty($formatted_tiers) ? (int)$formatted_tiers[0]['q'] : (int)$pr['moq'];
                 $products[] = [
                     'id' => (int)$pr['id'],
                     'name' => $pr['name'],
                     'sku' => $pr['sku'],
                     'cat' => $pr['cat'] ?? 'Uncategorized',
-                    'moq' => (int)$pr['moq'],
+                    'moq' => $effective_product_moq,
                     'price' => $base_price,
                     'status' => $pr['status'],
                     'desc' => $pr['desc'] ?? '',
