@@ -90,6 +90,37 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+// Global button loading helper for frontend actions
+function setButtonLoading(btn, isLoading, customText) {
+    if (typeof btn === 'string') btn = document.getElementById(btn);
+    if (!btn) return;
+    
+    if (isLoading) {
+        btn.disabled = true;
+        if (!btn.dataset.originalHtml) {
+            btn.dataset.originalHtml = btn.innerHTML;
+        }
+        var text = customText || btn.dataset.loadingText || 'Processing...';
+        btn.innerHTML = `<i class="ti ti-loader animate-spin text-lg"></i> <span>${text}</span>`;
+        btn.classList.add('opacity-75', 'cursor-not-allowed');
+    } else {
+        btn.disabled = false;
+        if (btn.dataset.originalHtml) {
+            btn.innerHTML = btn.dataset.originalHtml;
+        }
+        btn.classList.remove('opacity-75', 'cursor-not-allowed');
+    }
+}
+window.setButtonLoading = setButtonLoading;
+
+document.addEventListener('submit', function(e) {
+    var form = e.target;
+    var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+    if (submitBtn) {
+        setButtonLoading(submitBtn, true);
+    }
+});
 </script>
 </body>
 </html>
