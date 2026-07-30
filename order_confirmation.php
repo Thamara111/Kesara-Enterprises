@@ -68,6 +68,10 @@ require_once __DIR__ . "/layouts/head.php";
 require_once __DIR__ . "/layouts/header.php";
 ?>
 
+<!-- Leaflet.js Map Assets -->
+<link rel="stylesheet" href="/assets/leaflet.css" />
+<script src="/assets/leaflet.js"></script>
+
 <main class="bg-gray-50 py-12 min-h-screen">
     <div class="max-w-8xl mx-auto px-6 md:px-12">
         
@@ -102,6 +106,15 @@ require_once __DIR__ . "/layouts/header.php";
                         </button>
                     </div>
                 </div>
+
+                <!-- [VIVA TASK 08 - STEP 3: Frontend UI Order Confirmation - Estimated Delivery Date Badge (Commented out for later use)]
+                <div class="mt-6 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs">
+                    <span class="font-bold text-indigo-900 flex items-center gap-2">
+                        <i class="ti ti-calendar-event text-indigo-600 text-base"></i> Estimated Delivery Date:
+                    </span>
+                    <span class="font-extrabold text-indigo-700"><?= date('D, d M Y', strtotime($order['estimated_delivery_date'] ?? '+3 weekdays')) ?></span>
+                </div>
+                -->
             </div>
         </div>
 
@@ -156,6 +169,40 @@ require_once __DIR__ . "/layouts/header.php";
                     <div class="mt-8 p-4 bg-gray-50 rounded-2xl flex items-start gap-4">
                         <i class="ti ti-note text-lg text-gray-400 shrink-0 mt-0.5"></i>
                         <p class="text-[13px] text-gray-500 italic">"Please deliver to warehouse entrance. Contact representative upon arrival."</p>
+                    </div>
+                </div>
+
+                <!-- LIVE DELIVERY MAP TRACKING CARD -->
+                <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm overflow-hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Live Delivery Tracking</h2>
+                            </div>
+                            <h3 class="text-base font-extrabold text-gray-900 tracking-tight mt-1">Real-time Delivery Route & GPS Dispatch Map</h3>
+                        </div>
+                        <div id="order-map-badge">
+                            <span class="px-3.5 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-brand-light text-brand border border-brand/20">
+                                <i class="ti ti-map-pin text-sm mr-1"></i> <?= htmlspecialchars(strtoupper($order['status'])) ?>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Map Canvas Container -->
+                    <div class="relative w-full h-[360px] rounded-2xl overflow-hidden border border-gray-100 shadow-inner bg-gray-50">
+                        <!-- Floating HUD Header over map -->
+                        <div class="absolute top-4 left-4 z-[1000] bg-white/95 backdrop-blur-md px-4 py-3 rounded-2xl border border-gray-100 shadow-lg max-w-xs">
+                            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Order Destination</p>
+                            <p class="text-xs font-bold text-gray-900 mt-0.5"><?= htmlspecialchars($order['business_name']) ?></p>
+                            <p class="text-[11px] text-gray-500 font-medium truncate max-w-[240px]"><?= htmlspecialchars($order['address']) ?></p>
+                            <div class="mt-2 flex items-center gap-2 text-[10px] font-bold text-brand">
+                                <i class="ti ti-truck text-sm"></i>
+                                <span id="order-map-hud-status">Connecting to live dispatch tracking...</span>
+                            </div>
+                        </div>
+
+                        <div id="order-tracking-map" class="w-full h-full z-0"></div>
                     </div>
                 </div>
 
@@ -486,6 +533,146 @@ if (new URLSearchParams(window.location.search).get('print') === '1') {
         downloadInvoice();
     });
 }
+
+// ── Leaflet Live Tracking Map Initialization ─────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    var mapEl = document.getElementById('order-tracking-map');
+    if (!mapEl) return;
+
+    var userAddress = <?= json_encode($order['address'] ?? '') ?>;
+    var businessName = <?= json_encode($order['business_name'] ?? '') ?>;
+    var orderFormattedId = <?= json_encode('KE-2025-' . str_pad($order['id'], 5, '0', STR_PAD_LEFT)) ?>;
+    var orderStatus = <?= json_encode(strtolower($order['status'] ?? 'pending')) ?>;
+
+    // Central Warehouse Location (Colombo)
+    var warehouseCoords = [6.9271, 79.8612];
+
+    // Compute coordinates for destination based on address / business hash
+    var destCoords = [6.9000, 79.8700]; // Default Colombo
+    var addrLower = (userAddress || '').toLowerCase();
+    if (addrLower.includes('gampaha')) destCoords = [7.0873, 79.9925];
+    else if (addrLower.includes('kandy')) destCoords = [7.2906, 80.6337];
+    else if (addrLower.includes('galle')) destCoords = [6.0535, 80.2210];
+    else if (addrLower.includes('negombo')) destCoords = [7.2008, 79.8737];
+    else if (addrLower.includes('kalutara')) destCoords = [6.5854, 79.9607];
+    else if (addrLower.includes('kurunegala')) destCoords = [7.4863, 80.3623];
+    else if (addrLower.includes('matara')) destCoords = [5.9549, 80.5550];
+    else {
+        var hash = 0;
+        for (var i = 0; i < businessName.length; i++) hash = businessName.charCodeAt(i) + ((hash << 5) - hash);
+        destCoords = [6.9271 + ((Math.abs(hash) % 80) - 40) / 1000.0, 79.8612 + ((Math.abs(hash * 3) % 80) - 40) / 1000.0];
+    }
+
+    // Initialize Leaflet Map
+    var map = L.map('order-tracking-map', { zoomControl: false }).setView(destCoords, 12);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    // SVG Grid fallback tile for offline mode
+    var offlineGridSvg = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" fill="%23f8fafc"/><path d="M0 64h256M0 128h256M0 192h256M64 0v256M128 0v256M192 0v256" stroke="%23e2e8f0" stroke-width="1"/><text x="12" y="24" fill="%23cbd5e1" font-family="sans-serif" font-size="9" font-weight="bold">OFFLINE GRID</text></svg>';
+
+    // Load CartoDB Positron tiles (matching admin-tracking)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 20,
+        errorTileUrl: offlineGridSvg
+    }).addTo(map);
+
+    // Custom Marker Icon Creator
+    function createCustomMarkerIcon(iconClass, bgClass) {
+        return L.divIcon({
+            className: 'custom-order-leaflet-marker',
+            html: `<div class="w-9 h-9 rounded-full ${bgClass} border-2 border-white shadow-xl flex items-center justify-center text-white font-bold text-sm transform transition-all hover:scale-110">
+                     <i class="ti ${iconClass}"></i>
+                   </div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+        });
+    }
+
+    var whIcon = createCustomMarkerIcon('ti-building-warehouse', 'bg-emerald-600');
+    var destIcon = createCustomMarkerIcon('ti-map-pin', 'bg-red-600');
+    var driverIcon = createCustomMarkerIcon('ti-truck', 'bg-brand');
+
+    // Add Warehouse Marker
+    L.marker(warehouseCoords, { icon: whIcon })
+     .addTo(map)
+     .bindPopup('<b>Kesara Central Warehouse</b><br>Origin Dispatch Center');
+
+    // Add Destination Marker
+    L.marker(destCoords, { icon: destIcon })
+     .addTo(map)
+     .bindPopup(`<b>${businessName}</b><br>${orderFormattedId} Delivery Destination`);
+
+    var routePoints = [warehouseCoords, destCoords];
+    var driverMarker = null;
+    var hudStatusEl = document.getElementById('order-map-hud-status');
+
+    function syncDriverLocation() {
+        try {
+            var rawAss = localStorage.getItem('ke_assignments');
+            if (rawAss) {
+                var assignments = JSON.parse(rawAss);
+                var matched = false;
+                assignments.forEach(a => {
+                    (a.stops || []).forEach(s => {
+                        if (s.name && s.name.includes(orderFormattedId)) {
+                            matched = true;
+                            if (s.lat && s.lng) {
+                                destCoords = [s.lat, s.lng];
+                            }
+                            if (a.sim_coords) {
+                                if (!driverMarker) {
+                                    driverMarker = L.marker(a.sim_coords, { icon: driverIcon })
+                                        .addTo(map)
+                                        .bindPopup(`<b>Driver ${a.driver}</b><br>Vehicle: ${a.vehicle}`);
+                                } else {
+                                    driverMarker.setLatLng(a.sim_coords);
+                                }
+                                routePoints = [warehouseCoords, a.sim_coords, destCoords];
+                                if (hudStatusEl) hudStatusEl.textContent = `Driver ${a.driver} en route (${a.vehicle})`;
+                            } else if (hudStatusEl) {
+                                hudStatusEl.textContent = `Assigned to Driver ${a.driver} — Awaiting dispatch`;
+                            }
+                        }
+                    });
+                });
+                if (!matched && hudStatusEl) {
+                    hudStatusEl.textContent = orderStatus === 'delivered' ? 'Order delivered successfully' : 'Preparing dispatch from Central Warehouse';
+                }
+            } else if (hudStatusEl) {
+                hudStatusEl.textContent = orderStatus === 'delivered' ? 'Order delivered successfully' : 'Preparing dispatch from Central Warehouse';
+            }
+        } catch (e) { }
+
+        if (window.orderRoutePolyline) {
+            map.removeLayer(window.orderRoutePolyline);
+        }
+
+        window.orderRoutePolyline = L.polyline(routePoints, {
+            color: '#002B49',
+            weight: 3.5,
+            dashArray: '6, 8',
+            opacity: 0.85
+        }).addTo(map);
+
+        var bounds = L.latLngBounds([warehouseCoords, destCoords]);
+        if (driverMarker) bounds.extend(driverMarker.getLatLng());
+        map.fitBounds(bounds, { padding: [40, 40] });
+    }
+
+    syncDriverLocation();
+
+    // Listen for live updates from Driver Portal
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'ke_assignments') {
+            syncDriverLocation();
+        }
+    });
+
+    // Poll every 3 seconds for continuous live telemetry sync
+    setInterval(syncDriverLocation, 3000);
+});
 </script>
 
 <?php require_once __DIR__ . "/layouts/footer.php"; ?>

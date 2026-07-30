@@ -243,6 +243,12 @@ require_once __DIR__ . "/layouts/header.php";
                                         </td>
                                         <td class="py-5 text-right">
                                             <a href="/order-success?id=<?= htmlspecialchars($o['id']) ?>" class="text-xs font-bold text-brand hover:underline">View Details</a>
+
+                                            <!-- [VIVA TASK 07 - STEP 4: Frontend UI Customer Account - Order Cancellation Reason Modal (Commented out for later use)]
+                                            <?php if (strtolower($o['status']) === 'pending'): ?>
+                                                <button onclick="openCancelModal(<?= $o['id'] ?>)" class="ml-2 text-xs font-bold text-red-600 hover:underline">Cancel Order</button>
+                                            <?php endif; ?>
+                                            -->
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -382,28 +388,51 @@ require_once __DIR__ . "/layouts/header.php";
                     <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
                         <h2 class="text-lg font-bold text-gray-900 mb-8 tracking-tight uppercase">Change Password</h2>
                         
-                        <div class="max-w-md space-y-6">
+                        <!-- Feedback Alert Container -->
+                        <div id="acc-pwd-alert" class="hidden mb-6 p-4 rounded-2xl text-xs font-bold flex items-center gap-3"></div>
+
+                        <form id="form-change-password" onsubmit="updateAccountPassword(event)" class="max-w-md space-y-6">
+                            <!-- Current Password -->
                             <div class="space-y-2">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Current Password</label>
-                                <input type="password" placeholder="••••••••" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                <div class="relative">
+                                    <input type="password" id="acc-curr-password" required placeholder=" ••••••••" class="w-full pl-5 pr-12 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                    <button type="button" onclick="toggleAccPasswordVisibility('acc-curr-password', this)" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand transition-colors focus:outline-none">
+                                        <i class="ti ti-eye text-lg"></i>
+                                    </button>
+                                </div>
                             </div>
+
+                            <!-- New Password -->
                             <div class="space-y-2">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">New Password</label>
-                                <input type="password" maxlength="12" placeholder="Min. 8 characters" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all" oninput="checkAccountPasswordStrength(this.value)">
+                                <div class="relative">
+                                    <input type="password" id="acc-new-password" required maxlength="20" placeholder=" Min. 8 characters" class="w-full pl-5 pr-12 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all" oninput="checkAccountPasswordStrength(this.value)">
+                                    <button type="button" onclick="toggleAccPasswordVisibility('acc-new-password', this)" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand transition-colors focus:outline-none">
+                                        <i class="ti ti-eye text-lg"></i>
+                                    </button>
+                                </div>
                                 <div class="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
                                     <div id="account-strengthBar" class="h-full rounded-full transition-all duration-400 w-0 bg-gray-300"></div>
                                 </div>
                                 <p id="account-strengthLabel" class="text-[10px] mt-1 text-gray-400 font-semibold"></p>
                             </div>
+
+                            <!-- Confirm New Password -->
                             <div class="space-y-2">
                                 <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Confirm New Password</label>
-                                <input type="password" maxlength="12" placeholder="Repeat new password" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                <div class="relative">
+                                    <input type="password" id="acc-confirm-password" required maxlength="20" placeholder=" Repeat new password" class="w-full pl-5 pr-12 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                    <button type="button" onclick="toggleAccPasswordVisibility('acc-confirm-password', this)" class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand transition-colors focus:outline-none">
+                                        <i class="ti ti-eye text-lg"></i>
+                                    </button>
+                                </div>
                             </div>
 
-                            <button class="bg-brand text-brand-light font-bold px-8 py-3.5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95">
+                            <button type="submit" id="btn-update-password" class="bg-brand text-brand-light font-bold px-8 py-3.5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2">
                                 Update Password
                             </button>
-                        </div>
+                        </form>
                     </div>
                 </section>
 
@@ -478,6 +507,89 @@ function checkAccountPasswordStrength(password) {
     bar.className = "h-full rounded-full transition-all duration-400 " + colorClass;
     label.textContent = text;
     label.className = textClass;
+}
+
+function toggleAccPasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const icon = btn.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        if (icon) {
+            icon.classList.remove('ti-eye');
+            icon.classList.add('ti-eye-off');
+        }
+    } else {
+        input.type = 'password';
+        if (icon) {
+            icon.classList.remove('ti-eye-off');
+            icon.classList.add('ti-eye');
+        }
+    }
+}
+
+function updateAccountPassword(e) {
+    e.preventDefault();
+    const currPass = document.getElementById('acc-curr-password').value;
+    const newPass = document.getElementById('acc-new-password').value;
+    const confirmPass = document.getElementById('acc-confirm-password').value;
+    const alertContainer = document.getElementById('acc-pwd-alert');
+    const submitBtn = document.getElementById('btn-update-password');
+
+    function showAlert(msg, isSuccess) {
+        if (!alertContainer) return;
+        alertContainer.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border-red-100', 'bg-green-50', 'text-green-700', 'border-green-100');
+        if (isSuccess) {
+            alertContainer.classList.add('bg-green-50', 'text-green-700', 'border', 'border-green-100');
+            alertContainer.innerHTML = `<i class="ti ti-circle-check text-lg shrink-0"></i> <span>${msg}</span>`;
+        } else {
+            alertContainer.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-100');
+            alertContainer.innerHTML = `<i class="ti ti-alert-circle text-lg shrink-0"></i> <span>${msg}</span>`;
+        }
+    }
+
+    if (!currPass || !newPass || !confirmPass) {
+        showAlert("All fields are required.", false);
+        return;
+    }
+
+    if (newPass.length < 8) {
+        showAlert("New password must be at least 8 characters long.", false);
+        return;
+    }
+
+    if (newPass !== confirmPass) {
+        showAlert("New password and confirmation password do not match.", false);
+        return;
+    }
+
+    if (submitBtn) setButtonLoading(submitBtn, true, 'Updating Password...');
+
+    fetch('/api/change_password.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            current_password: currPass,
+            new_password: newPass,
+            confirm_password: confirmPass
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (submitBtn) setButtonLoading(submitBtn, false);
+        if (data.status === 'success') {
+            showAlert(data.message || 'Password updated successfully!', true);
+            document.getElementById('form-change-password').reset();
+            checkAccountPasswordStrength('');
+        } else {
+            showAlert(data.message || 'Failed to update password.', false);
+        }
+    })
+    .catch(err => {
+        if (submitBtn) setButtonLoading(submitBtn, false);
+        console.error(err);
+        showAlert("Network error occurred. Please try again.", false);
+    });
 }
 </script>
 

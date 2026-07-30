@@ -36,6 +36,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             if ($pdo) {
                 try {
+                    /*
+                    // [VIVA TASK 05 - STEP 1: Self-Healing DB]: Auto-create tin_number column in users table if missing
+                    $checkTin = $pdo->query("SHOW COLUMNS FROM users LIKE 'tin_number'");
+                    if (!$checkTin->fetch()) {
+                        $pdo->exec("ALTER TABLE users ADD COLUMN tin_number VARCHAR(30) UNIQUE DEFAULT NULL AFTER br_number");
+                    }
+
+                    // [VIVA TASK 05 - STEP 2: Extract & Insert TIN Input]: Read TIN number and insert into users table
+                    $tin_number = trim($_POST['tin_number'] ?? '');
+                    $insert_tin_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, business_name, br_number, tin_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+                    $insert_tin_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $tin_number, $business_type, $address]);
+                    */
+
                     $check_stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
                     $check_stmt->execute([$email]);
                     if ($check_stmt->fetch()) {
@@ -392,6 +405,14 @@ require_once __DIR__ . "/layouts/head.php";
                                         <input type="text" name="br_number" required placeholder="PV 12345"
                                             class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
                                     </div>
+                                    <!-- [VIVA TASK 05 - STEP 3: Frontend UI Registration Form - Tax Identification Number (TIN) Field (Commented out for later use)]
+                                    <div class="space-y-2">
+                                        <label class="block text-sm font-semibold text-gray-700">TIN Number (Tax ID) <span
+                                                class="text-red-500">*</span></label>
+                                        <input type="text" name="tin_number" required placeholder="123456789-0000"
+                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
+                                    </div>
+                                    -->
                                     <div class="space-y-2">
                                         <label class="block text-sm font-semibold text-gray-700">Business type <span
                                                 class="text-red-500">*</span></label>
@@ -525,8 +546,7 @@ require_once __DIR__ . "/layouts/head.php";
                 e.preventDefault();
                 const formData = new FormData(this);
                 const btn = this.querySelector('button[type="submit"]');
-                btn.disabled = true;
-                btn.textContent = 'Submitting Request...';
+                if (btn) setButtonLoading(btn, true, 'Submitting Request...');
 
                 fetch('api/register.php', {
                     method: 'POST',
@@ -537,16 +557,14 @@ require_once __DIR__ . "/layouts/head.php";
                         if (data.status === 'success') {
                             window.location.search = '?success=1';
                         } else {
+                            if (btn) setButtonLoading(btn, false);
                             if(typeof showToast === 'function') showToast(data.message || 'Error requesting account.', 'error');
-                            btn.disabled = false;
-                            btn.textContent = 'Submit application';
                         }
                     })
                     .catch(err => {
                         console.error(err);
+                        if (btn) setButtonLoading(btn, false);
                         if(typeof showToast === 'function') showToast('Network error occurred.', 'error');
-                        btn.disabled = false;
-                        btn.textContent = 'Submit application';
                     });
             });
         }

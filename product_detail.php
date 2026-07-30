@@ -96,6 +96,11 @@ $prod_specs = [
     'packaging' => 'Bulk pack',
     'lead' => '3–5 Business Days'
 ];
+// Determine effective Minimum Order Quantity (MOQ) from the first pricing tier if available
+$effective_moq = (!empty($pricing_tiers) && isset($pricing_tiers[0]['min_qty']))
+    ? (int) $pricing_tiers[0]['min_qty']
+    : (int) ($product['moq'] ?? 50);
+
 // Extract discount with active date range validation
 $discount_pct = isset($product['discount']) ? (float) $product['discount'] : 0;
 $d_start = !empty($product['discount_start']) ? $product['discount_start'] : null;
@@ -262,20 +267,22 @@ require_once __DIR__ . "/layouts/header.php";
                     <?php
                     $total_product_stock = count($variations) > 0 ? array_sum(array_column($variations, 'quantity')) : 0;
                     $max_variant_inventory = count($variations) > 0 ? max(array_column($variations, 'quantity')) : 0;
-                    $is_out_of_stock = ($max_variant_inventory <= 50);
-                    $stat = $is_out_of_stock ? 'out of stock' : 'in stock';
-                    if ($stat === 'in stock') {
+                    $is_out_of_stock = ($total_product_stock <= 0);
+                    if ($total_product_stock > 100) {
+                        $stat = 'in stock';
                         $sc_bg = 'bg-green-50 border-green-100';
                         $sc_tx = 'text-green-600';
                         $sc_dot = 'bg-green-500';
-                    } elseif ($stat === 'out of stock') {
-                        $sc_bg = 'bg-red-50 border-red-100';
-                        $sc_tx = 'text-red-600';
-                        $sc_dot = 'bg-red-500';
-                    } else {
+                    } elseif ($total_product_stock > 0) {
+                        $stat = 'low stock';
                         $sc_bg = 'bg-amber-50 border-amber-100';
                         $sc_tx = 'text-amber-600';
                         $sc_dot = 'bg-amber-500';
+                    } else {
+                        $stat = 'out of stock';
+                        $sc_bg = 'bg-red-50 border-red-100';
+                        $sc_tx = 'text-red-600';
+                        $sc_dot = 'bg-red-500';
                     }
                     ?>
                     <span
@@ -434,6 +441,16 @@ require_once __DIR__ . "/layouts/header.php";
                                 if (!$is_available)
                                     continue;
                                 $is_selected = ($so === $default_size);
+
+                                // Find initial stock quantity for default colour and size
+                                $initial_qty = 0;
+                                foreach ($variations as $v) {
+                                    if (strcasecmp(trim($v['colour'] ?? ''), trim($default_colour)) === 0 && strcasecmp(trim($v['size'] ?? ''), trim($so)) === 0) {
+                                        $initial_qty = (int) ($v['quantity'] ?? 0);
+                                        break;
+                                    }
+                                }
+                                $initial_out = ($initial_qty <= 0);
                                 ?>
                                 <div id="size-row-card-<?= htmlspecialchars($so) ?>"
                                     onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')"
@@ -441,7 +458,7 @@ require_once __DIR__ . "/layouts/header.php";
                                     <div class="flex items-center gap-4">
                                         <span
                                             class="w-10 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-xs font-extrabold text-gray-900 bg-gray-50"><?= htmlspecialchars($so) ?></span>
-                                        <span class="text-xs font-bold text-gray-400"
+                                        <span class="text-xs font-bold text-gray-400 <?= $initial_out ? 'hidden' : '' ?>"
                                             id="size-price-wrapper-<?= htmlspecialchars($so) ?>">
                                             <?php if ($can_see_prices): ?>
                                                 LKR <span class="size-price-display">...</span>
@@ -450,30 +467,30 @@ require_once __DIR__ . "/layouts/header.php";
                                             <?php endif; ?>
                                         </span>
                                         <span id="size-stock-badge-<?= htmlspecialchars($so) ?>"
-                                            class="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1 shadow-sm">
+                                            class="<?= $initial_out ? 'hidden' : '' ?> text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 flex items-center gap-1 shadow-sm">
                                             <i class="ti ti-box text-emerald-500 text-[10px]"></i>
-                                            <span id="size-stock-val-<?= htmlspecialchars($so) ?>">0</span> in stock
+                                            <span id="size-stock-val-<?= htmlspecialchars($so) ?>"><?= number_format($initial_qty) ?></span> in stock
                                         </span>
                                         <span id="size-out-badge-<?= htmlspecialchars($so) ?>"
-                                            class="hidden text-[9px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded uppercase tracking-widest border border-red-100">Out
+                                            class="<?= $initial_out ? '' : 'hidden' ?> text-[9px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded uppercase tracking-widest border border-red-100">Out
                                             of Stock</span>
                                     </div>
                                     <div class="flex items-center bg-gray-100 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
                                         onclick="event.stopPropagation()">
                                         <button type="button" id="size-minus-<?= htmlspecialchars($so) ?>"
                                             onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', -10)"
-                                            class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                            <?= $is_out_of_stock ? 'disabled' : '' ?>><i
+                                            class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed <?= $initial_out ? 'opacity-50 cursor-not-allowed' : '' ?>"
+                                            <?= ($is_out_of_stock || $initial_out) ? 'disabled' : '' ?>><i
                                                 class="ti ti-minus text-xs"></i></button>
                                         <input type="number" id="size-qty-<?= htmlspecialchars($so) ?>" value="0" min="0"
                                             step="10" onfocus="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')"
                                             onchange="onSizeQtyChange('<?= htmlspecialchars($so) ?>')"
-                                            class="w-12 text-center text-xs font-black text-gray-900 bg-transparent border-none outline-none focus:ring-0 transition-all duration-300 py-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            <?= $is_out_of_stock ? 'disabled' : '' ?>>
+                                            class="w-12 text-center text-xs font-black text-gray-900 bg-transparent border-none outline-none focus:ring-0 transition-all duration-300 py-1 disabled:opacity-50 disabled:cursor-not-allowed <?= $initial_out ? 'opacity-50 cursor-not-allowed' : '' ?>"
+                                            <?= ($is_out_of_stock || $initial_out) ? 'disabled' : '' ?>>
                                         <button type="button" id="size-plus-<?= htmlspecialchars($so) ?>"
                                             onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', 10)"
-                                            class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                            <?= $is_out_of_stock ? 'disabled' : '' ?>><i
+                                            class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed <?= $initial_out ? 'opacity-50 cursor-not-allowed' : '' ?>"
+                                            <?= ($is_out_of_stock || $initial_out) ? 'disabled' : '' ?>><i
                                                 class="ti ti-plus text-xs"></i></button>
                                     </div>
                                 </div>
@@ -486,7 +503,7 @@ require_once __DIR__ . "/layouts/header.php";
                 <div class="space-y-4 mb-8">
                     <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order Quantity
                         <span class="text-gray-300 font-medium lowercase tracking-normal">(min.
-                            <?= htmlspecialchars($product['moq']) ?>)</span></label>
+                            <?= htmlspecialchars($effective_moq) ?>)</span></label>
                     <div class="flex items-center gap-6">
                         <div
                             class="flex items-center bg-gray-50 border border-gray-100 rounded-xl overflow-hidden group focus-within:ring-2 focus-within:ring-brand/20 transition-all">
@@ -506,7 +523,7 @@ require_once __DIR__ . "/layouts/header.php";
                         class="hidden items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl text-red-600">
                         <i class="ti ti-alert-triangle text-lg"></i>
                         <span class="text-xs font-bold uppercase tracking-wide">Min.
-                            <?= htmlspecialchars($product['moq']) ?> units required</span>
+                            <?= htmlspecialchars($effective_moq) ?> units required</span>
                     </div>
                 </div>
 
@@ -629,7 +646,7 @@ require_once __DIR__ . "/layouts/header.php";
     }
     if (empty($js_tiers)) {
         $js_tiers[] = [
-            'min' => (int) $product['moq'],
+            'min' => $effective_moq,
             'max' => 999999,
             'price' => (float) $product['base_price']
         ];
@@ -637,7 +654,7 @@ require_once __DIR__ . "/layouts/header.php";
     echo json_encode($js_tiers);
     ?>;
     const discount = <?= (float) $discount ?>;
-    const moq = <?= (int) $product['moq'] ?>;
+    const moq = <?= $effective_moq ?>;
     const canSeePrices = <?= $can_see_prices ? 'true' : 'false' ?>;
     let qty = 0;
     const sizeOptions = <?php echo json_encode($size_options); ?>;
@@ -658,13 +675,13 @@ require_once __DIR__ . "/layouts/header.php";
     });
 
     function checkGlobalVariantStock() {
-        let variant = inventoryVariations.find(v => v.colour === selectedColor && v.size === selectedSize);
+        let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === (selectedColor || '').trim().toLowerCase() && (v.size || '').trim().toLowerCase() === (selectedSize || '').trim().toLowerCase());
         let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
 
         const minusBtn = document.getElementById('global-qty-minus');
         const plusBtn = document.getElementById('global-qty-plus');
 
-        if (qtyAvailable <= 50) {
+        if (qtyAvailable <= 0) {
             if (minusBtn) minusBtn.disabled = true;
             if (plusBtn) plusBtn.disabled = true;
         } else {
@@ -739,12 +756,12 @@ require_once __DIR__ . "/layouts/header.php";
 
     function changeQty(delta) {
         if (selectedSize && selectedColor) {
-            let variant = inventoryVariations.find(v => v.colour === selectedColor && v.size === selectedSize);
+            let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === (selectedColor || '').trim().toLowerCase() && (v.size || '').trim().toLowerCase() === (selectedSize || '').trim().toLowerCase());
             let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
-            if (qtyAvailable <= 50) return;
+            if (qtyAvailable <= 0) return;
 
             const currentVal = (selectedQuantities[selectedColor] && selectedQuantities[selectedColor][selectedSize]) || 0;
-            const newVal = Math.max(0, currentVal + delta);
+            const newVal = Math.min(qtyAvailable, Math.max(0, currentVal + delta));
             selectedQuantities[selectedColor][selectedSize] = newVal;
 
             const input = document.getElementById('size-qty-' + selectedSize);
@@ -759,14 +776,14 @@ require_once __DIR__ . "/layouts/header.php";
 
     function changeSizeQty(size, delta) {
         if (selectedColor) {
-            let variant = inventoryVariations.find(v => v.colour === selectedColor && v.size === size);
+            let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === (selectedColor || '').trim().toLowerCase() && (v.size || '').trim().toLowerCase() === size.trim().toLowerCase());
             let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
-            if (qtyAvailable <= 50) return;
+            if (qtyAvailable <= 0) return;
 
             const input = document.getElementById('size-qty-' + size);
             if (input) {
                 let val = (selectedQuantities[selectedColor] && selectedQuantities[selectedColor][size]) || 0;
-                val = Math.max(0, val + delta);
+                val = Math.min(qtyAvailable, Math.max(0, val + delta));
                 input.value = val;
                 selectedQuantities[selectedColor][size] = val;
                 updateSizeInputStyles(size, val);
@@ -777,10 +794,13 @@ require_once __DIR__ . "/layouts/header.php";
 
     function onSizeQtyChange(size) {
         if (selectedColor) {
+            let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === (selectedColor || '').trim().toLowerCase() && (v.size || '').trim().toLowerCase() === size.trim().toLowerCase());
+            let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
+
             const input = document.getElementById('size-qty-' + size);
             if (input) {
                 let val = parseInt(input.value) || 0;
-                val = Math.max(0, val);
+                val = Math.min(qtyAvailable, Math.max(0, val));
                 input.value = val;
                 selectedQuantities[selectedColor][size] = val;
                 updateSizeInputStyles(size, val);
@@ -841,14 +861,15 @@ require_once __DIR__ . "/layouts/header.php";
     const colorTotalStock = {};
     colorsArray.forEach(c => colorTotalStock[c] = 0);
     inventoryVariations.forEach(v => {
-        if (colorTotalStock[v.colour] !== undefined) {
-            colorTotalStock[v.colour] += parseInt(v.quantity) || 0;
+        const cMatch = colorsArray.find(c => c.trim().toLowerCase() === (v.colour || '').trim().toLowerCase());
+        if (cMatch) {
+            colorTotalStock[cMatch] += parseInt(v.quantity) || 0;
         }
     });
 
     // Initially disable completely out of stock colors
     colorsArray.forEach((c, idx) => {
-        if (colorTotalStock[c] <= 50) {
+        if ((colorTotalStock[c] || 0) <= 0) {
             const btn = document.getElementById('color-btn-' + idx);
             if (btn) {
                 btn.disabled = true;
@@ -858,7 +879,7 @@ require_once __DIR__ . "/layouts/header.php";
     });
 
     function selectColor(idx, color) {
-        if (colorTotalStock[color] <= 50) return; // Prevent selection if out of stock
+        if ((colorTotalStock[color] || 0) <= 0) return; // Prevent selection if out of stock
 
         selectedColor = color;
         document.getElementById('selected-color-name').textContent = color;
@@ -885,10 +906,10 @@ require_once __DIR__ . "/layouts/header.php";
             const stockBadge = document.getElementById('size-stock-badge-' + size);
             const stockVal = document.getElementById('size-stock-val-' + size);
 
-            let variant = inventoryVariations.find(v => v.colour === color && v.size === size);
+            let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === color.trim().toLowerCase() && (v.size || '').trim().toLowerCase() === size.trim().toLowerCase());
             let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
 
-            if (qtyAvailable <= 50) {
+            if (qtyAvailable <= 0) {
                 if (input) {
                     input.disabled = true;
                     input.value = 0;
@@ -921,13 +942,19 @@ require_once __DIR__ . "/layouts/header.php";
         recalculateTotalQty();
     }
 
-    // Initial setup to disable out of stock sizes for the default color
-    window.addEventListener('DOMContentLoaded', () => {
+    // Initial setup to select default color and initialize variant stock
+    function initVariantStock() {
         let defIdx = colorsArray.indexOf(defaultColor);
         if (defIdx !== -1) {
             selectColor(defIdx, defaultColor);
         }
-    });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initVariantStock);
+    } else {
+        initVariantStock();
+    }
 
     function selectSize(idx, size) {
         selectedSize = size;

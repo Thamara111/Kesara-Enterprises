@@ -34,6 +34,10 @@ $filter_sizes    = isset($_GET['sizes']) && is_array($_GET['sizes']) ? array_map
 $filter_stock    = isset($_GET['stock']) && is_array($_GET['stock'])  ? array_map('trim', $_GET['stock'])  : [];
 $filter_sort     = $_GET['sort'] ?? 'newest';
 
+// STEP 1: Backend GET Inputs]: Extract and sanitize min_price & max_price parameters
+// $filter_min_price = isset($_GET['min_price']) && is_numeric($_GET['min_price']) ? (float)$_GET['min_price'] : null;
+// $filter_max_price = isset($_GET['max_price']) && is_numeric($_GET['max_price']) ? (float)$_GET['max_price'] : null;
+
 $all_categories = [];
 if ($pdo) {
     try {
@@ -44,8 +48,25 @@ if ($pdo) {
 $catalog_products = [];
 if ($pdo) {
     try {
+        // STEP 2: Self-Healing Database]: Auto-create index on base_price if missing
+        // $checkIndex = $pdo->query("SHOW INDEX FROM products WHERE Key_name = 'idx_products_base_price'");
+        // if (!$checkIndex || !$checkIndex->fetch()) {
+        //     $pdo->exec("CREATE INDEX idx_products_base_price ON products(base_price)");
+        // }
+
         $where2  = ["p.deleted_at IS NULL"];
         $params2 = [];
+
+        // STEP 3: Dynamic SQL Query]: Append min_price and max_price WHERE conditions
+        // if ($filter_min_price !== null && $filter_min_price >= 0) {
+        //     $where2[]  = "p.base_price >= ?";
+        //     $params2[] = $filter_min_price;
+        // }
+        // if ($filter_max_price !== null && $filter_max_price > 0) {
+        //     $where2[]  = "p.base_price <= ?";
+        //     $params2[] = $filter_max_price;
+        // }
+
         if ($filter_search !== '') {
             $where2[]  = "(p.name LIKE ? OR p.sku LIKE ?)";
             $params2[] = '%' . $filter_search . '%';
@@ -151,6 +172,39 @@ if (!$is_ajax) {
             </div>
           </div>
           <hr class="border-gray-100 my-6">
+
+          <!-- STEP 4: Frontend UI Sidebar]: Price Range Filter Form Fields -->
+          <!-- <div class="mb-8">
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Price Range (LKR)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <input 
+                  type="number" 
+                  name="min_price" 
+                  placeholder="Min Price" 
+                  min="0" 
+                  step="100"
+                  value="<?php echo htmlspecialchars($_GET['min_price'] ?? ''); ?>"
+                  class="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:border-brand focus:ring-1 focus:ring-brand outline-none"
+                >
+              </div>
+              <div>
+                <input 
+                  type="number" 
+                  name="max_price" 
+                  placeholder="Max Price" 
+                  min="0" 
+                  step="100"
+                  value="<?php echo htmlspecialchars($_GET['max_price'] ?? ''); ?>"
+                  class="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl focus:border-brand focus:ring-1 focus:ring-brand outline-none"
+                >
+              </div>
+            </div>
+            <button type="submit" class="mt-3 w-full py-2 bg-gray-900 text-white text-xs font-bold rounded-xl hover:bg-brand transition-colors">
+              Apply Price Filter
+            </button>
+          </div>
+          <hr class="border-gray-100 my-6"> -->
 
           <!-- Size -->
           <div class="mb-8">

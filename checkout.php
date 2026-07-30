@@ -125,8 +125,6 @@ if (!$can_see_prices) {
                         </div>
                     </div>
 
-                </div>
-
                 <div class="mt-8">
                     <button type="submit" id="pay-btn" class="w-full bg-brand text-brand-light font-bold py-5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 text-lg flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed">
                         <i class="ti ti-check text-xl"></i>
@@ -138,8 +136,9 @@ if (!$can_see_prices) {
                 </div>
             </form>
         </div>
+    </div>
 
-        <!-- Right: Order Summary -->
+    <!-- Right: Order Summary -->
         <div>
             <div class="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm sticky top-10">
                 <h2 class="text-sm font-bold text-gray-900 uppercase tracking-widest mb-6 border-b border-gray-100 pb-4">Order Summary</h2>
@@ -162,6 +161,15 @@ if (!$can_see_prices) {
                         <span>Total</span>
                         <span id="summary-total" class="text-brand">LKR 0.00</span>
                     </div>
+
+                    <!-- [VIVA TASK 06 - STEP 4: Frontend UI Checkout - Wholesale Credit Limit Badge (Commented out for later use)]
+                    <div class="mt-4 p-3 bg-brand/5 border border-brand/20 rounded-2xl flex items-center justify-between text-xs">
+                        <span class="font-bold text-brand-dark flex items-center gap-1.5">
+                            <i class="ti ti-credit-card text-brand"></i> Approved Credit Limit:
+                        </span>
+                        <span class="font-extrabold text-brand">LKR <?= number_format($_SESSION['credit_limit'] ?? 100000, 2) ?></span>
+                    </div>
+                    -->
                 </div>
             </div>
         </div>
