@@ -28,13 +28,13 @@ if ($is_ajax) {
     $can_see_prices = $is_logged_in && $buyer_approved;
 }
 
-$filter_search   = trim($_GET['search']   ?? '');
-$filter_category = trim($_GET['category'] ?? '');
-$filter_sizes    = isset($_GET['sizes']) && is_array($_GET['sizes']) ? array_map('trim', $_GET['sizes']) : [];
-$filter_stock    = isset($_GET['stock']) && is_array($_GET['stock'])  ? array_map('trim', $_GET['stock'])  : [];
-$filter_sort     = $_GET['sort'] ?? 'newest';
+$filter_search     = trim($_GET['search']     ?? '');
+$filter_category   = trim($_GET['category']   ?? '');
+$filter_sizes      = isset($_GET['sizes']) && is_array($_GET['sizes']) ? array_map('trim', $_GET['sizes']) : [];
+$filter_stock      = isset($_GET['stock']) && is_array($_GET['stock'])  ? array_map('trim', $_GET['stock'])  : [];
+$filter_discounted = isset($_GET['discounted']) && ($_GET['discounted'] === '1' || $_GET['discounted'] === 'true');
+$filter_sort       = $_GET['sort'] ?? 'newest';
 
-// STEP 1: Backend GET Inputs]: Extract and sanitize min_price & max_price parameters
 // $filter_min_price = isset($_GET['min_price']) && is_numeric($_GET['min_price']) ? (float)$_GET['min_price'] : null;
 // $filter_max_price = isset($_GET['max_price']) && is_numeric($_GET['max_price']) ? (float)$_GET['max_price'] : null;
 
@@ -57,7 +57,6 @@ if ($pdo) {
         $where2  = ["p.deleted_at IS NULL"];
         $params2 = [];
 
-        // STEP 3: Dynamic SQL Query]: Append min_price and max_price WHERE conditions
         // if ($filter_min_price !== null && $filter_min_price >= 0) {
         //     $where2[]  = "p.base_price >= ?";
         //     $params2[] = $filter_min_price;
@@ -75,6 +74,9 @@ if ($pdo) {
         if ($filter_category !== '') {
             $where2[]  = "c.slug = ?";
             $params2[] = $filter_category;
+        }
+        if ($filter_discounted) {
+            $where2[]  = "(p.discount > 0 AND (p.discount_start IS NULL OR p.discount_start <= CURDATE()) AND (p.discount_end IS NULL OR p.discount_end >= CURDATE()))";
         }
         if (!empty($filter_stock)) {
             $stock_conditions = [];
@@ -173,7 +175,7 @@ if (!$is_ajax) {
           </div>
           <hr class="border-gray-100 my-6">
 
-          <!-- STEP 4: Frontend UI Sidebar]: Price Range Filter Form Fields -->
+          <!-- Price Range -->
           <!-- <div class="mb-8">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Price Range (LKR)</label>
             <div class="grid grid-cols-2 gap-2">
@@ -225,6 +227,20 @@ if (!$is_ajax) {
           </div>
           <hr class="border-gray-100 my-6">
 
+          <!-- Discounted Items -->
+          <div class="mb-8">
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Offers & Deals</label>
+            <label class="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" name="discounted" value="1"
+                     <?php echo $filter_discounted ? 'checked' : ''; ?> onchange="this.form.submit()"
+                     class="rounded text-brand focus:ring-brand border-gray-300">
+              <span class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                <i class="ti ti-discount-2 text-red-500 text-base"></i> Discounted Items Only
+              </span>
+            </label>
+          </div>
+          <hr class="border-gray-100 my-6">
+
           <!-- Stock -->
           <div class="mb-8">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Stock Status</label>
@@ -248,8 +264,12 @@ if (!$is_ajax) {
       <div class="flex flex-col gap-6 h-full">
 
         <!-- TOP BAR -->
+        <!-- TOP BAR -->
         <form id="topbar-form" method="GET" action="">
           <input type="hidden" name="category" value="<?php echo htmlspecialchars($filter_category); ?>">
+          <?php if ($filter_discounted): ?><input type="hidden" name="discounted" value="1"><?php endif; ?>
+          <!-- <?php if ($filter_min_price !== null): ?><input type="hidden" name="min_price" value="<?php echo htmlspecialchars($filter_min_price); ?>"><?php endif; ?>
+          <?php if ($filter_max_price !== null): ?><input type="hidden" name="max_price" value="<?php echo htmlspecialchars($filter_max_price); ?>"><?php endif; ?> -->
           <?php foreach ($filter_sizes as $sz): ?><input type="hidden" name="sizes[]" value="<?php echo htmlspecialchars($sz); ?>"><?php endforeach; ?>
           <?php foreach ($filter_stock as $st): ?><input type="hidden" name="stock[]" value="<?php echo htmlspecialchars($st); ?>"><?php endforeach; ?>
           <div class="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
@@ -284,11 +304,22 @@ if (!$is_ajax) {
         <div id="product-list-container" class="flex flex-col gap-6">
 <?php endif; ?>
         <?php
-        $has_active = $filter_search!==''||$filter_category!==''||!empty($filter_sizes)||!empty($filter_stock);
+        // $has_active = $filter_search!==''||$filter_category!==''||!empty($filter_sizes)||!empty($filter_stock)||$filter_discounted||$filter_min_price!==null||$filter_max_price!==null;
+        $has_active = $filter_search!==''||$filter_category!==''||!empty($filter_sizes)||!empty($filter_stock)||$filter_discounted;
         if ($has_active):
         ?>
         <div class="flex items-center gap-3 flex-wrap">
           <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Active:</span>
+          <!-- <?php if ($filter_min_price !== null || $filter_max_price !== null): ?>
+          <a href="<?php echo catalog_url([],['min_price','max_price']); ?>" class="px-3 py-1 bg-brand-light text-brand text-[11px] font-bold rounded-full flex items-center gap-2 border border-brand/10 shadow-sm hover:opacity-80 transition-opacity">
+            Price: LKR <?php echo ($filter_min_price !== null ? number_format($filter_min_price) : '0') . ' - ' . ($filter_max_price !== null ? number_format($filter_max_price) : 'Any'); ?> <i class="ti ti-x"></i>
+          </a>
+          <?php endif; ?> -->
+          <?php if ($filter_discounted): ?>
+          <a href="<?php echo catalog_url([],['discounted']); ?>" class="px-3 py-1 bg-red-50 text-red-600 text-[11px] font-bold rounded-full flex items-center gap-2 border border-red-100 shadow-sm hover:opacity-80 transition-opacity">
+            <i class="ti ti-discount-2"></i> Discounted Only <i class="ti ti-x"></i>
+          </a>
+          <?php endif; ?>
           <?php if ($filter_search!==''): ?>
           <a href="<?php echo catalog_url([],['search']); ?>" class="px-3 py-1 bg-brand-light text-brand text-[11px] font-bold rounded-full flex items-center gap-2 border border-brand/10 shadow-sm hover:opacity-80 transition-opacity">
             Search: <?php echo htmlspecialchars($filter_search); ?> <i class="ti ti-x"></i>
@@ -481,6 +512,20 @@ if (!$is_ajax) {
       if (activeCatBtn && activeCatBtn.value) {
           params.set('category', activeCatBtn.value);
       }
+      
+      const discountedCheck = document.querySelector('#filter-form input[name="discounted"]:checked');
+      if (discountedCheck) {
+          params.set('discounted', '1');
+      }
+
+      // const minPriceInput = document.querySelector('#filter-form input[name="min_price"]');
+      // const maxPriceInput = document.querySelector('#filter-form input[name="max_price"]');
+      // if (minPriceInput && minPriceInput.value) {
+      //     params.set('min_price', minPriceInput.value);
+      // }
+      // if (maxPriceInput && maxPriceInput.value) {
+      //     params.set('max_price', maxPriceInput.value);
+      // }
       
       const sizeChecks = document.querySelectorAll('#filter-form input[name="sizes[]"]:checked');
       sizeChecks.forEach(cb => params.append('sizes[]', cb.value));
