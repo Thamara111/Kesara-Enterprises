@@ -327,6 +327,23 @@ require_once __DIR__ . "/layouts/header.php";
                             // Determine if this is the default middle tier for active class (e.g. 2nd tier or 1st tier if count is small)
                             $is_active = (count($pricing_tiers) > 1 && $index === 1) || (count($pricing_tiers) === 1 && $index === 0);
                             ?>
+<!--                             
+                            [VIVA TASK 03 - UI: Dynamic Tier Row Data-Attributes & Upper Bound Rendering]
+                            <div class="flex justify-between items-center p-4 text-sm tier-row <?= $is_active ? 'bg-brand-light/30 border-y border-brand/10 text-brand' : 'bg-white text-gray-500' ?>"
+                                 id="tier-<?= $tier_idx++ ?>"
+                                 data-min="<?= (int)$t['min_qty'] ?>" 
+                                 data-max="<?= !empty($t['max_qty']) ? (int)$t['max_qty'] : 999999 ?>"
+                                 data-price="<?= (float)$t['price'] ?>">
+                                <div class="flex items-center gap-3">
+                                    <span class="<?= $is_active ? 'font-bold' : '' ?>">
+                                        <?= htmlspecialchars($t['min_qty']) ?>
+                                        <?= !empty($t['max_qty']) ? ' – ' . htmlspecialchars($t['max_qty']) : '+' ?> units
+                                    </span>
+                                    <span class="active-badge px-2 py-0.5 bg-brand text-brand-light text-[9px] font-bold rounded-full <?= $is_active ? '' : 'hidden' ?>">
+                                        ACTIVE TIER
+                                    </span>
+                                </div>
+                            -->
                             <div class="flex justify-between items-center p-4 text-sm <?= $is_active ? 'bg-brand-light/30 border-y border-brand/10 text-brand' : 'bg-white text-gray-500' ?>"
                                 id="tier-<?= $tier_idx++ ?>">
                                 <div class="flex items-center gap-3">

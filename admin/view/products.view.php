@@ -51,6 +51,21 @@ if (isset($pdo) && $pdo !== null) {
         $prods = $stmt->fetchAll();
 
         foreach ($prods as $pr) {
+            /*
+            // [VIVA TASK 03: Tiered Pricing Max Limit Query]
+            $t_stmt = $pdo->prepare("SELECT min_qty AS q, max_qty AS max_q, price AS p FROM pricing_tiers WHERE product_id = ? ORDER BY min_qty ASC");
+            $t_stmt->execute([$pr['id']]);
+            $tiers = $t_stmt->fetchAll();
+
+            $formatted_tiers = [];
+            foreach ($tiers as $t) {
+                $formatted_tiers[] = [
+                    'q' => (int) $t['q'],
+                    'max_q' => !empty($t['max_q']) ? (int) $t['max_q'] : null,
+                    'p' => (float) $t['p']
+                ];
+            }
+            */
             $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ?");
             $t_stmt->execute([$pr['id']]);
             $tiers = $t_stmt->fetchAll();
