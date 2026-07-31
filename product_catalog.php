@@ -233,7 +233,7 @@ if (!$is_ajax) {
           <hr class="border-gray-100 my-6">
 
           <!-- Discounted Items -->
-          <div class="mb-8">
+          <!-- <div class="mb-8">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Offers & Deals</label>
             <label class="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" name="discounted" value="1"
@@ -244,7 +244,7 @@ if (!$is_ajax) {
               </span>
             </label>
           </div>
-          <hr class="border-gray-100 my-6">
+          <hr class="border-gray-100 my-6"> -->
 
           <!-- Stock -->
           <div class="mb-8">
