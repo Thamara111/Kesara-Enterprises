@@ -588,3 +588,24 @@ require_once __DIR__ . "/layouts/head.php";
         document.addEventListener('DOMContentLoaded', initAuthForm);
     }
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: auth.php (Customer Login & Wholesale Registration)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - REST API Endpoint: api/register.php
+   - Customer Dashboard: my_account.php
+   - Admin Management: admin/view/customers.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Form Fields: HTML input fields inside auth.php
+   - API Handler: api/register.php (if updating API registration logic)
+   - Admin Customer View: admin/view/customers.view.php (if adding user attributes)
+=============================================================================
+*/
+?>

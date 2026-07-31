@@ -1157,3 +1157,21 @@ foreach ($admin_drivers as $d) {
         }, 100);
     }
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/delivery.personnel.view.php (Delivery Drivers Management View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - driver_portal/index.php
+   - admin/view/delivery.assignments.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Delivery Personnel table in database
+=============================================================================
+*/
+?>

@@ -1645,3 +1645,25 @@ if (isset($pdo) && $pdo !== null) {
     applyFilters();
     // Pane starts hidden on all screen sizes — opens only when a row is clicked
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/orders.view.php (Admin Order Management & Driver Dispatching)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - REST API Endpoint: api/orders.php, api/delivery.php
+   - Customer Checkout: checkout.php
+   - Customer Order Confirmation: order_confirmation.php
+   - Driver Portal: driver_portal/index.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Order Status Handler: SQL update queries in api/orders.php
+   - Delivery Assignment: driver_portal/index.php (if updating driver dispatch structure)
+   - Customer Order History: my_account.php (if updating order status types)
+=============================================================================
+*/
+?>

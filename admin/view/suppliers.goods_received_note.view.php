@@ -532,3 +532,21 @@ document.querySelectorAll('.grn-line-item').forEach(el => updateLine(el.dataset.
 
 closeGRNRefPane();
 </script>
+
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/suppliers.goods_received_note.view.php (Goods Received Note - GRN View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/view/suppliers.purchase_orders.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - GRN table and Inventory Stock Incrementing
+=============================================================================
+*/
+?>

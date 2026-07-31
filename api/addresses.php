@@ -211,3 +211,21 @@ try {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/addresses.php (Customer Address Book API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - my_account.php
+   - checkout.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Address management in my_account.php and checkout.php delivery selection
+=============================================================================
+*/

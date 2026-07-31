@@ -1107,3 +1107,21 @@ foreach ($admin_assignments as $a) {
         setTimeout(() => { t.classList.remove('toast-show'); t.addEventListener('transitionend', () => t.remove(), { once: true }); }, duration);
     }
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/delivery.assignments.view.php (Delivery Run Assignments View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - api/delivery.php
+   - driver_portal/index.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Driver Dispatch API (api/delivery.php) and Driver Portal
+=============================================================================
+*/
+?>

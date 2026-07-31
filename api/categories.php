@@ -185,3 +185,22 @@ if ($method === 'POST') {
 
 http_response_code(405);
 echo json_encode(["status" => "error", "message" => "Method Not Allowed"]);
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/categories.php (Product Categories CRUD API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - product_catalog.php
+   - admin/view/categories.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Admin Categories View (admin/view/categories.view.php) and Catalog Sidebar Filters
+=============================================================================
+*/
+

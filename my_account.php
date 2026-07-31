@@ -895,3 +895,26 @@ function updateAccountPassword(e) {
 </script>
 
 <?php require_once __DIR__ . "/layouts/footer.php"; ?>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: my_account.php (Customer Profile, Order History & Loyalty Dashboard)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - Header & Footer: layouts/header.php, layouts/footer.php
+   - Authentication: auth.php
+   - Order Confirmation: order_confirmation.php
+   - Admin Customer View: admin/view/customers.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - User Profile Fields: SQL UPDATE `users` queries inside my_account.php
+   - Customer Authentication: auth.php (if changing session or profile parameters)
+   - Admin Customer Details: admin/view/customers.view.php (if adding user attributes)
+=============================================================================
+*/
+?>
+

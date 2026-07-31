@@ -122,3 +122,21 @@ function validateOrderItems(PDO $pdo, array $items): array {
         'validated_items' => $validated_items
     ];
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/model_validation.php (Self-Healing Schema & Field Validator API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - database/schema.sql
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Database Table & Column structure self-healing checks
+=============================================================================
+*/
+

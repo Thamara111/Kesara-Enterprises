@@ -85,3 +85,22 @@ if (isset($pdo) && $pdo !== null) {
     // Fallback -> Returning success response in demo mode
     echo json_encode(["status" => "success", "message" => "Profile updated (Demo Mode)."]);
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/update_profile.php (Customer Profile Details Update API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - my_account.php
+   - admin/view/customers.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - My Account Profile Settings (my_account.php)
+=============================================================================
+*/
+

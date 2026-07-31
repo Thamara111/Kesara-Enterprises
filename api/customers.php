@@ -161,3 +161,22 @@ if (isset($pdo) && $pdo !== null) {
 } else {
     echo json_encode(["status" => "success", "message" => "Customer status updated to " . ucfirst($status) . " (Demo Mode)."]);
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/customers.php (Admin Customer Status & Comments API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/view/customers.view.php
+   - auth.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Admin Customer Management (admin/view/customers.view.php)
+=============================================================================
+*/
+

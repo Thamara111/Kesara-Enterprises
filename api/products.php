@@ -489,3 +489,23 @@ if ($method === 'POST') {
 
 http_response_code(405);
 echo json_encode(["status" => "error", "message" => "Method Not Allowed"]);
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/products.php (REST API Product Catalog & Admin Inventory Handler)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - Customer Catalog: product_catalog.php
+   - Product Details: product_detail.php
+   - Admin Inventory View: admin/view/products.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Database Schema: `products`, `categories`, `pricing_tiers` tables
+   - Catalog Display: product_catalog.php (if changing returned JSON keys)
+   - Admin Product Management: admin/view/products.view.php (if updating product creation fields)
+=============================================================================
+*/
+

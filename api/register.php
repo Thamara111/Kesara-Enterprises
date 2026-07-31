@@ -36,6 +36,7 @@ $password        = $input['password'] ?? '';
 $business_name   = trim($input['business_name'] ?? '');
 $br_number       = trim($input['br_number'] ?? '');
 $business_type   = trim($input['business_type'] ?? '');
+// $tin_number = trim($input['tin_number'] ?? '');
 $address         = trim($input['address'] ?? '');
 
 // Checking data -> Ensuring no required registration fields are empty
@@ -84,3 +85,21 @@ if (isset($pdo) && $pdo !== null) {
     http_response_code(201);
     echo json_encode(["status" => "success", "message" => "Your wholesale account request has been submitted successfully! We will contact you within 24h. (Demo Mode)"]);
 }
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/register.php (REST API Wholesale Registration Endpoint)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - Web Authentication Form: auth.php
+   - Admin Customer Management: admin/view/customers.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Web Registration Handler: auth.php (if updating web registration logic)
+   - Admin Customer View: admin/view/customers.view.php (if adding user attributes)
+=============================================================================
+*/
+

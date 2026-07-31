@@ -512,3 +512,22 @@ function submitReply(e) {
     });
 }
 </script>
+
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/inquiries.view.php (Customer Contact Inquiries Manager View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - api/admin_inquiries.php
+   - contact.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Contact Us Form (contact.php) and Admin Inquiries API
+=============================================================================
+*/
+?>

@@ -933,3 +933,24 @@ if (empty($admin_customers)) {
         });
     }
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/customers.view.php (Admin Customer Approval & Profile Management)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - REST API Endpoint: api/register.php
+   - Customer Auth: auth.php
+   - Customer Profile: my_account.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Customer Details Drawer: HTML fields inside customers.view.php (Line ~300-350)
+   - Registration Handling: auth.php and api/register.php (if adding customer fields)
+   - User Profile Page: my_account.php (if displaying newly added customer attributes)
+=============================================================================
+*/
+?>

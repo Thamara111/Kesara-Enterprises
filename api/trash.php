@@ -64,3 +64,21 @@ try {
     http_response_code(500);
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/trash.php (Soft Delete & Restore Operations API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/view/trash.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Admin Trash & Recovery Center (admin/view/trash.view.php)
+=============================================================================
+*/
+

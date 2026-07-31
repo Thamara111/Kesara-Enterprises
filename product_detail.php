@@ -1190,3 +1190,25 @@ require_once __DIR__ . "/layouts/header.php";
 </div>
 
 <?php require_once __DIR__ . "/layouts/footer.php"; ?>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: product_detail.php (Product Specification, Stock Check & Add to Cart)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - Header & Footer: layouts/header.php, layouts/footer.php
+   - Catalog: product_catalog.php
+   - Shopping Cart: cart.php
+   - Admin Product View: admin/view/products.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Tiered Pricing & Stock Display: Quantity calculation inside product_detail.php
+   - Admin Inventory Management: admin/view/products.view.php (if adding product specifications)
+   - Cart Calculation: cart.php (if changing pricing structure or MOQ rules)
+=============================================================================
+*/
+?>

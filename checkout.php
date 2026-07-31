@@ -427,3 +427,28 @@ document.addEventListener('DOMContentLoaded', initializeCheckout);
 </script>
 </body>
 </html>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: checkout.php (Order Placement, Delivery Address & Payment Processing)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - Shopping Cart: cart.php
+   - Order Confirmation: order_confirmation.php
+   - Customer Profile & Orders: my_account.php
+   - Mailer Service: src/Mailer.php
+   - Admin Orders View: admin/view/orders.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Order Fields / Status: SQL INSERT into `orders` and `order_items` tables
+   - Confirmation Page: order_confirmation.php (displaying order summary)
+   - Email Notifications: src/Mailer.php (if adding new order data to customer emails)
+   - Admin Order Management: admin/view/orders.view.php (if adding custom order attributes)
+=============================================================================
+*/
+?>
+

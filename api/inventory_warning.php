@@ -254,3 +254,22 @@ echo json_encode([
     'failed_for'   => $failed,
     'items_flagged'=> $total,
 ]);
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/inventory_warning.php (Low Stock & Restock Alert Notification API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/view/inventory.view.php
+   - src/Mailer.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Admin Inventory Alert Dashboard and Automated Email Alerts
+=============================================================================
+*/
+

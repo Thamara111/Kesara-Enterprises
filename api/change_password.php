@@ -120,3 +120,22 @@ if (isset($pdo) && $pdo !== null) {
     // Fallback -> Returning success response in demo mode
     echo json_encode(["status" => "success", "message" => "Your password has been updated successfully! (Demo Mode)"]);
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/change_password.php (Customer Password Update API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - my_account.php
+   - auth.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Customer Account Settings (my_account.php) Security Tab
+=============================================================================
+*/
+

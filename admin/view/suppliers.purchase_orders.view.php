@@ -1252,3 +1252,20 @@ if (isset($pdo) && $pdo !== null) {
         }, 100);
     }
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/suppliers.purchase_orders.view.php (Supplier Purchase Orders View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/view/suppliers.goods_received_note.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Purchase Orders & GRN processing
+=============================================================================
+*/
+?>

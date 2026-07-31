@@ -634,3 +634,27 @@ if (!$is_ajax) {
 </script>
 
 <?php require_once __DIR__."/layouts/footer.php"; ?>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: product_catalog.php (Product Catalog, Search & Dynamic Filtering)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - Header & Footer: layouts/header.php, layouts/footer.php
+   - Product Details: product_detail.php
+   - Shopping Cart: cart.php
+   - REST API Endpoint: api/products.php
+   - Admin Inventory View: admin/view/products.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Filters & Search: Filter UI forms inside product_catalog.php
+   - Product Card Display: Product loop cards inside product_catalog.php
+   - Admin Product Management: admin/view/products.view.php (if adding product attributes)
+   - API Products Endpoint: api/products.php (if updating catalog API response)
+=============================================================================
+*/
+?>

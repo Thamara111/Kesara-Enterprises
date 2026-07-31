@@ -905,3 +905,21 @@ if ($pressure_count > 0) {
     <?php endif; ?>
 
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/inventory.view.php (Stock Variant & Per-Size Inventory View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - api/admin_inventory.php
+   - product_detail.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Inventory Stock Adjustment API (api/admin_inventory.php)
+=============================================================================
+*/
+?>

@@ -546,3 +546,26 @@ render();
 </script>
 
 <?php require_once __DIR__ . "/layouts/footer.php"; ?>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: cart.php (Shopping Cart & Quantity Tier Pricing Calculator)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - Header & Footer: layouts/header.php, layouts/footer.php
+   - Catalog & Details: product_catalog.php, product_detail.php
+   - Checkout Flow: checkout.php
+   - REST API Endpoint: api/cart.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Pricing Tiers & Discounts: Price calculation logic in cart.php JS / PHP
+   - Checkout Submission: checkout.php (must handle updated cart format)
+   - API Cart Synchronizer: api/cart.php (if using AJAX cart updates)
+=============================================================================
+*/
+?>
+

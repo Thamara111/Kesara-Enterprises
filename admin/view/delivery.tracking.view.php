@@ -805,3 +805,22 @@ function startApp() {
 
 document.addEventListener('DOMContentLoaded', startApp);
 </script>
+
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/delivery.tracking.view.php (Live GPS Delivery Tracking View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - driver_portal/index.php
+   - api/delivery.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Driver Portal simulation telemetry
+=============================================================================
+*/
+?>

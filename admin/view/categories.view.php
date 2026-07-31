@@ -494,3 +494,22 @@ function submitDelete() {
 // Initial render
 applyFilters();
 </script>
+
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/categories.view.php (Admin Category Management View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - api/categories.php
+   - product_catalog.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Categories API (api/categories.php) and Catalog Sidebar
+=============================================================================
+*/
+?>

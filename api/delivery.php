@@ -87,3 +87,22 @@ if ($method === 'POST') {
 // Checking request -> Blocking non-POST requests with Method Not Allowed error
 http_response_code(405);
 echo json_encode(["status" => "error", "message" => "Method Not Allowed"]);
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/delivery.php (Delivery Dispatch & Status Update API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - driver_portal/index.php
+   - admin/view/orders.view.php
+   - admin/view/delivery.assignments.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Driver Portal (driver_portal/index.php) and Admin Order Dispatch
+=============================================================================
+*/
+

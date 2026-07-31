@@ -295,3 +295,21 @@ function executeHardDelete() {
     });
 }
 </script>
+
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/trash.view.php (Soft Deleted Records Recovery View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - api/trash.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Trash API (api/trash.php) for restoring soft-deleted products/categories
+=============================================================================
+*/
+?>

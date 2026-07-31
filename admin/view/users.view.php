@@ -466,3 +466,20 @@ function getRoleMeta($role)
         label.className = textClass;
     };
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/users.view.php (Admin System Users & Roles View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/admin_index.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Admins table & Role permissions
+=============================================================================
+*/
+?>

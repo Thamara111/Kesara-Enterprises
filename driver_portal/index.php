@@ -1754,3 +1754,24 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 </body>
 </html>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: driver_portal/index.php (Driver Portal, Delivery Dispatch & GPS Tracking)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - REST API Endpoint: api/delivery.php
+   - Admin Orders View: admin/view/orders.view.php
+   - Customer Order Confirmation: order_confirmation.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Delivery Status Handler: SQL update queries in api/delivery.php
+   - Admin Driver Dispatch: admin/view/orders.view.php (if adding driver features)
+=============================================================================
+*/
+?>
+

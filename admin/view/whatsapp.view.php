@@ -98,3 +98,21 @@ if (isset($pdo) && $pdo !== null) {
         <?php endif; ?>
     </div>
 </div>
+
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/whatsapp.view.php (WhatsApp Notification Logs View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - api/mock_whatsapp.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - WhatsApp API (api/mock_whatsapp.php)
+=============================================================================
+*/
+?>

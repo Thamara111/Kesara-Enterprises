@@ -1015,3 +1015,20 @@ foreach ($admin_suppliers as $s) {
         if (firstSupplier) selectSupplier(firstSupplier, false);
         closeSupplierDetailPane();
     </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/suppliers.view.php (Suppliers & Vendor Management View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/view/suppliers.purchase_orders.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Suppliers table in database
+=============================================================================
+*/
+?>

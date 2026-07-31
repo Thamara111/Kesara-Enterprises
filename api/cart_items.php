@@ -96,3 +96,22 @@ try {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Failed to fetch cart items: ' . $e->getMessage()]);
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/cart_items.php (Session & DB Cart Synchronizer API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - cart.php
+   - checkout.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Shopping Cart UI (cart.php) and Checkout Order summary (checkout.php)
+=============================================================================
+*/
+

@@ -112,3 +112,22 @@ else {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Invalid action."]);
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/admin_inventory.php (Admin Per-Variant Inventory Stock API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/view/inventory.view.php
+   - product_detail.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Admin Inventory Manager (admin/view/inventory.view.php) and Product Details Stock checks
+=============================================================================
+*/
+

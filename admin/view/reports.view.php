@@ -509,3 +509,21 @@ function exportActiveReport() {
 
 document.addEventListener('turbo:load', initCharts);
 </script>
+
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/reports.view.php (Sales, Revenue & Analytics Reports View)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/admin_index.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Database `orders`, `order_items`, and `users` analytics
+=============================================================================
+*/
+?>

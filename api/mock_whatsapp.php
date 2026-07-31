@@ -50,3 +50,22 @@ if (isset($pdo) && $pdo !== null) {
     // Fallback -> Returning success response in demo mode
     echo json_encode(["status" => "success", "message" => "Mock WhatsApp message sent (Demo Mode)."]);
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/mock_whatsapp.php (WhatsApp Notification Simulation API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/view/whatsapp.view.php
+   - checkout.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Admin WhatsApp Manager (admin/view/whatsapp.view.php)
+=============================================================================
+*/
+

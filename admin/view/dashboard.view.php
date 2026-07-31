@@ -596,3 +596,21 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
         }
     }
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/dashboard.view.php (Admin Main Metrics & Overview Dashboard)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - admin/admin_index.php
+   - admin/view/orders.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Sales, Inventory & Pending Order summary metrics
+=============================================================================
+*/
+?>

@@ -101,3 +101,23 @@ if (isset($pdo) && $pdo !== null) {
     http_response_code(201);
     echo json_encode(["status" => "success", "message" => "Inquiry submitted successfully (Demo Mode)."]);
 }
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/inquiries.php (Public Contact Us Form Handler API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - contact.php
+   - src/Mailer.php
+   - admin/view/inquiries.view.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Contact Us Form (contact.php) and Admin Inquiries View
+=============================================================================
+*/
+

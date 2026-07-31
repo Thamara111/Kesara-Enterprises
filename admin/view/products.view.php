@@ -1190,3 +1190,24 @@ if (empty($all_suppliers)) {
         }, 3000);
     }
 </script>
+
+<?php
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: admin/view/products.view.php (Admin Products & Inventory Dashboard)
+
+ CONNECTED / DEPENDENT FILES:
+   - Database Connection: database/connection.php
+   - REST API Endpoint: api/products.php
+   - Customer Catalog: product_catalog.php
+   - Customer Product Detail: product_detail.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Product Add/Edit Modal: Form inputs inside products.view.php (Line ~330-430)
+   - API Products Endpoint: api/products.php (must process any new product fields)
+   - Customer Catalog: product_catalog.php (if displaying new product attributes)
+=============================================================================
+*/
+?>

@@ -417,3 +417,23 @@ if ($method === 'POST') {
 
 http_response_code(405);
 echo json_encode(["status" => "error", "message" => "Method Not Allowed"]);
+
+
+
+/*
+=============================================================================
+ FILE DEPENDENCY & CROSS-REFERENCE MAP
+=============================================================================
+ FILE: api/orders.php (Order Creation, Status Log & Payment API)
+
+ CONNECTED / DEPENDENT FILES:
+   - database/connection.php
+   - checkout.php
+   - admin/view/orders.view.php
+   - my_account.php
+
+ RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
+   - Checkout Page (checkout.php) and Admin Order Manager (admin/view/orders.view.php)
+=============================================================================
+*/
+
