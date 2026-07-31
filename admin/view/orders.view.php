@@ -1059,8 +1059,8 @@ if (isset($pdo) && $pdo !== null) {
         if (status_lower === 'pending') {
             actionContainer.innerHTML = `
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="updateStatus(${oid}, 'processing')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest">Approve & Process</button>
-                <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
+                <button onclick="updateStatus(${oid}, 'processing', this)" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest flex items-center justify-center gap-2"><span>Approve & Process</span></button>
+                <button onclick="updateStatus(${oid}, 'cancelled', this)" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2"><span>Cancel Order</span></button>
             </div>
         `;
         } else if (status_lower === 'processing') {
@@ -1068,10 +1068,10 @@ if (isset($pdo) && $pdo !== null) {
             var addrEsc = (el.dataset.address || '').replace(/'/g, "\\'");
             actionContainer.innerHTML = `
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="openAssignModalFromOrders(${oid}, '${compEsc}', '${addrEsc}', '${el.dataset.formattedId}')" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                    <i class="ti ti-truck-delivery text-base"></i> Assign Driver
+                <button onclick="openAssignModalFromOrders(${oid}, '${compEsc}', '${addrEsc}', '${el.dataset.formattedId}', this)" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                    <i class="ti ti-truck-delivery text-base"></i> <span>Assign Driver</span>
                 </button>
-                <button onclick="updateStatus(${oid}, 'cancelled')" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest">Cancel Order</button>
+                <button onclick="updateStatus(${oid}, 'cancelled', this)" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2"><span>Cancel Order</span></button>
             </div>
         `;
         } else if (status_lower === 'assigned') {
@@ -1391,7 +1391,10 @@ if (isset($pdo) && $pdo !== null) {
             delivered: 'Delivery confirmed successfully.'
         };
 
-        if (btnElement) setButtonLoading(btnElement, true);
+        if (btnElement) {
+            var loadTxt = status === 'processing' ? 'Processing...' : 'Updating...';
+            setButtonLoading(btnElement, true, loadTxt);
+        }
 
         fetch('/api/orders.php?action=update_status', {
             method: 'POST',
