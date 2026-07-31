@@ -1,7 +1,7 @@
 <?php
 /**
  * User Account Dashboard
- * Displays the logged-in user's profile, recent orders, and account status.
+ * Displays the logged-in user's profile, recent orders, delivery addresses, and account status.
  * Also handles user logout logic.
  */
 if (session_status() === PHP_SESSION_NONE) {
@@ -23,6 +23,7 @@ if (!$user_id) {
 
 require_once __DIR__ . "/database/connection.php";
 $user = null;
+$user_addresses = [];
 $orders = [];
 $total_orders = 0;
 $total_spent = 0;
@@ -32,12 +33,46 @@ $last_order_year = "";
 
 if (isset($pdo) && $pdo !== null) {
     try {
+        // Self-healing database setup for delivery addresses
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user_addresses (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            title VARCHAR(100) NOT NULL,
+            address TEXT NOT NULL,
+            city VARCHAR(100) DEFAULT NULL,
+            province VARCHAR(100) DEFAULT NULL,
+            postal_code VARCHAR(20) DEFAULT NULL,
+            is_default TINYINT(1) DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+
+        // Seed default address if user_addresses is empty for this user
+        $checkCount = $pdo->prepare("SELECT COUNT(*) FROM user_addresses WHERE user_id = ?");
+        $checkCount->execute([$user_id]);
+        if ($checkCount->fetchColumn() == 0) {
+            $uStmt = $pdo->prepare("SELECT business_name, address FROM users WHERE id = ?");
+            $uStmt->execute([$user_id]);
+            $uData = $uStmt->fetch();
+            if ($uData && !empty($uData['address'])) {
+                $seedTitle = !empty($uData['business_name']) ? $uData['business_name'] . ' Warehouse' : 'Primary Address';
+                $pdo->prepare("INSERT INTO user_addresses (user_id, title, address, is_default) VALUES (?, ?, ?, 1)")
+                    ->execute([$user_id, $seedTitle, $uData['address']]);
+            }
+        }
+
         // Fetch User details
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
         $user = $stmt->fetch();
         
         if ($user) {
+            // Fetch User Delivery Addresses
+            $stmt_addr = $pdo->prepare("SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, id DESC");
+            $stmt_addr->execute([$user_id]);
+            $user_addresses = $stmt_addr->fetchAll();
+
             // Fetch Order statistics & list
             $stmt_orders = $pdo->prepare("SELECT o.*, 
                                                  (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS items_count,
@@ -70,7 +105,6 @@ if (!$user) {
     exit;
 }
 
-
 function formatSpent($amount) {
     if ($amount >= 1000000) {
         return 'LKR ' . number_format($amount / 1000000, 1) . 'M';
@@ -97,7 +131,7 @@ require_once __DIR__ . "/layouts/header.php";
             <i class="ti ti-chevron-right text-[10px]"></i>
             <span class="text-gray-900 font-bold tracking-tight uppercase">My Account</span>
             <div class="ml-auto hidden md:flex items-center gap-2 text-gray-400 font-medium tracking-tight">
-                <span><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></span>
+                <span id="header-user-fullname"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></span>
                 <span class="text-gray-200">/</span>
                 <span><?= htmlspecialchars($user['business_name']) ?></span>
             </div>
@@ -110,11 +144,11 @@ require_once __DIR__ . "/layouts/header.php";
                 <div class="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm overflow-hidden">
                     <!-- User Brief -->
                     <div class="flex items-center gap-4 mb-8 border-b border-gray-50 pb-6">
-                        <div class="w-12 h-12 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold shadow-sm border border-brand/10">
+                        <div id="brief-user-avatar" class="w-12 h-12 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold shadow-sm border border-brand/10">
                             <?= strtoupper(substr($user['first_name'], 0, 1) . substr($user['last_name'], 0, 1)) ?>
                         </div>
                         <div class="flex-1 min-w-0">
-                            <h2 class="text-sm font-bold text-gray-900 truncate"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></h2>
+                            <h2 id="brief-user-name" class="text-sm font-bold text-gray-900 truncate"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></h2>
                             <p class="text-[11px] text-gray-400 font-medium truncate mb-1"><?= htmlspecialchars($user['business_name']) ?></p>
                             <?php
                                 $status_lbl = strtolower($user['status']);
@@ -132,23 +166,23 @@ require_once __DIR__ . "/layouts/header.php";
 
                     <!-- Nav List -->
                     <nav class="space-y-1">
-                        <button onclick="showSection('orders')" id="nav-orders" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all active-nav">
+                        <button onclick="showSection('orders')" id="nav-orders" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold transition-all active-nav cursor-pointer">
                             <i class="ti ti-package text-xl"></i>
                             Order History
                         </button>
-                        <button onclick="showSection('profile')" id="nav-profile" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-gray-400 hover:bg-gray-50 hover:text-brand transition-all">
+                        <button onclick="showSection('profile')" id="nav-profile" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-gray-400 hover:bg-gray-50 hover:text-brand transition-all cursor-pointer">
                             <i class="ti ti-user text-xl"></i>
                             My Profile
                         </button>
-                        <button onclick="showSection('addresses')" id="nav-addresses" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-gray-400 hover:bg-gray-50 hover:text-brand transition-all">
+                        <button onclick="showSection('addresses')" id="nav-addresses" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-gray-400 hover:bg-gray-50 hover:text-brand transition-all cursor-pointer">
                             <i class="ti ti-map-pin text-xl"></i>
                             Addresses
                         </button>
-                        <button onclick="showSection('invoices')" id="nav-invoices" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-gray-400 hover:bg-gray-50 hover:text-brand transition-all">
+                        <button onclick="showSection('invoices')" id="nav-invoices" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-gray-400 hover:bg-gray-50 hover:text-brand transition-all cursor-pointer">
                             <i class="ti ti-file-invoice text-xl"></i>
                             Invoices
                         </button>
-                        <button onclick="showSection('security')" id="nav-security" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-gray-400 hover:bg-gray-50 hover:text-brand transition-all">
+                        <button onclick="showSection('security')" id="nav-security" class="nav-btn group flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-bold text-gray-400 hover:bg-gray-50 hover:text-brand transition-all cursor-pointer">
                             <i class="ti ti-lock text-xl"></i>
                             Security
                         </button>
@@ -197,15 +231,17 @@ require_once __DIR__ . "/layouts/header.php";
                         <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 border-b border-gray-50 pb-6">
                             <h2 class="text-lg font-bold text-gray-900 uppercase tracking-tight">Recent Orders</h2>
                             <div class="flex items-center gap-4">
-                                <select class="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-[11px] font-bold text-gray-500 uppercase tracking-widest outline-none focus:ring-1 focus:ring-brand">
-                                    <option>All Statuses</option>
-                                    <option>Pending</option>
-                                    <option>Shipped</option>
-                                    <option>Delivered</option>
+                                <select id="order-status-filter" onchange="filterAccountOrders()" class="bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-[11px] font-bold text-gray-500 uppercase tracking-widest outline-none focus:ring-1 focus:ring-brand cursor-pointer">
+                                    <option value="all">All Statuses</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="shipped">Shipped</option>
+                                    <option value="delivered">Delivered</option>
+                                    <option value="cancelled">Cancelled</option>
                                 </select>
                                 <div class="relative">
                                     <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                                    <input type="text" placeholder="Search orders..." class="bg-gray-50 border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-xs outline-none focus:ring-1 focus:ring-brand w-full md:w-48">
+                                    <input type="text" id="order-search-input" oninput="filterAccountOrders()" placeholder="Search orders..." class="bg-gray-50 border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-xs outline-none focus:ring-1 focus:ring-brand w-full md:w-48">
                                 </div>
                             </div>
                         </div>
@@ -221,9 +257,9 @@ require_once __DIR__ . "/layouts/header.php";
                                         <th class="pb-4 text-right">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody class="divide-y divide-gray-50">
+                                <tbody class="divide-y divide-gray-50" id="account-orders-tbody">
                                     <?php foreach ($orders as $o): ?>
-                                    <tr class="group">
+                                    <tr class="account-order-row group" data-status="<?= htmlspecialchars(strtolower($o['status'])) ?>" data-search="ke-2025-<?= str_pad($o['id'], 5, '0', STR_PAD_LEFT) ?> <?= htmlspecialchars(mb_strtolower($o['items_count'].' products '.$o['total_units'].' units LKR '.$o['total_amount'])) ?>">
                                         <td class="py-5 font-bold text-gray-900 text-sm">KE-2025-<?= str_pad($o['id'], 5, '0', STR_PAD_LEFT) ?></td>
                                         <td class="py-5 text-gray-500 text-xs"><?= htmlspecialchars($o['items_count']) ?> products · <?= htmlspecialchars($o['total_units']) ?> units</td>
                                         <td class="py-5 font-bold text-gray-900 text-sm">LKR <?= number_format($o['total_amount']) ?></td>
@@ -243,21 +279,13 @@ require_once __DIR__ . "/layouts/header.php";
                                         </td>
                                         <td class="py-5 text-right">
                                             <a href="/order-success?id=<?= htmlspecialchars($o['id']) ?>" class="text-xs font-bold text-brand hover:underline">View Details</a>
-
-                                            <!-- [VIVA TASK 07 - STEP 4: Frontend UI Customer Account - Order Cancellation Reason Modal (Commented out for later use)]
-                                            <?php if (strtolower($o['status']) === 'pending'): ?>
-                                                <button onclick="openCancelModal(<?= $o['id'] ?>)" class="ml-2 text-xs font-bold text-red-600 hover:underline">Cancel Order</button>
-                                            <?php endif; ?>
-                                            -->
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
                                     
-                                    <?php if (empty($orders)): ?>
-                                    <tr>
-                                        <td colspan="5" class="py-8 text-center text-sm text-gray-400">No orders found.</td>
+                                    <tr id="account-orders-empty" class="<?= empty($orders) ? '' : 'hidden' ?>">
+                                        <td colspan="5" class="py-8 text-center text-sm text-gray-400">No orders found matching the filter criteria.</td>
                                     </tr>
-                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -269,25 +297,28 @@ require_once __DIR__ . "/layouts/header.php";
                     <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
                         <h2 class="text-lg font-bold text-gray-900 mb-8 tracking-tight">My Profile</h2>
                         
-                        <div class="space-y-8">
+                        <!-- Profile Feedback Alert -->
+                        <div id="profile-alert" class="hidden mb-6 p-4 rounded-2xl text-xs font-bold flex items-center gap-3"></div>
+
+                        <form id="form-update-profile" onsubmit="updateProfile(event)" class="space-y-8">
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div class="space-y-2">
-                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">First Name</label>
-                                    <input type="text" value="<?= htmlspecialchars($user['first_name']) ?>" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">First Name *</label>
+                                    <input type="text" id="profile-first-name" name="first_name" required value="<?= htmlspecialchars($user['first_name']) ?>" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last Name</label>
-                                    <input type="text" value="<?= htmlspecialchars($user['last_name']) ?>" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Last Name *</label>
+                                    <input type="text" id="profile-last-name" name="last_name" required value="<?= htmlspecialchars($user['last_name']) ?>" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
                                 </div>
                             </div>
                             <div class="grid md:grid-cols-2 gap-6">
                                 <div class="space-y-2">
-                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email Address</label>
-                                    <input type="email" value="<?= htmlspecialchars($user['email']) ?>" pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Email Address *</label>
+                                    <input type="email" id="profile-email" name="email" required value="<?= htmlspecialchars($user['email']) ?>" pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone Number</label>
-                                    <input type="tel" value="<?= htmlspecialchars($user['phone']) ?>" maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone Number *</label>
+                                    <input type="tel" id="profile-phone" name="phone" required value="<?= htmlspecialchars($user['phone']) ?>" maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" class="w-full px-5 py-3.5 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
                                 </div>
                             </div>
 
@@ -308,10 +339,10 @@ require_once __DIR__ . "/layouts/header.php";
                                 <p class="text-[10px] font-medium text-brand/40 mt-6 italic">Business details cannot be changed online. Please contact our support team for updates.</p>
                             </div>
 
-                            <button class="bg-brand text-brand-light font-bold px-8 py-3.5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95">
+                            <button type="submit" id="btn-save-profile" class="bg-brand text-brand-light font-bold px-8 py-3.5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
                                 Save Profile Changes
                             </button>
-                        </div>
+                        </form>
                     </div>
                 </section>
 
@@ -319,34 +350,42 @@ require_once __DIR__ . "/layouts/header.php";
                 <section id="sec-addresses" class="hidden space-y-6">
                     <div class="flex items-center justify-between px-2">
                         <h2 class="text-lg font-bold text-gray-900 tracking-tight uppercase">Delivery Addresses</h2>
-                        <button class="flex items-center gap-2 text-xs font-bold text-brand hover:underline">
+                        <button onclick="openAddressModal('add')" class="flex items-center gap-2 text-xs font-bold text-brand hover:underline cursor-pointer">
                             <i class="ti ti-plus"></i> Add New Address
                         </button>
                     </div>
 
-                    <div class="grid md:grid-cols-2 gap-6">
-                        <div class="bg-brand-light/30 border-2 border-brand rounded-3xl p-8 relative shadow-sm">
-                            <span class="absolute top-4 right-4 px-2 py-0.5 bg-brand text-brand-light text-[9px] font-bold rounded-full uppercase">Default</span>
-                            <h3 class="text-[15px] font-bold text-brand mb-4"><?= htmlspecialchars($user['business_name']) ?> Warehouse</h3>
-                            <p class="text-sm text-brand/70 leading-relaxed font-medium">
-                                <?= nl2br(htmlspecialchars($user['address'])) ?>
-                            </p>
-                            <div class="mt-8 flex gap-4">
-                                <button class="text-xs font-bold text-brand hover:underline">Edit Address</button>
+                    <div class="grid md:grid-cols-2 gap-6" id="addresses-grid">
+                        <?php foreach ($user_addresses as $addr): ?>
+                        <?php $isDef = !empty($addr['is_default']); ?>
+                        <div class="<?= $isDef ? 'bg-brand-light/30 border-2 border-brand' : 'bg-white border border-gray-150 group hover:border-brand/30' ?> rounded-3xl p-8 relative shadow-sm transition-all flex flex-col justify-between">
+                            <div>
+                                <?php if ($isDef): ?>
+                                <span class="absolute top-4 right-4 px-2.5 py-0.5 bg-brand text-brand-light text-[9px] font-bold rounded-full uppercase tracking-wider">Default</span>
+                                <?php endif; ?>
+                                <h3 class="text-[15px] font-bold <?= $isDef ? 'text-brand' : 'text-gray-900 group-hover:text-brand' ?> mb-4 transition-colors"><?= htmlspecialchars($addr['title']) ?></h3>
+                                <p class="text-sm <?= $isDef ? 'text-brand/70' : 'text-gray-500' ?> leading-relaxed font-medium">
+                                    <?= nl2br(htmlspecialchars($addr['address'])) ?>
+                                    <?php if ($addr['city']): ?><br><?= htmlspecialchars($addr['city']) ?><?php endif; ?>
+                                    <?php if ($addr['province']): ?>, <?= htmlspecialchars($addr['province']) ?><?php endif; ?>
+                                    <?php if ($addr['postal_code']): ?> <?= htmlspecialchars($addr['postal_code']) ?><?php endif; ?>
+                                </p>
+                            </div>
+                            <div class="mt-8 flex items-center gap-4 flex-wrap">
+                                <button onclick='openAddressModal("edit", <?= htmlspecialchars(json_encode($addr), ENT_QUOTES, "UTF-8") ?>)' class="text-xs font-bold text-brand hover:underline cursor-pointer">Edit Address</button>
+                                <?php if (!$isDef): ?>
+                                <button onclick="setDefaultAddress(<?= $addr['id'] ?>)" class="text-xs font-bold text-gray-600 hover:text-brand hover:underline cursor-pointer">Set as Default</button>
+                                <button onclick="deleteAddress(<?= $addr['id'] ?>)" class="text-xs font-bold text-red-500 hover:text-red-700 hover:underline cursor-pointer">Delete</button>
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <div class="bg-white border border-gray-150 rounded-3xl p-8 relative shadow-sm group hover:border-brand/30 transition-all">
-                            <h3 class="text-[15px] font-bold text-gray-900 mb-4 group-hover:text-brand transition-colors">Colombo Showroom</h3>
-                            <p class="text-sm text-gray-500 leading-relaxed font-medium">
-                                No. 12, Main Street<br>
-                                Colombo 03, Western Province<br>
-                                Sri Lanka
-                            </p>
-                            <div class="mt-8 flex gap-4">
-                                <button class="text-xs font-bold text-brand hover:underline">Edit Address</button>
-                                <button class="text-xs font-bold text-red-400 hover:text-red-600">Delete</button>
-                            </div>
+                        <?php endforeach; ?>
+
+                        <?php if (empty($user_addresses)): ?>
+                        <div class="col-span-2 bg-white border border-gray-100 rounded-3xl p-12 text-center text-gray-400 text-sm font-medium">
+                            No delivery addresses saved yet. Click "Add New Address" above to add one.
                         </div>
+                        <?php endif; ?>
                     </div>
                 </section>
 
@@ -369,7 +408,7 @@ require_once __DIR__ . "/layouts/header.php";
                                 </div>
                                 <div class="flex items-center justify-between md:justify-end gap-10">
                                     <span class="text-sm font-bold text-gray-900">LKR <?= number_format($o['total_amount']) ?></span>
-                                    <button onclick="window.open('/order-success?id=<?= htmlspecialchars($o['id']) ?>&print=1', '_blank')" class="bg-gray-50 text-gray-900 hover:bg-brand hover:text-brand-light font-bold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-2 border border-gray-100 group-hover:border-brand/10">
+                                    <button onclick="window.open('/order-success?id=<?= htmlspecialchars($o['id']) ?>&print=1', '_blank')" class="bg-gray-50 text-gray-900 hover:bg-brand hover:text-brand-light font-bold px-4 py-2 rounded-xl text-xs transition-all flex items-center gap-2 border border-gray-100 group-hover:border-brand/10 cursor-pointer">
                                         <i class="ti ti-download"></i> PDF
                                     </button>
                                 </div>
@@ -429,7 +468,7 @@ require_once __DIR__ . "/layouts/header.php";
                                 </div>
                             </div>
 
-                            <button type="submit" id="btn-update-password" class="bg-brand text-brand-light font-bold px-8 py-3.5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2">
+                            <button type="submit" id="btn-update-password" class="bg-brand text-brand-light font-bold px-8 py-3.5 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 flex items-center justify-center gap-2 cursor-pointer">
                                 Update Password
                             </button>
                         </form>
@@ -440,6 +479,58 @@ require_once __DIR__ . "/layouts/header.php";
         </div>
     </div>
 </main>
+
+<!-- Address Modal Popup -->
+<div id="address-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[1000] hidden items-center justify-center p-4 transition-opacity duration-200 opacity-0">
+    <div class="bg-white rounded-3xl border border-gray-100 shadow-2xl max-w-lg w-full p-8 transform scale-95 transition-all duration-200">
+        <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+            <h3 id="address-modal-title" class="text-xl font-extrabold text-gray-900 tracking-tight">Add New Address</h3>
+            <button onclick="closeAddressModal()" class="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer">
+                <i class="ti ti-x text-2xl"></i>
+            </button>
+        </div>
+
+        <form id="form-address" onsubmit="saveAddress(event)" class="space-y-5">
+            <input type="hidden" id="addr-id" value="">
+            
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Address Label / Title *</label>
+                <input type="text" id="addr-title" required placeholder="e.g. Colombo Branch, Main Warehouse" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Street Address *</label>
+                <textarea id="addr-street" required rows="2" placeholder="e.g. No. 12, Main Street, Fort" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all resize-none"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">City</label>
+                    <input type="text" id="addr-city" placeholder="e.g. Colombo" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Province / State</label>
+                    <input type="text" id="addr-province" placeholder="e.g. Western Province" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+                </div>
+            </div>
+
+            <div class="space-y-1.5">
+                <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Postal Code</label>
+                <input type="text" id="addr-postal" placeholder="e.g. 00300" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand/10 transition-all">
+            </div>
+
+            <div class="flex items-center gap-3 pt-2">
+                <input type="checkbox" id="addr-default" class="w-4 h-4 text-brand rounded border-gray-300 focus:ring-brand cursor-pointer">
+                <label for="addr-default" class="text-xs font-bold text-gray-700 cursor-pointer">Set as default delivery address</label>
+            </div>
+
+            <div class="flex gap-3 pt-4 border-t border-gray-100">
+                <button type="button" onclick="closeAddressModal()" class="flex-1 bg-gray-50 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-100 transition-colors cursor-pointer">Cancel</button>
+                <button type="submit" id="btn-save-address" class="flex-1 bg-brand text-brand-light font-bold py-3.5 rounded-2xl hover:bg-brand-dark shadow-lg shadow-brand/20 transition-all transform hover:-translate-y-px cursor-pointer">Save Address</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <style>
 .active-nav {
@@ -467,6 +558,212 @@ function showSection(id) {
         navEl.classList.add('text-gray-400', 'hover:bg-gray-50', 'hover:text-brand');
     }
   });
+}
+
+// 1. Account Orders Filter
+function filterAccountOrders() {
+    var status = (document.getElementById('order-status-filter')?.value || 'all').toLowerCase();
+    var query = (document.getElementById('order-search-input')?.value || '').toLowerCase().trim();
+    
+    var rows = document.querySelectorAll('.account-order-row');
+    var visibleCount = 0;
+
+    rows.forEach(r => {
+        var rStatus = (r.dataset.status || '').toLowerCase();
+        var rSearch = (r.dataset.search || '').toLowerCase();
+        
+        var matchStatus = (status === 'all' || rStatus === status);
+        var matchSearch = (!query || rSearch.includes(query));
+
+        if (matchStatus && matchSearch) {
+            r.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            r.classList.add('hidden');
+        }
+    });
+
+    var emptyEl = document.getElementById('account-orders-empty');
+    if (emptyEl) {
+        if (visibleCount === 0) emptyEl.classList.remove('hidden');
+        else emptyEl.classList.add('hidden');
+    }
+}
+
+// 2. Profile Update
+function updateProfile(e) {
+    e.preventDefault();
+    var firstName = document.getElementById('profile-first-name').value.trim();
+    var lastName = document.getElementById('profile-last-name').value.trim();
+    var email = document.getElementById('profile-email').value.trim();
+    var phone = document.getElementById('profile-phone').value.trim();
+    var alertContainer = document.getElementById('profile-alert');
+    var submitBtn = document.getElementById('btn-save-profile');
+
+    function showAlert(msg, isSuccess) {
+        if (!alertContainer) return;
+        alertContainer.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border-red-100', 'bg-green-50', 'text-green-700', 'border-green-100');
+        if (isSuccess) {
+            alertContainer.classList.add('bg-green-50', 'text-green-700', 'border', 'border-green-100');
+            alertContainer.innerHTML = `<i class="ti ti-circle-check text-lg shrink-0"></i> <span>${msg}</span>`;
+        } else {
+            alertContainer.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-100');
+            alertContainer.innerHTML = `<i class="ti ti-alert-circle text-lg shrink-0"></i> <span>${msg}</span>`;
+        }
+    }
+
+    if (submitBtn) setButtonLoading(submitBtn, true, 'Saving...');
+
+    fetch('/api/update_profile.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            phone: phone
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (submitBtn) setButtonLoading(submitBtn, false);
+        if (data.status === 'success') {
+            showAlert(data.message || 'Profile updated successfully!', true);
+            if (typeof showToast === 'function') showToast(data.message || 'Profile updated successfully!', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showAlert(data.message || 'Failed to update profile.', false);
+        }
+    })
+    .catch(err => {
+        if (submitBtn) setButtonLoading(submitBtn, false);
+        console.error(err);
+        showAlert("Network error occurred.", false);
+    });
+}
+
+// 3, 4, 5. Delivery Address Management
+function openAddressModal(mode, data = null) {
+    var modal = document.getElementById('address-modal');
+    var title = document.getElementById('address-modal-title');
+    document.getElementById('form-address').reset();
+
+    if (mode === 'edit' && data) {
+        title.textContent = 'Edit Address';
+        document.getElementById('addr-id').value = data.id || '';
+        document.getElementById('addr-title').value = data.title || '';
+        document.getElementById('addr-street').value = data.address || '';
+        document.getElementById('addr-city').value = data.city || '';
+        document.getElementById('addr-province').value = data.province || '';
+        document.getElementById('addr-postal').value = data.postal_code || '';
+        document.getElementById('addr-default').checked = !!parseInt(data.is_default);
+    } else {
+        title.textContent = 'Add New Address';
+        document.getElementById('addr-id').value = '';
+        document.getElementById('addr-default').checked = false;
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    void modal.offsetWidth;
+    modal.classList.remove('opacity-0');
+    if (modal.firstElementChild) {
+        modal.firstElementChild.classList.remove('scale-95');
+    }
+}
+
+function closeAddressModal() {
+    var modal = document.getElementById('address-modal');
+    modal.classList.add('opacity-0');
+    if (modal.firstElementChild) {
+        modal.firstElementChild.classList.add('scale-95');
+    }
+    setTimeout(() => {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }, 200);
+}
+
+function saveAddress(e) {
+    e.preventDefault();
+    var btn = document.getElementById('btn-save-address');
+    var payload = {
+        action: 'save',
+        address_id: document.getElementById('addr-id').value,
+        title: document.getElementById('addr-title').value.trim(),
+        address: document.getElementById('addr-street').value.trim(),
+        city: document.getElementById('addr-city').value.trim(),
+        province: document.getElementById('addr-province').value.trim(),
+        postal_code: document.getElementById('addr-postal').value.trim(),
+        is_default: document.getElementById('addr-default').checked ? 1 : 0
+    };
+
+    if (btn) setButtonLoading(btn, true, 'Saving...');
+
+    fetch('/api/addresses.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (btn) setButtonLoading(btn, false);
+        if (data.status === 'success') {
+            if (typeof showToast === 'function') showToast(data.message || 'Address saved.', 'success');
+            closeAddressModal();
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            if (typeof showToast === 'function') showToast('Error: ' + data.message, 'error');
+        }
+    })
+    .catch(err => {
+        if (btn) setButtonLoading(btn, false);
+        if (typeof showToast === 'function') showToast('Network error occurred.', 'error');
+    });
+}
+
+function setDefaultAddress(id) {
+    uiConfirm("Set this address as your default delivery address?", () => {
+        fetch('/api/addresses.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'set_default', address_id: id })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (typeof showToast === 'function') showToast(data.message || 'Default address updated.', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                if (typeof showToast === 'function') showToast('Error: ' + data.message, 'error');
+            }
+        })
+        .catch(err => {
+            if (typeof showToast === 'function') showToast('Network error occurred.', 'error');
+        });
+    }, "Set Default Address?", "Set Default");
+}
+
+function deleteAddress(id) {
+    uiConfirm("Are you sure you want to delete this address?", () => {
+        fetch('/api/addresses.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', address_id: id })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (typeof showToast === 'function') showToast(data.message || 'Address deleted.', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                if (typeof showToast === 'function') showToast('Error: ' + data.message, 'error');
+            }
+        })
+        .catch(err => {
+            if (typeof showToast === 'function') showToast('Network error occurred.', 'error');
+        });
+    }, "Delete Address?", "Delete");
 }
 
 function checkAccountPasswordStrength(password) {
