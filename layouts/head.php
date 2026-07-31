@@ -199,15 +199,42 @@ $can_see_prices = $is_logged_in && $buyer_approved;
                 toast.addEventListener('transitionend', onTransitionEnd);
             }, 4000);
         }
-        window.uiConfirm = function(message, onConfirm) {
+        window.uiConfirm = function(message, onConfirm, title = null, confirmText = null) {
             const modal = document.getElementById('global-confirm-modal');
             const box = document.getElementById('global-confirm-box');
-            document.getElementById('global-confirm-message').textContent = message;
+            const titleEl = document.getElementById('global-confirm-title');
+            const msgEl = document.getElementById('global-confirm-message');
+            const okBtn = document.getElementById('global-confirm-ok');
+
+            var isDeleteAction = message.toLowerCase().includes('delete') || message.toLowerCase().includes('remove') || message.toLowerCase().includes('cancel');
+
+            if (!title) {
+                if (message.toLowerCase().includes('supplier')) title = 'Delete Supplier?';
+                else if (message.toLowerCase().includes('product')) title = 'Delete Product?';
+                else if (message.toLowerCase().includes('category')) title = 'Delete Category?';
+                else if (message.toLowerCase().includes('order')) title = 'Delete Order?';
+                else if (message.toLowerCase().includes('user') || message.toLowerCase().includes('customer') || message.toLowerCase().includes('staff')) title = 'Delete Account?';
+                else title = isDeleteAction ? 'Delete Item?' : 'Confirm Action';
+            }
+
+            if (!confirmText) {
+                confirmText = isDeleteAction ? 'Delete' : 'Confirm';
+            }
+
+            titleEl.textContent = title;
             
+            var formattedMsg = message;
+            if (isDeleteAction && !formattedMsg.toLowerCase().includes('cannot be undone')) {
+                formattedMsg = formattedMsg.trim();
+                if (!formattedMsg.endsWith('.')) formattedMsg += '.';
+                formattedMsg += ' This action cannot be undone.';
+            }
+            msgEl.textContent = formattedMsg;
+            okBtn.textContent = confirmText;
+
             modal.classList.remove('hidden');
             modal.classList.add('flex');
-            // force reflow
-            void modal.offsetWidth;
+            void modal.offsetWidth; // force reflow
             modal.classList.remove('opacity-0');
             box.classList.remove('scale-95');
 
@@ -240,8 +267,6 @@ $can_see_prices = $is_logged_in && $buyer_approved;
                 Turbo.setConfirmMethod((message, element) => {
                     return new Promise(resolve => {
                         window.uiConfirm(message, () => resolve(true));
-                        // If they cancel, we also need to resolve(false).
-                        // Let's patch uiConfirm to optionally return a promise or handle cancel.
                         const oldClose = document.getElementById('global-confirm-cancel').onclick;
                         document.getElementById('global-confirm-cancel').onclick = () => {
                             if(oldClose) oldClose();
@@ -258,19 +283,15 @@ $can_see_prices = $is_logged_in && $buyer_approved;
     
     <!-- Global Confirm Modal -->
     <div id="global-confirm-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[10000] hidden items-center justify-center p-4 opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 transform scale-95 transition-transform duration-300" id="global-confirm-box">
-            <div class="flex items-start gap-4">
-                <div class="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
-                    <i class="ti ti-alert-triangle text-amber-500 text-xl"></i>
-                </div>
-                <div>
-                    <h3 class="text-base font-bold text-gray-900 mb-1">Confirm Action</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed" id="global-confirm-message"></p>
-                </div>
+        <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-sm w-full text-center flex flex-col items-center transform scale-95 transition-all duration-300" id="global-confirm-box">
+            <div class="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-6">
+                <i class="ti ti-trash text-3xl"></i>
             </div>
-            <div class="mt-6 flex justify-end gap-3">
-                <button id="global-confirm-cancel" class="px-4 py-2 rounded-xl text-sm font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 transition-colors">Cancel</button>
-                <button id="global-confirm-ok" class="px-4 py-2 rounded-xl text-sm font-bold text-white bg-brand shadow-lg shadow-brand/20 hover:opacity-90 transition-all">Confirm</button>
+            <h3 class="text-xl font-extrabold text-gray-900 mb-2" id="global-confirm-title">Delete Product?</h3>
+            <p class="text-sm font-medium text-gray-500 mb-8 leading-relaxed" id="global-confirm-message">Are you sure you want to delete this product? This action cannot be undone.</p>
+            <div class="flex gap-3 w-full">
+                <button id="global-confirm-cancel" class="flex-1 bg-gray-50 text-gray-700 font-bold py-3.5 rounded-2xl hover:bg-gray-100 transition-colors">Cancel</button>
+                <button id="global-confirm-ok" class="flex-1 bg-red-500 text-white font-bold py-3.5 rounded-2xl hover:bg-red-600 shadow-lg shadow-red-500/20 transition-all transform hover:-translate-y-px">Delete</button>
             </div>
         </div>
     </div>
