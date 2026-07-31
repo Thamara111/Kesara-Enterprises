@@ -1,7 +1,7 @@
 <?php
 /**
- * Shopping Cart Page
- * Displays items added to the cart, calculates totals (including MOQ logic and pricing tiers), and prepares for checkout.
+ * Wholesale Shopping Cart Page
+ * Displays cart items, validates minimum order quantities (MOQ), calculates tiered pricing totals and VAT, and prepares order for checkout or quote export.
  */
 ob_start();
 $page_meta = [
@@ -164,7 +164,7 @@ require_once __DIR__ . "/layouts/header.php";
 let cartItems = [];
 let dbProducts = {};
 
-// Load cart from LocalStorage
+// Getting data -> Loading cart item list from browser local storage
 function loadCartFromStorage() {
     const saved = localStorage.getItem('kesara_cart');
     if (saved) {
@@ -178,7 +178,7 @@ function loadCartFromStorage() {
 }
 
 function saveCartToStorage() {
-    // Only save id and qty and selection state
+    // Saving data -> Saving product ID, quantity, color, size, and selection state to browser local storage
     const toSave = cartItems.map(item => ({id: item.id, qty: item.qty, color: item.color, size: item.size, selected: item.selected}));
     localStorage.setItem('kesara_cart', JSON.stringify(toSave));
     if (typeof window.updateCartBadges === 'function') {
@@ -186,7 +186,7 @@ function saveCartToStorage() {
     }
 }
 
-// Fetch DB details for the items
+// Getting data -> Fetching product specifications and dynamic pricing tiers from database API
 async function initializeCart() {
     const storageCart = loadCartFromStorage();
     
@@ -214,7 +214,7 @@ async function initializeCart() {
             const products = data.data;
             products.forEach(p => dbProducts[p.id] = p);
             
-            // Rebuild cartItems with db details
+            // Processing data -> Merging local storage cart items with database product details and MOQ rules
             cartItems = storageCart.map(item => {
                 const dbP = dbProducts[item.id];
                 if (!dbP) return null;
@@ -234,7 +234,7 @@ async function initializeCart() {
                     selected: item.selected !== false
                 };
             }).filter(i => i !== null);
-            saveCartToStorage(); // Save validated quantities
+            saveCartToStorage();
             render();
         } else {
             document.getElementById('cart-items').innerHTML = `<div class="p-4 text-red-500 bg-red-50 rounded-xl border border-red-100 text-sm">Failed to load cart items: ${data.message || 'Unknown error'}</div>`;
@@ -247,10 +247,10 @@ async function initializeCart() {
     }
 }
 
-// Call on load
+// Initialization -> Fetching cart details when DOM is fully loaded
 document.addEventListener('DOMContentLoaded', initializeCart);
 
-// Helper to calculate price based on total selected qty of the same product
+// Processing data -> Calculating total quantity for specific product ID across selected cart lines
 function getProductTotalQty(productId) {
     return cartItems.filter(i => i.id === productId && i.selected).reduce((sum, i) => sum + i.qty, 0);
 }
@@ -258,7 +258,6 @@ function getProductTotalQty(productId) {
 function getPrice(item) {
   if (!item.tiers || item.tiers.length === 0) return 0;
   let totalQty = getProductTotalQty(item.id);
-  // If item is unselected, we still show a price based on its own qty just for display
   if (!item.selected) totalQty = item.qty;
 
   let basePrice = 0;
@@ -269,12 +268,12 @@ function getPrice(item) {
       break;
     }
   }
-  // Fallback to highest tier if over max, or lowest if under min
+  // Fallback -> Fallback to default tier pricing if quantity range is outside bounds
   if (basePrice === 0) {
       basePrice = item.tiers[item.tiers.length - 1].price;
   }
   
-  // Apply discount if present
+  // Processing data -> Applying percentage discount if active on product
   if (item.discount && item.discount > 0) {
       return basePrice * (1 - (item.discount / 100));
   }
@@ -304,9 +303,8 @@ function render() {
   let subtotal = 0;
   let belowMoqCount = 0;
 
-
   cartItems.forEach((item, i) => {
-    // For MOQ check, we check the total qty of that product ID
+    // Checking data -> Verifying if total quantity meets product Minimum Order Quantity (MOQ)
     const productTotalQty = getProductTotalQty(item.id);
     const belowMoq = item.selected && productTotalQty < item.moq;
     if(belowMoq) belowMoqCount++;
@@ -351,7 +349,7 @@ function render() {
     container.appendChild(row);
 
     if (item.selected) {
-        // Summary Line
+        // Formatting data -> Creating summary breakdown item line for checkout sidebar
         const sLine = document.createElement('div');
         sLine.className = 'flex justify-between items-start text-[13px]';
         sLine.innerHTML = `
@@ -369,7 +367,7 @@ function render() {
   document.getElementById('vat-val').textContent = 'LKR ' + vat.toLocaleString();
   document.getElementById('total-val').textContent = 'LKR ' + total.toLocaleString();
 
-  // Alerts & Checkout state
+  // Checking status -> Updating MOQ warning alerts and checkout button state
   const alerts = document.getElementById('moq-alerts');
   const checkoutBtn = document.getElementById('checkout-btn');
   
@@ -543,7 +541,7 @@ function downloadQuote() {
   printWindow.document.close();
 }
 
-// Initial Render
+// Application init -> Rendering initial shopping cart UI
 render();
 </script>
 

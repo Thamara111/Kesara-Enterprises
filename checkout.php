@@ -1,24 +1,23 @@
 <?php
 /**
- * Checkout Page
- * Handles the final step of the purchasing process.
- * Verifies buyer approval status, calculates totals, and processes order submission.
+ * Wholesale Checkout Page
+ * Handles wholesale order placement, verifies buyer account approval status, builds price calculation summary, and uploads bank transfer payment receipt.
  */
-// Mock Checkout Page for Kesara Enterprises
 require_once __DIR__ . "/database/connection.php";
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-// Cache-control headers to prevent stale display of approval-gated content
-header("Cache-Control: no-cache, no-store, must-revalidate"); // HTTP 1.1.
-header("Pragma: no-cache"); // HTTP 1.0.
-header("Expires: 0"); // Proxies.
+// Security check -> Setting cache-control headers to prevent stale rendering of buyer-restricted content
+header("Cache-Control: no-cache, no-store, must-revalidate");
+header("Pragma: no-cache");
+header("Expires: 0");
 
 $is_logged_in = isset($_SESSION['user_id']);
 $buyer_approved = false;
 
 if ($is_logged_in && isset($pdo)) {
     try {
+        // Checking data -> Fetching customer account status from database
         $auth_stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? LIMIT 1");
         $auth_stmt->execute([$_SESSION['user_id']]);
         $auth_user = $auth_stmt->fetch();
@@ -177,18 +176,20 @@ if (!$can_see_prices) {
     </main>
 
 <script>
-// Checkout & DB Cart integration
+// Integration -> Linking checkout interface with local storage cart and product API
 
 let cartItems = [];
 let dbProducts = {};
 let finalTotalAmount = 0;
 let finalItemsPayload = [];
 
+// Getting data -> Loading selected cart items from browser local storage
 function loadCartFromStorage() {
     const saved = localStorage.getItem('kesara_cart');
     return saved ? JSON.parse(saved) : [];
 }
 
+// Getting data -> Fetching database pricing tiers for checkout items
 async function initializeCheckout() {
     const storageCart = loadCartFromStorage();
     if (storageCart.length === 0) {
@@ -245,6 +246,7 @@ function getPrice(item) {
   return item.tiers[item.tiers.length - 1].price;
 }
 
+// Formatting data -> Rendering order breakdown, calculating subtotal, 18% VAT, and final total amount
 function renderSummary() {
     let subtotal = 0;
     const summaryContainer = document.getElementById('summary-items');
@@ -285,7 +287,7 @@ function renderSummary() {
     document.getElementById('btn-total').textContent = finalFormatted;
 }
 
-// File Drag & Drop + Selection Logic
+// Event handling -> Binding drag-and-drop receipt upload file listeners
 document.addEventListener('DOMContentLoaded', () => {
     const dropZone = document.getElementById('drop-zone');
     const fileInput = document.getElementById('receipt_file');
@@ -361,7 +363,7 @@ function clearSelectedFile() {
     document.getElementById('drop-zone').classList.remove('hidden');
 }
 
-// Validation & Submission
+// Processing request -> Submitting wholesale order payload and transfer receipt file to orders API
 let isSubmittingOrder = false;
 async function processPayment(e) {
     e.preventDefault();

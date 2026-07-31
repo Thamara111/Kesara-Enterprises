@@ -1,7 +1,7 @@
 <?php
 /**
- * Authentication and Registration Page
- * Handles customer login, registration (with BR number verification), and session management.
+ * Customer Authentication & Registration Page
+ * Handles wholesale customer sign in, account registration with BR number verification, and session setup.
  */
 require_once __DIR__ . "/database/connection.php";
 
@@ -13,6 +13,7 @@ $email_error = false;
 $password_error = false;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Processing request -> Handling customer registration form submission
     if ($page_mode === 'register') {
         $first_name = trim($_POST['first_name'] ?? '');
         $last_name = trim($_POST['last_name'] ?? '');
@@ -25,12 +26,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $business_type = trim($_POST['business_type'] ?? '');
         $address = trim($_POST['address'] ?? '');
 
+        // Checking data -> Ensuring required registration fields are not empty
         if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($whatsapp_number) || empty($password) || empty($business_name) || empty($br_number) || empty($business_type) || empty($address)) {
             $error_message = "All fields are required.";
+        // Checking data -> Validating email address format
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error_message = "Invalid email format.";
+        // Checking data -> Validating Sri Lankan 10-digit phone number format
         } elseif (!preg_match('/^0[0-9]{9}$/', $phone)) {
             $error_message = "Phone number must start with 0 and be exactly 10 digits.";
+        // Checking data -> Validating Sri Lankan 10-digit WhatsApp number format
         } elseif (!preg_match('/^0[0-9]{9}$/', $whatsapp_number)) {
             $error_message = "WhatsApp number must start with 0 and be exactly 10 digits.";
         } else {
@@ -49,12 +54,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $insert_tin_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $tin_number, $business_type, $address]);
                     */
 
+                    // Checking data -> Checking if an account with this email address already exists
                     $check_stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
                     $check_stmt->execute([$email]);
                     if ($check_stmt->fetch()) {
                         $error_message = "An account with this email address already exists.";
                     } else {
+                        // Processing data -> Hashing customer password using bcrypt algorithm
                         $hashed_pass = password_hash($password, PASSWORD_BCRYPT);
+                        // Saving data -> Inserting new customer account into users table with pending status
                         $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, business_name, br_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
                         $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $business_type, $address]);
 
@@ -69,10 +77,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 exit;
             }
         }
+    // Processing request -> Handling customer login form submission
     } elseif ($page_mode === 'login') {
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
 
+        // Checking data -> Validating email address and password inputs
         if (empty($email) || empty($password)) {
             $error_message = "Email and password are required.";
             if (empty($email))
@@ -85,15 +95,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             if ($pdo) {
                 try {
+                    // Getting data -> Fetching customer user record matching email
                     $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
                     $stmt->execute([$email]);
                     $user = $stmt->fetch();
 
+                    // Checking data -> Verifying password hash and account approval status
                     if ($user && password_verify($password, $user['password'])) {
                         if ($user['status'] === 'approved') {
                             if (session_status() === PHP_SESSION_NONE) {
                                 session_start();
                             }
+                            // Saving session -> Storing authenticated user credentials in session
                             $_SESSION['user_id'] = $user['id'];
                             $_SESSION['user_email'] = $user['email'];
                             $_SESSION['user_name'] = $user['first_name'] . ' ' . $user['last_name'];
@@ -230,7 +243,7 @@ require_once __DIR__ . "/layouts/head.php";
                     <form action="" method="POST" class="space-y-6">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Email address <span
-                                    class="text-red-500">*</span></label>
+                                     class="text-red-500">*</span></label>
                             <div class="relative">
                                 <input type="email" name="email" required placeholder="you@company.com"
                                     pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"

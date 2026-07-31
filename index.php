@@ -1,7 +1,7 @@
 <?php
 /**
- * Frontend Homepage
- * Displays featured products, categories, and promotional sections.
+ * Wholesale Portal Homepage
+ * Displays hero banner, product categories, best selling items, wholesale ordering steps, business benefits, contact details, and company overview.
  */
 require_once __DIR__ . "/database/connection.php";
 
@@ -10,14 +10,14 @@ $featured_products = [];
 
 if ($pdo) {
     try {
-        // Fetch categories with style counts
+        // Getting data -> Querying active product categories along with total style counts per category
         $stmt = $pdo->query("SELECT c.id, c.name, c.slug, c.icon, c.image, COUNT(p.id) AS style_count 
                              FROM categories c 
                              LEFT JOIN products p ON p.category_id = c.id 
                              GROUP BY c.id");
         $categories = $stmt->fetchAll();
 
-        // Fetch featured products (first 4 latest products)
+        // Getting data -> Fetching 4 latest active featured products with pricing and MOQ details
         $stmt = $pdo->query("SELECT p.id, p.name, p.sku, p.moq, p.base_price, p.status, p.images 
                              FROM products p 
                              WHERE p.deleted_at IS NULL
@@ -25,11 +25,9 @@ if ($pdo) {
                              LIMIT 4");
         $featured_products = $stmt->fetchAll();
     } catch (\Exception $e) {
-        // Silently catch database query issues
+        // Error handling -> Catching database connection or query exceptions silently
     }
 }
-
-
 
 $page_meta = [
     'title' => 'Kesara Enterprises | Wholesale Underwear Supplier Sri Lanka',

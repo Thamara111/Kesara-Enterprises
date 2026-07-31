@@ -1,14 +1,13 @@
 <?php
 /**
- * User Account Dashboard
- * Displays the logged-in user's profile, recent orders, delivery addresses, and account status.
- * Also handles user logout logic.
+ * Wholesale Customer Account Dashboard Page
+ * Renders user profile management, past order history & status filters, saved delivery address management, VAT invoice downloads, and security password update tools.
  */
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Handle Logout
+// Processing logout request and clearing active user session
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     session_destroy();
     header("Location: /login");
@@ -33,7 +32,7 @@ $last_order_year = "";
 
 if (isset($pdo) && $pdo !== null) {
     try {
-        // Self-healing database setup for delivery addresses
+        // Initializing user delivery addresses table if not present in database schema
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_addresses (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -48,7 +47,7 @@ if (isset($pdo) && $pdo !== null) {
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
 
-        // Seed default address if user_addresses is empty for this user
+        // Seeding default primary delivery address from user account record
         $checkCount = $pdo->prepare("SELECT COUNT(*) FROM user_addresses WHERE user_id = ?");
         $checkCount->execute([$user_id]);
         if ($checkCount->fetchColumn() == 0) {
@@ -62,18 +61,18 @@ if (isset($pdo) && $pdo !== null) {
             }
         }
 
-        // Fetch User details
+        // Getting data -> Fetching user account profile details
         $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
         $user = $stmt->fetch();
         
         if ($user) {
-            // Fetch User Delivery Addresses
+            // Getting data -> Fetching saved delivery addresses for active user
             $stmt_addr = $pdo->prepare("SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, id DESC");
             $stmt_addr->execute([$user_id]);
             $user_addresses = $stmt_addr->fetchAll();
 
-            // Fetch Order statistics & list
+            // Getting data -> Fetching order statistics and detailed item counts
             $stmt_orders = $pdo->prepare("SELECT o.*, 
                                                  (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS items_count,
                                                  (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE order_id = o.id) AS total_units
@@ -95,11 +94,11 @@ if (isset($pdo) && $pdo !== null) {
             }
         }
     } catch (\Exception $e) {
-        // Fallback
+        // Falling back to empty dataset on database query exception
     }
 }
 
-// If user data could not be loaded, redirect to login
+// Redirecting unauthenticated user to login screen
 if (!$user) {
     header("Location: /login");
     exit;
@@ -560,7 +559,7 @@ function showSection(id) {
   });
 }
 
-// 1. Account Orders Filter
+// Filtering order history table rows by status selection and keyword search query
 function filterAccountOrders() {
     var status = (document.getElementById('order-status-filter')?.value || 'all').toLowerCase();
     var query = (document.getElementById('order-search-input')?.value || '').toLowerCase().trim();
@@ -590,7 +589,7 @@ function filterAccountOrders() {
     }
 }
 
-// 2. Profile Update
+// Sending data -> Submitting updated profile details payload to account management API
 function updateProfile(e) {
     e.preventDefault();
     var firstName = document.getElementById('profile-first-name').value.trim();
@@ -642,7 +641,7 @@ function updateProfile(e) {
     });
 }
 
-// 3, 4, 5. Delivery Address Management
+// Managing delivery address modal display state for add and edit workflows
 function openAddressModal(mode, data = null) {
     var modal = document.getElementById('address-modal');
     var title = document.getElementById('address-modal-title');
@@ -684,6 +683,7 @@ function closeAddressModal() {
     }, 200);
 }
 
+// Sending data -> Submitting address creation or update payload to address API
 function saveAddress(e) {
     e.preventDefault();
     var btn = document.getElementById('btn-save-address');
@@ -722,6 +722,7 @@ function saveAddress(e) {
     });
 }
 
+// Sending data -> Setting selected address as default delivery destination
 function setDefaultAddress(id) {
     uiConfirm("Set this address as your default delivery address?", () => {
         fetch('/api/addresses.php', {
@@ -744,6 +745,7 @@ function setDefaultAddress(id) {
     }, "Set Default Address?", "Set Default");
 }
 
+// Sending data -> Deleting selected address record via address management API
 function deleteAddress(id) {
     uiConfirm("Are you sure you want to delete this address?", () => {
         fetch('/api/addresses.php', {
@@ -766,6 +768,7 @@ function deleteAddress(id) {
     }, "Delete Address?", "Delete");
 }
 
+// Validating password complexity and updating real-time visual strength indicator
 function checkAccountPasswordStrength(password) {
     const bar = document.getElementById('account-strengthBar');
     const label = document.getElementById('account-strengthLabel');
@@ -825,6 +828,7 @@ function toggleAccPasswordVisibility(inputId, btn) {
     }
 }
 
+// Sending data -> Submitting password change payload to authentication API
 function updateAccountPassword(e) {
     e.preventDefault();
     const currPass = document.getElementById('acc-curr-password').value;

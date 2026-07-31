@@ -1,7 +1,7 @@
 <?php
 /**
- * About Us Page
- * Static page presenting the company's mission, values, and history.
+ * Wholesale Company Profile & Legacy Page
+ * Displays company background since 2012, supply chain metrics, mission, vision, core values, and executive leadership team.
  */
 require_once __DIR__ . "/database/connection.php";
 

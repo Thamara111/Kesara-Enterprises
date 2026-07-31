@@ -1,8 +1,7 @@
 <?php
 /**
- * Product Detail Page
- * Displays comprehensive details for a specific product including images, attributes, and pricing tiers.
- * Integrates 'Add to Cart' functionality gated by user approval status.
+ * Wholesale Product Specification & Order Page
+ * Displays product image gallery, specifications, color & size quantity matrix, volume-based pricing tiers, and wholesale quote request modal.
  */
 require_once __DIR__ . "/database/connection.php";
 
@@ -19,6 +18,7 @@ $user_email = '';
 
 if ($is_logged_in && isset($pdo)) {
     try {
+        // Querying authenticated customer user profile details and status
         $auth_stmt = $pdo->prepare("SELECT first_name, last_name, email, phone, business_name, status FROM users WHERE id = ? LIMIT 1");
         $auth_stmt->execute([$_SESSION['user_id']]);
         $auth_user = $auth_stmt->fetch();
@@ -34,7 +34,7 @@ if ($is_logged_in && isset($pdo)) {
             }
         }
     } catch (\Exception $e) {
-        // Fail closed — treat as not authorized on DB error
+        // Falling back to guest access on database connection error
         $buyer_approved = false;
     }
 }
@@ -43,7 +43,7 @@ $can_see_prices = $is_logged_in && $buyer_approved;
 
 $sku = $_GET['sku'] ?? 'KB-001';
 
-// Query product
+// Initializing product lookup variables and pricing structure arrays
 $product = null;
 $pricing_tiers = [];
 $variations = [];
@@ -51,6 +51,7 @@ $category_name = "Briefs";
 
 if (isset($pdo) && $pdo !== null) {
     try {
+        // Fetching product specifications matching SKU code
         $stmt = $pdo->prepare("SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON p.category_id = c.id WHERE p.sku = ?");
         $stmt->execute([$sku]);
         $product = $stmt->fetch();
@@ -58,7 +59,7 @@ if (isset($pdo) && $pdo !== null) {
         if ($product) {
             $category_name = $product['category_name'];
 
-            // Query pricing tiers
+            // Querying pricing tiers and variant inventory records from database
             $stmt_tiers = $pdo->prepare("SELECT * FROM pricing_tiers WHERE product_id = ? ORDER BY min_qty ASC");
             $stmt_tiers->execute([$product['id']]);
             $pricing_tiers = $stmt_tiers->fetchAll();
@@ -73,7 +74,7 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
-// Mock Product Fallback
+// Loading default sample product attributes if SKU is not found in database
 if (!$product) {
     $product = [
         'id' => 999,
@@ -338,7 +339,7 @@ require_once __DIR__ . "/layouts/header.php";
                             // Determine if this is the default middle tier for active class (e.g. 2nd tier or 1st tier if count is small)
                             $is_active = (count($pricing_tiers) > 1 && $index === 1) || (count($pricing_tiers) === 1 && $index === 0);
                             ?>
-<!--                             
+                            <!--                             
                             [VIVA TASK 03 - UI: Dynamic Tier Row Data-Attributes & Upper Bound Rendering]
                             <div class="flex justify-between items-center p-4 text-sm tier-row <?= $is_active ? 'bg-brand-light/30 border-y border-brand/10 text-brand' : 'bg-white text-gray-500' ?>"
                                  id="tier-<?= $tier_idx++ ?>"
@@ -758,7 +759,7 @@ require_once __DIR__ . "/layouts/header.php";
             warn.classList.remove('flex');
         }
 
-        // Update Tier Visuals dynamically for elements that match tiers index
+        // Highlighting current pricing tier row based on selected quantity
         for (let i = 1; i <= tiers.length; i++) {
             const el = document.getElementById('tier-' + i);
             if (el) {
@@ -1009,6 +1010,7 @@ require_once __DIR__ . "/layouts/header.php";
         checkGlobalVariantStock();
     }
 
+    // Adding selected color, size, and quantity matrix items into local storage cart
     function addToCart() {
         if (qty < moq) {
             uiAlert("Minimum Order Quantity is " + moq + " units in total across all selections.");
@@ -1084,6 +1086,7 @@ require_once __DIR__ . "/layouts/header.php";
         document.getElementById('quoteModal').classList.remove('flex');
     }
 
+    // Submitting wholesale quote request payload to inquiries API
     function submitQuoteRequest(e) {
         e.preventDefault();
         const btn = document.getElementById('submitQuoteBtn');

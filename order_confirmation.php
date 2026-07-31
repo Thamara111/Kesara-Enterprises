@@ -1,8 +1,7 @@
 <?php
 /**
- * Order Confirmation Page
- * Displays the details and status of a successfully placed order.
- * Fetches order items and tracking logs for the given order ID.
+ * Order Confirmation & Dispatch Tracking Page
+ * Displays order summary, item breakdown, live GPS delivery map tracking, status timeline, and VAT invoice PDF generation.
  */
 require_once __DIR__ . "/database/connection.php";
 
@@ -18,7 +17,7 @@ $total_units = 0;
 
 if (isset($pdo) && $pdo !== null) {
     try {
-        // Fetch order details
+        // Getting data -> Querying order header details and user profile
         $stmt = $pdo->prepare("SELECT o.*, u.first_name, u.last_name, u.email, u.phone, u.business_name, u.address 
                                FROM orders o 
                                JOIN users u ON o.user_id = u.id 
@@ -27,7 +26,7 @@ if (isset($pdo) && $pdo !== null) {
         $order = $stmt->fetch();
         
         if ($order) {
-            // Fetch order items with product details and default variations
+            // Getting data -> Querying order items with product SKU and name details
             $stmt_items = $pdo->prepare("SELECT oi.*, p.name AS product_name, p.sku
                                          FROM order_items oi 
                                          JOIN products p ON oi.product_id = p.id 
@@ -36,7 +35,6 @@ if (isset($pdo) && $pdo !== null) {
             $order_items = $stmt_items->fetchAll();
             
             $total = (float)$order['total_amount'];
-            // Reverse calculate subtotal and VAT
             $subtotal = $total / 1.18;
             $vat = $total - $subtotal;
             
@@ -44,7 +42,7 @@ if (isset($pdo) && $pdo !== null) {
                 $total_units += $oi['quantity'];
             }
 
-            // Fetch order status logs
+            // Getting data -> Querying chronological order status change logs
             $stmt_logs = $pdo->prepare("SELECT * FROM order_status_log WHERE order_id = ? ORDER BY changed_at ASC");
             $stmt_logs->execute([$order_id]);
             $status_logs = $stmt_logs->fetchAll();
@@ -54,7 +52,7 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
-// Redirect to account if order is not found or database is offline
+// Security check -> Redirecting to account page if order is invalid or not found
 if (!$order) {
     header("Location: /account");
     exit;
@@ -534,7 +532,7 @@ if (new URLSearchParams(window.location.search).get('print') === '1') {
     });
 }
 
-// ── Leaflet Live Tracking Map Initialization ─────────────────────────────
+// Initializing Leaflet live delivery route map and driver GPS tracking connection
 document.addEventListener('DOMContentLoaded', () => {
     var mapEl = document.getElementById('order-tracking-map');
     if (!mapEl) return;

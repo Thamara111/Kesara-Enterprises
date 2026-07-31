@@ -1,8 +1,7 @@
 <?php
 /**
- * Product Catalog Page
- * Lists all available wholesale products with filtering and sorting capabilities.
- * Allows customers to browse by category, size, stock status, and MOQ.
+ * Wholesale Product Catalog Page
+ * Displays available wholesale products with real-time AJAX filtering, category tabs, size matrix checks, stock availability status, and sorting capabilities.
  */
 require_once __DIR__ . "/database/connection.php";
 
@@ -17,6 +16,7 @@ if ($is_ajax) {
     $buyer_approved = false;
     if ($is_logged_in && isset($pdo)) {
         try {
+            // Checking data -> Checking if customer user is logged in and approved for viewing price catalog
             $auth_stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? LIMIT 1");
             $auth_stmt->execute([$_SESSION['user_id']]);
             $auth_user = $auth_stmt->fetch();
@@ -41,6 +41,7 @@ $filter_sort       = $_GET['sort'] ?? 'newest';
 $all_categories = [];
 if ($pdo) {
     try {
+        // Getting data -> Fetching active product category list for sidebar filters
         $all_categories = $pdo->query("SELECT id, name, slug FROM categories ORDER BY name")->fetchAll();
     } catch (\Exception $e) {}
 }
@@ -66,6 +67,7 @@ if ($pdo) {
         //     $params2[] = $filter_max_price;
         // }
 
+        // Filtering data -> Building search, category, discount, stock, and size query filters
         if ($filter_search !== '') {
             $where2[]  = "(p.name LIKE ? OR p.sku LIKE ?)";
             $params2[] = '%' . $filter_search . '%';
@@ -99,6 +101,8 @@ if ($pdo) {
         }
         $order_map = ['newest'=>'p.created_at DESC','price_asc'=>'p.base_price ASC','price_desc'=>'p.base_price DESC','alpha'=>'p.name ASC'];
         $order = $order_map[$filter_sort] ?? 'p.created_at DESC';
+        
+        // Getting data -> Executing SQL query to retrieve filtered wholesale product items
         $sql2 = "SELECT DISTINCT p.name, p.sku, p.base_price AS price, p.discount, p.discount_start, p.discount_end, p.images, c.name AS category_name, c.slug AS category_slug, COALESCE((SELECT MAX(quantity) FROM inventory WHERE product_id = p.id), 0) AS max_inv
                  FROM products p LEFT JOIN categories c ON c.id = p.category_id $size_join2
                  WHERE " . implode(' AND ', $where2) . " ORDER BY $order";
@@ -108,7 +112,7 @@ if ($pdo) {
     } catch (\Exception $e) {}
 }
 
-
+// Processing data -> Calculating pagination pages and slicing items for current page
 $items_per_page = 8;
 $total_items    = count($catalog_products);
 $total_pages    = max(1,(int)ceil($total_items/$items_per_page));
@@ -116,6 +120,7 @@ $current_page   = max(1,min($total_pages,(int)($_GET['page']??1)));
 $offset         = ($current_page-1)*$items_per_page;
 $paged_products = array_slice($catalog_products,$offset,$items_per_page);
 
+// Helper function -> Building current filter URL string with parameter overrides
 function catalog_url(array $overrides=[], array $remove=[]): string {
     $params = $_GET;
     foreach ($overrides as $k=>$v) { $params[$k]=$v; }
@@ -263,7 +268,6 @@ if (!$is_ajax) {
       <!-- MAIN -->
       <div class="flex flex-col gap-6 h-full">
 
-        <!-- TOP BAR -->
         <!-- TOP BAR -->
         <form id="topbar-form" method="GET" action="">
           <input type="hidden" name="category" value="<?php echo htmlspecialchars($filter_category); ?>">
@@ -487,6 +491,7 @@ if (!$is_ajax) {
   const topbarForm = document.getElementById('topbar-form');
   const container = document.getElementById('product-list-container');
 
+  // JavaScript AJAX -> Asynchronously fetching filtered catalog HTML fragment without full page reload
   function updateProducts(url) {
       if(container) container.style.opacity = '0.5';
       const fetchUrl = url + (url.includes('?') ? '&' : '?') + 'ajax=1';
@@ -621,6 +626,7 @@ if (!$is_ajax) {
       }
   });
 
+  // Event handling -> Listening to browser back and forward button events
   window.addEventListener('popstate', function() {
       // Allow browser back button to reload the page to restore filters state fully
       window.location.reload();

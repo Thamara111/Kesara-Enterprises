@@ -1,15 +1,14 @@
 <?php
 /**
- * Contact Us Page
- * Processes and validates customer inquiry form submissions.
- * Saves messages to the database for admin review.
+ * Wholesale Contact & Inquiry Page
+ * Processes customer contact inquiries, validates required fields, saves messages to database, and triggers email notifications to site admin.
  */
 require_once __DIR__ . "/database/connection.php";
 
 $errors = [];
 $success = isset($_GET['success']) && $_GET['success'] == 1;
 
-// Handle form submission
+// Processing customer inquiry form submission and performing field validation
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $business_name = trim($_POST['business_name'] ?? '');
@@ -18,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $inquiry_type = trim($_POST['inquiry_type'] ?? '');
     $message = trim($_POST['message'] ?? '');
 
-    // Validation
+    // Validating required form inputs and Sri Lankan phone number format
     if (empty($name)) {
         $errors['name'] = 'Your name is required.';
     }
@@ -37,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors['phone'] = 'Phone number must start with 0 and contain exactly 10 digits.';
     }
 
-    // Save to Database
+    // Saving data -> Storing validated inquiry payload into inquiries table
     if (empty($errors)) {
         if ($pdo) {
             try {
@@ -53,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 $success = true;
                 
-                // Send email notification to admin
+                // Sending data -> Dispatching HTML email notification to administrative team
                 require_once __DIR__ . "/src/Mailer.php";
                 $subject = "New Inquiry: " . htmlspecialchars($inquiry_type);
                 $body = "<h3>New Inquiry Received</h3>" .
@@ -64,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         "<p><strong>Message:</strong><br/>" . nl2br(htmlspecialchars($message)) . "</p>";
                 \App\Mailer::send('admin@kesara.lk', $subject, $body);
 
-                // Clear fields on success
+                // Clearing form input fields on successful submission
                 $name = $business_name = $email = $phone = $inquiry_type = $message = '';
             } catch (\Exception $e) {
                 $errors['db'] = 'Failed to submit inquiry. Please try again later. (' . $e->getMessage() . ')';
@@ -261,6 +260,7 @@ require_once __DIR__ . "/layouts/header.php";
 </main>
 
 <script>
+// Sending data -> Submitting inquiry form payload to inquiries API via AJAX
 document.getElementById('inquiry-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const formData = new FormData(this);

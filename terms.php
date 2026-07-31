@@ -1,6 +1,7 @@
 <?php
 /**
- * Wholesale Terms and Conditions Page
+ * Wholesale B2B Terms & Conditions Policy Page
+ * Outlines buyer eligibility, minimum order quantities (MOQ), tiered pricing policies, payment terms, delivery rules, return guidelines, and legal jurisdiction.
  */
 require_once __DIR__ . "/database/connection.php";
 
