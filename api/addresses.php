@@ -1,11 +1,12 @@
 <?php
 /**
- * REST API - Delivery Addresses Management
- * Handles adding, editing, deleting, listing, and setting default delivery addresses for customers.
+ * Delivery Addresses API
+ * Helps manage customer delivery addresses like adding, listing, updating, deleting, and setting default address.
  */
 session_start();
 header("Content-Type: application/json; charset=UTF-8");
 
+// Getting data -> Checking logged in user session
 $user_id = $_SESSION['user_id'] ?? null;
 if (!$user_id) {
     http_response_code(401);
@@ -15,7 +16,7 @@ if (!$user_id) {
 
 require_once __DIR__ . "/../database/connection.php";
 
-// Self-healing database setup
+// Getting data -> Making sure user_addresses table exists in database
 if (isset($pdo) && $pdo !== null) {
     try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS user_addresses (
@@ -32,7 +33,7 @@ if (isset($pdo) && $pdo !== null) {
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
 
-        // Seed default address if empty
+        // Getting data -> Checking if user has any addresses, and adding initial default address if empty
         $checkCount = $pdo->prepare("SELECT COUNT(*) FROM user_addresses WHERE user_id = ?");
         $checkCount->execute([$user_id]);
         if ($checkCount->fetchColumn() == 0) {
@@ -46,18 +47,21 @@ if (isset($pdo) && $pdo !== null) {
             }
         }
     } catch (\Exception $e) {
-        // Ignored
+        // Ignore database table setup errors if already set up
     }
 }
 
+// Getting data -> Reading request payload from JSON input or POST form data
 $input = json_decode(file_get_contents("php://input"), true);
 if (!$input) {
     $input = $_POST;
 }
 
+// Getting data -> Getting action parameter from request
 $action = trim($input['action'] ?? 'list');
 
 try {
+    // Getting data -> Getting all saved delivery addresses for this user
     if ($action === 'list') {
         $stmt = $pdo->prepare("SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, id DESC");
         $stmt->execute([$user_id]);
@@ -66,6 +70,7 @@ try {
         exit;
     }
 
+    // Saving data -> Adding a new address or updating existing delivery address
     if ($action === 'save') {
         $address_id = (int)($input['address_id'] ?? 0);
         $title = trim($input['title'] ?? '');
@@ -75,13 +80,14 @@ try {
         $postal_code = trim($input['postal_code'] ?? '');
         $is_default = !empty($input['is_default']) ? 1 : 0;
 
+        // Checking data -> Ensuring title and street address are not empty
         if (empty($title) || empty($address)) {
             http_response_code(400);
             echo json_encode(["status" => "error", "message" => "Title and street address are required."]);
             exit;
         }
 
-        // Check total address count for this user
+        // Getting data -> Counting total saved addresses for this user
         $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM user_addresses WHERE user_id = ?");
         $cntStmt->execute([$user_id]);
         $totalCount = (int)$cntStmt->fetchColumn();
@@ -91,22 +97,24 @@ try {
         }
 
         if ($is_default == 1) {
-            // Unset current default
+            // Updating data -> Removing default status from previous default address
             $pdo->prepare("UPDATE user_addresses SET is_default = 0 WHERE user_id = ?")->execute([$user_id]);
         }
 
         if ($address_id > 0) {
+            // Updating data -> Updating existing address in database
             $stmt = $pdo->prepare("UPDATE user_addresses SET title = ?, address = ?, city = ?, province = ?, postal_code = ?, is_default = ? WHERE id = ? AND user_id = ?");
             $stmt->execute([$title, $address, $city, $province, $postal_code, $is_default, $address_id, $user_id]);
             $message = "Address updated successfully.";
         } else {
+            // Saving data -> Inserting new address into database
             $stmt = $pdo->prepare("INSERT INTO user_addresses (user_id, title, address, city, province, postal_code, is_default) VALUES (?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$user_id, $title, $address, $city, $province, $postal_code, $is_default]);
             $address_id = $pdo->lastInsertId();
             $message = "Address added successfully.";
         }
 
-        // If marked as default, sync to users.address
+        // Updating data -> Updating main user profile address if set as default
         if ($is_default == 1) {
             $fullAddr = $address;
             if ($city) $fullAddr .= "\n" . $city;
@@ -119,6 +127,7 @@ try {
         exit;
     }
 
+    // Setting data -> Changing default delivery address
     if ($action === 'set_default') {
         $address_id = (int)($input['address_id'] ?? 0);
         if ($address_id <= 0) {
@@ -127,7 +136,7 @@ try {
             exit;
         }
 
-        // Verify ownership
+        // Checking data -> Verifying address exists and belongs to logged in user
         $chk = $pdo->prepare("SELECT * FROM user_addresses WHERE id = ? AND user_id = ?");
         $chk->execute([$address_id, $user_id]);
         $target = $chk->fetch();
@@ -137,12 +146,12 @@ try {
             exit;
         }
 
-        // Reset all defaults for user
+        // Updating data -> Removing default flag from all other addresses for this user
         $pdo->prepare("UPDATE user_addresses SET is_default = 0 WHERE user_id = ?")->execute([$user_id]);
-        // Set new default
+        // Updating data -> Setting selected address as default
         $pdo->prepare("UPDATE user_addresses SET is_default = 1 WHERE id = ? AND user_id = ?")->execute([$address_id, $user_id]);
 
-        // Sync to users.address
+        // Updating data -> Syncing selected default address to primary user profile
         $fullAddr = $target['address'];
         if ($target['city']) $fullAddr .= "\n" . $target['city'];
         if ($target['province']) $fullAddr .= ", " . $target['province'];
@@ -153,6 +162,7 @@ try {
         exit;
     }
 
+    // Deleting data -> Removing delivery address
     if ($action === 'delete') {
         $address_id = (int)($input['address_id'] ?? 0);
         if ($address_id <= 0) {
@@ -161,7 +171,7 @@ try {
             exit;
         }
 
-        // Check if target is default
+        // Checking data -> Checking if target address is default
         $chk = $pdo->prepare("SELECT is_default FROM user_addresses WHERE id = ? AND user_id = ?");
         $chk->execute([$address_id, $user_id]);
         $row = $chk->fetch();
@@ -172,10 +182,11 @@ try {
             exit;
         }
 
+        // Deleting data -> Deleting address record from database
         $stmt = $pdo->prepare("DELETE FROM user_addresses WHERE id = ? AND user_id = ?");
         $stmt->execute([$address_id, $user_id]);
 
-        // If deleted address was default, promote the latest remaining address as default
+        // Updating data -> Promoting latest remaining address as new default if deleted address was default
         if ($row['is_default'] == 1) {
             $rem = $pdo->prepare("SELECT id, address, city, province, postal_code FROM user_addresses WHERE user_id = ? ORDER BY id DESC LIMIT 1");
             $rem->execute([$user_id]);

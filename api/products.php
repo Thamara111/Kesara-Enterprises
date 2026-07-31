@@ -1,22 +1,21 @@
 <?php
 /**
- * REST API - Products
- * Manages fetching, creating, updating, and soft-deleting products.
- * Includes dynamic pricing tiers and multiple image uploads logic.
+ * Products Management API
+ * Helps fetch product catalog details, add new products, edit existing items, handle multi-image uploads, and soft-delete products.
  */
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-// Connect to database
+// Getting data -> Loading database connection settings
 require_once __DIR__ . "/../database/connection.php";
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Self-healing database check: Ensure all necessary columns exist on the products table
+// Getting data -> Ensuring products table contains all required columns
 if (isset($pdo) && $pdo !== null) {
     try {
         $check = $pdo->query("SHOW COLUMNS FROM products LIKE 'images'");
@@ -56,31 +55,31 @@ if (isset($pdo) && $pdo !== null) {
             $pdo->exec("ALTER TABLE products ADD COLUMN deleted_at DATETIME DEFAULT NULL");
         }
     } catch (\Exception $e) {
-        // Ignored
+        // Ignore database structure check errors if columns already exist
     }
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Handle OPTIONS requests (CORS preflight)
+// Checking request -> Handling browser OPTIONS preflight CORS checks
 if ($method === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-// Handle GET requests to fetch all available products
+// Getting data -> Fetching all active products with categories and tier pricing
 if ($method === 'GET') {
     $products = [];
     if (isset($pdo) && $pdo !== null) {
         try {
-            // Join products with their respective category names
+            // Getting data -> Fetching products joined with category names
             $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband 
                                  FROM products p 
                                  LEFT JOIN categories c ON p.category_id = c.id
                                  ORDER BY p.name ASC");
             $prods = $stmt->fetchAll();
 
-            // Iterate over each product to attach its pricing tiers
+            // Processing data -> Fetching pricing tiers and calculating discounts for each product
             foreach ($prods as $pr) {
                 /*
                 // [VIVA TASK 03 - API: Tiered Pricing Max Limit Query]
@@ -97,12 +96,12 @@ if ($method === 'GET') {
                     ];
                 }
                 */
-                // Fetch dynamic pricing tiers for the current product
+                // Getting data -> Fetching pricing tiers for current product
                 $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ?");
                 $t_stmt->execute([$pr['id']]);
                 $tiers = $t_stmt->fetchAll();
 
-                // Format the tiers for the frontend
+                // Formatting data -> Formatting pricing tiers for catalog display
                 $formatted_tiers = [];
                 foreach ($tiers as $t) {
                     $formatted_tiers[] = [
@@ -111,7 +110,7 @@ if ($method === 'GET') {
                     ];
                 }
 
-                // Calculate active discount status and effective price
+                // Processing data -> Calculating active discount status and effective price
                 $today_str = date('Y-m-d');
                 $base_price = (float)$pr['price'];
                 $discount_val = (float)($pr['discount'] ?? 0);
@@ -127,7 +126,7 @@ if ($method === 'GET') {
                 }
                 $effective_price = $is_discount_active ? round($base_price * (1 - ($discount_val / 100)), 2) : $base_price;
 
-                // Construct the structured response array for this specific product
+                // Formatting data -> Building product payload for response
                 $effective_product_moq = !empty($formatted_tiers) ? (int)$formatted_tiers[0]['q'] : (int)$pr['moq'];
                 $products[] = [
                     'id' => (int)$pr['id'],
@@ -165,15 +164,15 @@ if ($method === 'GET') {
     exit;
 }
 
-// Handle POST requests for creating, updating, or deleting products
+// Processing request -> Handling POST requests for saving or soft-deleting products
 if ($method === 'POST') {
-    // Determine the action (default is 'save' for create/update)
+    // Getting data -> Reading requested action parameter
     $action = $_GET['action'] ?? $_POST['action'] ?? 'save';
 
-    // Flow for soft-deleting a product
+    // Deleting data -> Soft-deleting product record
     if ($action === 'delete') {
         $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
-        // Fallback to JSON payload if $_POST is empty
+        // Getting data -> Reading product ID from JSON payload
         if (!$id) {
             $input = json_decode(file_get_contents("php://input"), true);
             $id = isset($input['id']) ? (int)$input['id'] : 0;
@@ -188,19 +187,19 @@ if ($method === 'POST') {
         if (isset($pdo) && $pdo !== null) {
             try {
                 $pdo->beginTransaction();
-                // Fetch product name before deleting
+                // Getting data -> Fetching product name before deletion
                 $stmt_name = $pdo->prepare("SELECT name FROM products WHERE id = ?");
                 $stmt_name->execute([$id]);
                 $prod = $stmt_name->fetch();
                 $prod_name = $prod ? $prod['name'] : 'Unknown Product';
 
-                // Soft delete product by setting the deleted_at timestamp
+                // Deleting data -> Setting deleted_at timestamp for soft deletion
                 $stmt2 = $pdo->prepare("UPDATE products SET deleted_at = NOW() WHERE id = ?");
                 $stmt2->execute([$id]);
 
-                // Audit Log
+                // Saving log -> Recording audit log for deleted product
                 $details = json_encode(['id' => $id, 'name' => $prod_name]);
-                $admin_id = $_SESSION['admin_id'] ?? 1; // Fallback to 1
+                $admin_id = $_SESSION['admin_id'] ?? 1;
                 $pdo->prepare("INSERT INTO audit_logs (admin_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)")->execute([$admin_id, 'Delete Product', 'Product', $id, $details]);
                 
                 $pdo->commit();
@@ -216,13 +215,13 @@ if ($method === 'POST') {
         exit;
     }
 
-    // Default Flow: Save (Create or Update a product)
+    // Saving data -> Creating or updating product record
     $input = json_decode(file_get_contents("php://input"), true);
     if (!$input) {
         $input = $_POST;
     }
 
-    // Extract all product fields, enforcing correct data types
+    // Getting data -> Extracting product fields with type formatting
     $id = isset($input['id']) ? (int)$input['id'] : 0;
     $name = trim($input['name'] ?? '');
     $sku = trim($input['sku'] ?? '');
@@ -241,23 +240,23 @@ if ($method === 'POST') {
     $gsm = trim($input['gsm'] ?? '');
     $waistband = trim($input['waistband'] ?? '');
     
-    // Parse dynamic pricing tiers array (could come as a JSON string from FormData)
+    // Getting data -> Reading and parsing pricing tiers array
     $tiers = $input['tiers'] ?? []; 
     if (is_string($tiers)) {
         $tiers = json_decode($tiers, true) ?: [];
     }
 
-    // Basic required fields validation
+    // Checking data -> Validating that product name and SKU are provided
     if (empty($name) || empty($sku)) {
         http_response_code(400);
         echo json_encode(["status" => "error", "message" => "Product Name and SKU are required."]);
         exit;
     }
 
-    // Process up to 6 product images
+    // Getting data -> Processing product image URLs
     $images = [];
     
-    // Parse manual image URLs first
+    // Getting data -> Reading image URLs from request
     if (isset($input['images_urls']) && is_array($input['images_urls'])) {
         $images = $input['images_urls'];
     } elseif (isset($_POST['images_urls']) && is_array($_POST['images_urls'])) {
@@ -269,7 +268,7 @@ if ($method === 'POST') {
         }
     }
 
-    // Handle files upload
+    // Uploading file -> Saving uploaded image files to server uploads directory
     $uploadDir = __DIR__ . '/../assets/uploads/';
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);
@@ -307,7 +306,7 @@ if ($method === 'POST') {
         }
     }
 
-    // Clean and compact the images array to remove empty slots before converting to JSON
+    // Formatting data -> Compacting image list and encoding to JSON
     $final_images = [];
     for ($i = 0; $i < 6; $i++) {
         if (!empty($images[$i])) {
@@ -316,12 +315,12 @@ if ($method === 'POST') {
     }
     $images_json = json_encode($final_images);
 
-    // Proceed with inserting or updating the product in the database
+    // Saving data -> Inserting or updating product in database
     if (isset($pdo) && $pdo !== null) {
         try {
             $pdo->beginTransaction();
 
-            // Resolve Category ID from Category Name
+            // Getting data -> Looking up category ID from category name
             $cat_id = null;
             if (!empty($category_name)) {
                 $c_stmt = $pdo->prepare("SELECT id FROM categories WHERE name = ?");
@@ -333,18 +332,18 @@ if ($method === 'POST') {
             }
 
             if ($id > 0) {
-                // Update an existing product record
+                // Updating data -> Saving updated product details to database
                 $stmt = $pdo->prepare("UPDATE products SET name = ?, sku = ?, category_id = ?, description = ?, moq = ?, base_price = ?, status = ?, images = ?, colors = ?, sizes = ?, discount = ?, discount_start = ?, discount_end = ?, gsm = ?, waistband = ? WHERE id = ?");
                 $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $discount_start, $discount_end, $gsm, $waistband, $id]);
                 $product_id = $id;
             } else {
-                // Insert a brand new product record
+                // Saving data -> Inserting new product record into database
                 $stmt = $pdo->prepare("INSERT INTO products (name, sku, category_id, description, moq, base_price, status, images, colors, sizes, discount, discount_start, discount_end, gsm, waistband) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $discount_start, $discount_end, $gsm, $waistband]);
                 $product_id = $pdo->lastInsertId();
             }
 
-            // Sync Pricing Tiers
+            // Updating data -> Saving pricing tiers for product
             $del_tiers = $pdo->prepare("DELETE FROM pricing_tiers WHERE product_id = ?");
             $del_tiers->execute([$product_id]);
 
@@ -358,7 +357,7 @@ if ($method === 'POST') {
                 $ins_tier->execute([$product_id, $min_qty, $max_qty, $price]);
             }
 
-            // Sync Inventory Variants
+            // Updating data -> Creating or updating inventory variants for colors and sizes
             $color_variations_json = $input['color_variations'] ?? $_POST['color_variations'] ?? '';
             $color_variations = !empty($color_variations_json) ? json_decode($color_variations_json, true) : null;
 
@@ -366,7 +365,7 @@ if ($method === 'POST') {
             $ins_inv = $pdo->prepare("INSERT INTO inventory (product_id, colour, size, quantity, restock_min) VALUES (?, ?, ?, 0, 50)");
 
             if (is_array($color_variations) && !empty($color_variations)) {
-                // If updating existing product, remove inventory items no longer selected in color_variations
+                // Updating data -> Removing obsolete inventory variant rows
                 if ($id > 0) {
                     $existing_inv = $pdo->prepare("SELECT id, colour, size FROM inventory WHERE product_id = ?");
                     $existing_inv->execute([$id]);
@@ -383,7 +382,7 @@ if ($method === 'POST') {
                     }
                 }
 
-                // Insert specific color-size pairs
+                // Saving data -> Inserting new color and size inventory variant rows
                 $derived_colors_arr = [];
                 $derived_sizes_set = [];
 
@@ -414,7 +413,7 @@ if ($method === 'POST') {
                 $upd_p_attrs->execute([$derived_colors_str, $derived_sizes_str, $product_id]);
 
             } else {
-                // Fallback to Cartesian product if color_variations object is omitted
+                // Fallback -> Creating standard inventory color and size combinations
                 $inv_colors = !empty(trim($colors)) ? array_map('trim', explode(',', $colors)) : ['Standard'];
                 $inv_sizes = !empty(trim($sizes)) ? array_map('trim', explode(',', $sizes)) : ['M'];
 
@@ -428,10 +427,10 @@ if ($method === 'POST') {
                 }
             }
 
-            // Sync Supplier Assignment if specified
+            // Updating data -> Syncing supplier assignment and unit cost
             $supplier_name = trim($input['supplier_name'] ?? $_POST['supplier_name'] ?? '');
             if (!empty($supplier_name)) {
-                // Ensure supplier_items has unit_cost column
+                // Getting data -> Ensuring supplier_items table has unit_cost column
                 try {
                     $checkUC = $pdo->query("SHOW COLUMNS FROM supplier_items LIKE 'unit_cost'");
                     if (!$checkUC->fetch()) {
@@ -445,7 +444,7 @@ if ($method === 'POST') {
                 if ($supp_res) {
                     $supp_id = (int)$supp_res['id'];
 
-                    // Sync supplier_items
+                    // Updating data -> Syncing supplier item record
                     $chk_si = $pdo->prepare("SELECT id FROM supplier_items WHERE supplier_id = ? AND item_name = ?");
                     $chk_si->execute([$supp_id, $name]);
                     if (!$chk_si->fetch()) {
@@ -456,7 +455,7 @@ if ($method === 'POST') {
                         $upd_si->execute([$base_price, $supp_id, $name]);
                     }
 
-                    // Sync supplier_products
+                    // Updating data -> Syncing supplier product relation
                     $chk_sp = $pdo->prepare("SELECT id FROM supplier_products WHERE supplier_id = ? AND product_id = ?");
                     $chk_sp->execute([$supp_id, $product_id]);
                     if (!$chk_sp->fetch()) {
@@ -469,10 +468,10 @@ if ($method === 'POST') {
                 }
             }
 
-            // Audit Log
+            // Saving log -> Recording audit log for created or updated product
             $actionName = ($id > 0) ? 'Update Product' : 'Create Product';
             $details = json_encode(['name' => $name, 'sku' => $sku]);
-            $admin_id = $_SESSION['admin_id'] ?? 1; // Fallback to 1 if session lost to prevent FK error
+            $admin_id = $_SESSION['admin_id'] ?? 1;
             $pdo->prepare("INSERT INTO audit_logs (admin_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)")->execute([$admin_id, $actionName, 'Product', $product_id, $details]);
 
             $pdo->commit();

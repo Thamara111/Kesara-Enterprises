@@ -1,7 +1,7 @@
 <?php
 /**
- * REST API - Change User Password
- * Handles authenticated password updates for logged-in wholesale customers.
+ * Change Password API
+ * Handles updating passwords for logged-in users and sending email security notifications.
  */
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
@@ -12,21 +12,21 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Verify user is logged in
+// Checking data -> Verifying user session is active
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode(["status" => "error", "message" => "Please sign in to change your password."]);
     exit;
 }
 
-// Enforce POST method
+// Checking request -> Ensuring HTTP request method is POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(["status" => "error", "message" => "Method Not Allowed"]);
     exit;
 }
 
-// Connect to database & Mailer
+// Getting data -> Loading database connection and mailer helper
 require_once __DIR__ . "/../database/connection.php";
 require_once __DIR__ . "/../src/Mailer.php";
 
@@ -39,18 +39,21 @@ $current_password = $input['current_password'] ?? '';
 $new_password     = $input['new_password'] ?? '';
 $confirm_password = $input['confirm_password'] ?? '';
 
+// Checking data -> Ensuring all password fields are filled
 if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "All password fields are required."]);
     exit;
 }
 
+// Checking data -> Checking minimum password length
 if (strlen($new_password) < 8) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "New password must be at least 8 characters long."]);
     exit;
 }
 
+// Checking data -> Making sure new password matches confirmation
 if ($new_password !== $confirm_password) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "New password and confirmation password do not match."]);
@@ -61,21 +64,24 @@ $user_id = (int)$_SESSION['user_id'];
 
 if (isset($pdo) && $pdo !== null) {
     try {
+        // Getting data -> Fetching user details and current password hash
         $stmt = $pdo->prepare("SELECT first_name, email, password FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+        // Checking data -> Verifying if current password matches existing hash
         if (!$user || !password_verify($current_password, $user['password'])) {
             http_response_code(400);
             echo json_encode(["status" => "error", "message" => "Current password is incorrect."]);
             exit;
         }
 
+        // Updating data -> Hashing new password and saving to database
         $new_hash = password_hash($new_password, PASSWORD_BCRYPT);
         $update_stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
         $update_stmt->execute([$new_hash, $user_id]);
 
-        // Send Password Change Confirmation Email
+        // Sending email -> Sending password change confirmation email
         $user_email = $user['email'] ?? ($_SESSION['user_email'] ?? '');
         $first_name = !empty($user['first_name']) ? htmlspecialchars($user['first_name']) : 'Customer';
 
@@ -100,16 +106,17 @@ if (isset($pdo) && $pdo !== null) {
             try {
                 \App\Mailer::send($user_email, $emailSubject, $emailBody);
             } catch (\Exception $mailEx) {
-                // Email fail-safe: log or ignore to not break client response
+                // Handling errors -> Ignoring email sending failure so password update still succeeds
             }
         }
 
         echo json_encode(["status" => "success", "message" => "Your password has been updated successfully!"]);
     } catch (\Exception $e) {
+        // Handling errors -> Returning error response on database failure
         http_response_code(500);
         echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
     }
 } else {
-    // Demo fallback
+    // Fallback -> Returning success response in demo mode
     echo json_encode(["status" => "success", "message" => "Your password has been updated successfully! (Demo Mode)"]);
 }

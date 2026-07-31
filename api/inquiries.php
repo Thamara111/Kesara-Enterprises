@@ -1,18 +1,17 @@
 <?php
 /**
- * REST API - Inquiries
- * Handles the public submission of contact forms and business inquiries.
- * Self-heals the database to ensure the `inquiries` table exists.
+ * Customer Inquiries API
+ * Handles public submissions for contact forms and business inquiries while ensuring the inquiries table exists in database.
  */
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-// Include the centralized database connection
+// Getting data -> Loading database connection settings
 require_once __DIR__ . "/../database/connection.php";
 
-// Self-healing database check: Create the inquiries table if it's missing
+// Getting data -> Creating inquiries table if it does not exist yet
 if (isset($pdo) && $pdo !== null) {
     try {
         $pdo->exec("CREATE TABLE IF NOT EXISTS inquiries (
@@ -26,27 +25,26 @@ if (isset($pdo) && $pdo !== null) {
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
     } catch (\Exception $e) {
-        // Ignored
+        // Ignore database table setup errors if table already exists
     }
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
 
-// Strictly only allow POST requests for submitting inquiries
+// Checking request -> Ensuring request method is POST
 if ($method !== 'POST') {
     http_response_code(405);
     echo json_encode(["status" => "error", "message" => "Method Not Allowed"]);
     exit;
 }
 
-// Get POST input (handle both JSON payloads and standard application/x-www-form-urlencoded forms)
+// Getting data -> Reading JSON payload or POST form input
 $input = json_decode(file_get_contents("php://input"), true);
 if (!$input) {
     $input = $_POST;
 }
 
-// Sanitize and trim all incoming form fields
-
+// Getting data -> Trimming and sanitizing incoming form fields
 $name = trim($input['name'] ?? '');
 $business_name = trim($input['business_name'] ?? '');
 $email = trim($input['email'] ?? '');
@@ -54,10 +52,10 @@ $phone = trim($input['phone'] ?? '');
 $inquiry_type = trim($input['inquiry_type'] ?? '');
 $message = trim($input['message'] ?? '');
 
-// Initialize an array to track validation errors
+// Checking data -> Creating empty list for validation errors
 $errors = [];
 
-// Validate required fields and email formatting
+// Checking data -> Validating required input fields, email format, and phone number
 if (empty($name)) $errors['name'] = 'Name is required.';
 if (empty($email)) {
     $errors['email'] = 'Email address is required.';
@@ -70,28 +68,28 @@ if (!empty($phone) && !preg_match('/^0[0-9]{9}$/', $phone)) {
 if (empty($inquiry_type)) $errors['inquiry_type'] = 'Inquiry type is required.';
 if (empty($message)) $errors['message'] = 'Message is required.';
 
-// If validation fails, return 400 Bad Request with the specific errors
+// Checking data -> Returning validation errors if any fields are invalid
 if (!empty($errors)) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Validation failed", "errors" => $errors]);
     exit;
 }
 
-// Attempt to insert the valid inquiry into the database
+// Saving data -> Inserting submitted inquiry into inquiries table
 if (isset($pdo) && $pdo !== null) {
     try {
         $stmt = $pdo->prepare("INSERT INTO inquiries (name, business_name, email, phone, inquiry_type, message) 
                                VALUES (:name, :business_name, :email, :phone, :inquiry_type, :message)");
         $stmt->execute([
             ':name' => $name,
-            ':business_name' => $business_name ?: null, // Store null if business name is empty
+            ':business_name' => $business_name ?: null,
             ':email' => $email,
-            ':phone' => $phone ?: null,                 // Store null if phone is empty
+            ':phone' => $phone ?: null,
             ':inquiry_type' => $inquiry_type,
             ':message' => $message
         ]);
         
-        // Return 201 Created on success
+        // Response -> Returning success response for submitted inquiry
         http_response_code(201);
         echo json_encode(["status" => "success", "message" => "Inquiry submitted successfully."]);
     } catch (\Exception $e) {
@@ -99,7 +97,7 @@ if (isset($pdo) && $pdo !== null) {
         echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
     }
 } else {
-    // Offline / demo fallback mode
+    // Fallback -> Returning success response in demo mode
     http_response_code(201);
     echo json_encode(["status" => "success", "message" => "Inquiry submitted successfully (Demo Mode)."]);
 }

@@ -1,28 +1,28 @@
 <?php
 /**
- * Trash API
- * Manages the restoration and permanent deletion (hard delete) of soft-deleted records.
- * Accessible only by administrators.
+ * Recycle Bin & Trash API
+ * Manages restoring deleted records or permanently deleting soft-deleted items across products, categories, orders, and users.
  */
 session_start();
 header("Content-Type: application/json; charset=UTF-8");
 
-// Security Check: Verify that the user is logged in and has the 'admin' role
+// Checking permission -> Making sure logged in user has admin privileges
 if (!isset($_SESSION['admin_role']) || $_SESSION['admin_role'] !== 'admin') {
     http_response_code(403);
     echo json_encode(["status" => "error", "message" => "Access denied."]);
     exit;
 }
 
+// Getting data -> Loading database connection settings
 require_once __DIR__ . "/../database/connection.php";
 
-// Parse the JSON request body
+// Getting data -> Reading JSON payload for action, target table, and record ID
 $input = json_decode(file_get_contents("php://input"), true);
 $action = $input['action'] ?? '';
 $table = $input['table'] ?? '';
 $id = (int)($input['id'] ?? 0);
 
-// Restrict operations to a specific whitelist of tables to prevent SQL injection or unintended table modifications
+// Checking data -> Restricting operations to allowed database tables only
 $allowed_tables = ['products', 'categories', 'orders', 'admins', 'users', 'suppliers'];
 
 if (!in_array($table, $allowed_tables) || $id <= 0) {
@@ -33,24 +33,24 @@ if (!in_array($table, $allowed_tables) || $id <= 0) {
 
 try {
     if ($action === 'restore') {
-        // Handle restoration of soft-deleted records
+        // Restoring data -> Restoring soft-deleted record
         if ($table === 'users') {
-            // Users use a 'status' column instead of deleted_at for their soft deletes
+            // Restoring data -> Resetting user account status to approved
             $stmt = $pdo->prepare("UPDATE `$table` SET status = 'approved' WHERE id = ?");
         } else {
-            // Most tables use the 'deleted_at' timestamp
+            // Restoring data -> Clearing deleted_at timestamp to restore record
             $stmt = $pdo->prepare("UPDATE `$table` SET deleted_at = NULL WHERE id = ?");
         }
         $stmt->execute([$id]);
         echo json_encode(["status" => "success", "message" => "Restored successfully."]);
         
     } elseif ($action === 'hard_delete') {
-        // Handle permanent deletion of records from the database
+        // Deleting data -> Permanently deleting record from database
         if ($table === 'products') {
-            // Clean up related pricing tiers before deleting a product to maintain referential integrity
+            // Deleting data -> Deleting associated pricing tiers for product
             $pdo->prepare("DELETE FROM pricing_tiers WHERE product_id = ?")->execute([$id]);
         } elseif ($table === 'suppliers') {
-            // Clean up related supplier_items and supplier_products before deleting a supplier
+            // Deleting data -> Deleting associated supplier items and products relations
             $pdo->prepare("DELETE FROM supplier_items WHERE supplier_id = ?")->execute([$id]);
             $pdo->prepare("DELETE FROM supplier_products WHERE supplier_id = ?")->execute([$id]);
         }

@@ -1,25 +1,25 @@
 <?php
 /**
- * REST API - Customers Management
- * Handles POST/PUT requests to update customer statuses (e.g., approving wholesale access).
- * Also handles fetching and saving admin comments on a specific customer profile.
+ * Customers Management API
+ * Helps manage customer statuses (approving, suspending, or rejecting access) and saving private admin notes for customer profiles.
  */
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
 
-// Include the centralized database connection
+// Getting data -> Loading database connection settings
 require_once __DIR__ . "/../database/connection.php";
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+// Checking request -> Handling browser OPTIONS preflight CORS checks
 if ($method === 'OPTIONS') {
     http_response_code(200);
     exit;
 }
 
-// Self-healing: ensure admin_comment column exists
+// Getting data -> Ensuring admin_comment column exists in users table
 if (isset($pdo) && $pdo !== null) {
     try {
         $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'admin_comment'");
@@ -27,33 +27,35 @@ if (isset($pdo) && $pdo !== null) {
             $pdo->exec("ALTER TABLE users ADD COLUMN admin_comment TEXT DEFAULT NULL");
         }
     } catch (\Exception $e) {
-        // Ignored
+        // Ignore database structure check errors if column already exists
     }
 }
 
+// Getting data -> Reading JSON payload or POST data
 $input = json_decode(file_get_contents("php://input"), true);
 if (!$input) {
     $input = $_POST;
 }
 
-// Determine the action to perform (defaults to updating status)
+// Getting data -> Reading action parameter and customer ID
 $action = trim($input['action'] ?? 'update_status');
 $id = isset($input['id']) ? (int)$input['id'] : 0;
 
-// Validate that a valid customer ID was provided
+// Checking data -> Ensuring customer ID is a valid positive number
 if ($id <= 0) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Invalid customer ID."]);
     exit;
 }
 
-// Handle requests to save private admin comments on a customer
+// Saving data -> Saving private admin comment for customer profile
 if ($method === 'POST' && $action === 'save_comment') {
-    // Extract the comment from the request payload
+    // Getting data -> Reading comment text from request payload
     $comment = trim($input['comment'] ?? '');
 
     if (isset($pdo) && $pdo !== null) {
         try {
+            // Updating data -> Saving admin comment in database
             $stmt = $pdo->prepare("UPDATE users SET admin_comment = ? WHERE id = ?");
             $stmt->execute([$comment, $id]);
             echo json_encode(["status" => "success", "message" => "Comment saved successfully."]);
@@ -67,8 +69,8 @@ if ($method === 'POST' && $action === 'save_comment') {
     exit;
 }
 
+// Getting data -> Fetching private admin comment for customer profile
 if ($method === 'GET') {
-    // Return a specific customer's admin comment
     if (isset($pdo) && $pdo !== null) {
         try {
             $stmt = $pdo->prepare("SELECT admin_comment FROM users WHERE id = ?");
@@ -85,17 +87,17 @@ if ($method === 'GET') {
     exit;
 }
 
-// Default Flow: POST - Update customer account status (e.g., approve or suspend)
+// Updating status -> Changing customer account status (approving, suspending, or rejecting)
 $status = trim($input['status'] ?? '');
 
-// Validate that a status was actually provided
+// Checking data -> Ensuring status value was provided
 if (empty($status)) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Status is required."]);
     exit;
 }
 
-// Enforce that the provided status is one of the allowed enumerated values
+// Checking data -> Checking if status is one of the allowed options
 $allowed_statuses = ['pending', 'approved', 'suspended', 'rejected'];
 if (!in_array($status, $allowed_statuses)) {
     http_response_code(400);
@@ -103,14 +105,14 @@ if (!in_array($status, $allowed_statuses)) {
     exit;
 }
 
-// Proceed with database update if connection is active
+// Updating data -> Updating customer status in database
 if (isset($pdo) && $pdo !== null) {
     try {
-        // Update the customer's status in the users table
+        // Updating data -> Saving new account status to users table
         $stmt = $pdo->prepare("UPDATE users SET status = ? WHERE id = ?");
         $stmt->execute([$status, $id]);
         
-        // Mock WhatsApp integration
+        // Sending notification -> Creating mock WhatsApp notification message for customer
         if ($status === 'approved' || $status === 'suspended') {
             $userStmt = $pdo->prepare("SELECT email, phone, first_name, admin_comment FROM users WHERE id = ?");
             $userStmt->execute([$id]);
@@ -134,6 +136,7 @@ if (isset($pdo) && $pdo !== null) {
                 $waStmt->execute([$id, $user['phone'], $fullMessage]);
             }
             
+            // Sending email -> Sending email status update notification to customer
             if ($user && !empty($user['email'])) {
                 require_once __DIR__ . "/../src/Mailer.php";
                 $emailSubject = $status === 'approved' ? "Your account has been approved!" : "Account Update: Suspended";

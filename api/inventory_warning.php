@@ -1,9 +1,7 @@
 <?php
 /**
- * Inventory Pressure Warning Email
- * Sends a warning email to admins, supplier managers, and finance managers
- * with a summary of critical / low-stock / out-of-stock items.
- * Intended to be triggered via cron or an external scheduler.
+ * Inventory Pressure Warning Email API
+ * Sends low stock warning emails to admins, supplier managers, and finance managers with a list of critical and out-of-stock items.
  */
 
 require_once __DIR__ . '/../database/connection.php';
@@ -11,7 +9,7 @@ require_once __DIR__ . '/../src/Mailer.php';
 
 header('Content-Type: application/json');
 
-// Only allow POST to trigger the email, acting as a webhook
+// Checking request -> Ensuring request method is POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['status' => 'error', 'message' => 'Method not allowed.']);
@@ -24,8 +22,7 @@ if (!$pdo) {
     exit;
 }
 
-// ── 1. Fetch all warning-level inventory items ────────────────────────────────
-// Join inventory with products, fetching anything where quantity is at or below the restock_min
+// Getting data -> Fetching low stock and out-of-stock items at or below restock threshold
 try {
     $stmt = $pdo->query("
         SELECT i.id, p.name AS product_name, p.sku,
@@ -42,14 +39,13 @@ try {
     exit;
 }
 
-// Exit early if the inventory is healthy and no items are under their thresholds
+// Checking data -> Returning status OK if no items are under restock threshold
 if (empty($items)) {
     echo json_encode(['status' => 'ok', 'message' => 'No inventory pressure items found. No email sent.']);
     exit;
 }
 
-// ── 2. Fetch recipients: admin, supplier_manager, and finance_manager roles ───
-// Get the contact details of the staff responsible for inventory management
+// Getting data -> Fetching emails of admin, supplier manager, and finance manager staff
 try {
     $recipientStmt = $pdo->prepare("
         SELECT username, email, role
@@ -70,23 +66,22 @@ if (empty($recipients)) {
     exit;
 }
 
-// ── 3. Categorise items ───────────────────────────────────────────────────────
-// Sort items into three buckets for the email summary: Out of Stock, Critical, Low Stock
+// Processing data -> Sorting items into out of stock, critical, and low stock buckets
 $out_of_stock = [];
 $critical     = [];
 $low_stock    = [];
 
 foreach ($items as $item) {
-    // Calculate percentage remaining vs the restock threshold
+    // Processing data -> Calculating stock percentage vs restock threshold
     $pct = $item['thresh'] > 0 ? round(($item['stock'] / $item['thresh']) * 100) : 0;
     $item['pct'] = $pct;
-    // Format a readable product label including its variant data (color, size)
+    // Formatting data -> Creating product label with color and size details
     $label = $item['product_name'] . ' · ' . $item['colour'] . ' · ' . $item['size'];
     $item['label'] = $label;
 
     if ($item['stock'] == 0) {
         $out_of_stock[] = $item;
-    } elseif ($pct <= 15) { // If stock is 15% or less of the threshold, it's critical
+    } elseif ($pct <= 15) { // Categorizing -> Marking item as critical if stock is 15% or less of threshold
         $critical[] = $item;
     } else {
         $low_stock[] = $item;
@@ -96,7 +91,7 @@ foreach ($items as $item) {
 $now = date('d M Y, H:i');
 $total = count($items);
 
-// ── 4. Build HTML email body ──────────────────────────────────────────────────
+// Formatting message -> Building HTML email table and summary template
 function buildRows(array $items, string $color, string $badgeBg, string $badgeText, string $statusLabel): string {
     $html = '';
     foreach ($items as $item) {
@@ -235,7 +230,7 @@ $emailBody = "
 </html>
 ";
 
-// ── 5. Send email to each recipient ──────────────────────────────────────────
+// Sending email -> Emailing inventory warning report to each recipient
 $sent    = [];
 $failed  = [];
 $subject = "⚠️ Inventory Pressure Warning — {$total} Items Need Attention ({$now})";
@@ -249,7 +244,7 @@ foreach ($recipients as $rec) {
     }
 }
 
-// ── 6. Return result ──────────────────────────────────────────────────────────
+// Response -> Returning JSON report of sent and failed warning emails
 echo json_encode([
     'status'       => empty($failed) ? 'success' : (empty($sent) ? 'error' : 'partial'),
     'message'      => empty($failed)
