@@ -1,4 +1,4 @@
-<footer class="bg-gray-900 border-t border-gray-100 pt-16 pb-8">
+<footer class="bg-gray-900 border-t border-gray-800 pt-16 pb-8">
     <div class="max-w-8xl mx-auto px-6 md:px-12">
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-12 mb-16">
             <div class="col-span-2 lg:col-span-1">
@@ -6,43 +6,42 @@
                     <div class="w-8 h-8 rounded-lg bg-brand-light flex items-center justify-center">
                         <i class="ti ti-building-store text-brand text-lg"></i>
                     </div>
-                    <span class="text-md font-bold text-gray-400">Kesara Enterprises</span>
+                    <span class="text-md font-bold text-white">Kesara Enterprises</span>
                 </div>
-                <p class="text-sm text-gray-500 leading-relaxed mb-6">
+                <p class="text-sm text-gray-400 leading-relaxed mb-6">
                     Sri Lanka's leading wholesale supplier of quality innerwear since 2012.
                 </p>
             </div>
             <div>
-                <p class="text-sm font-semibold text-gray-400 mb-4">Company</p>
-                <a href="/about" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">About us</a>
-                <a href="/contact" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Contact</a>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Careers</a>
+                <p class="text-sm font-bold text-white mb-4 uppercase tracking-wider">Company</p>
+                <a href="/about" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">About us</a>
+                <a href="/contact" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">Contact</a>
             </div>
             <div>
-                <p class="text-sm font-semibold text-gray-400 mb-4">Buyers</p>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Register</a>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Sign in</a>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">How it works</a>
+                <p class="text-sm font-bold text-white mb-4 uppercase tracking-wider">Buyers</p>
+                <a href="/login" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">Register</a>
+                <a href="/login" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">Sign in</a>
+                <a href="/about" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">How it works</a>
             </div>
             <div>
-                <p class="text-sm font-semibold text-gray-400 mb-4">Products</p>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Men's range</a>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Ladies range</a>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Children's range</a>
+                <p class="text-sm font-bold text-white mb-4 uppercase tracking-wider">Products</p>
+                <a href="/catalog" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">Men's range</a>
+                <a href="/catalog" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">Ladies range</a>
+                <a href="/catalog" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">Children's range</a>
             </div>
             <div>
-                <p class="text-sm font-semibold text-gray-400 mb-4">Legal</p>
-                <a href="/terms-&-conditions" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Terms of sale</a>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Privacy policy</a>
-                <a href="#" class="text-sm text-gray-500 block mb-2.5 hover:text-brand transition-colors no-underline">Returns policy</a>
+                <p class="text-sm font-bold text-white mb-4 uppercase tracking-wider">Legal</p>
+                <a href="/terms" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">Terms of sale</a>
+                <a href="/terms" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">Privacy policy</a>
+                <a href="/terms" class="text-sm text-gray-400 block mb-2.5 hover:text-brand transition-colors no-underline">Returns policy</a>
             </div>
         </div>
         
-        <hr class="border-gray-100 mb-8">
+        <hr class="border-gray-800 mb-8">
         
         <div class="flex flex-col md:flex-row justify-between items-center gap-4">
             <p class="text-sm text-gray-400">
-                © 2025 Kesara Enterprises (Pvt) Ltd. All rights reserved.
+                © <?= date('Y') ?> Kesara Enterprises (Pvt) Ltd. All rights reserved.
             </p>
             <p class="text-sm text-gray-400 font-medium">
                 Reg. No: PV 00000 · VAT: 123456789
@@ -59,7 +58,7 @@ function updateCartBadges() {
     if (saved) {
         try {
             const cart = JSON.parse(saved);
-            count = cart.length; // Count of distinct items, or use cart.reduce((sum, item) => sum + item.qty, 0) for total qty
+            count = cart.length;
         } catch(e) {}
     }
     
@@ -113,14 +112,6 @@ function setButtonLoading(btn, isLoading, customText) {
     }
 }
 window.setButtonLoading = setButtonLoading;
-
-document.addEventListener('submit', function(e) {
-    var form = e.target;
-    var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
-    if (submitBtn) {
-        setButtonLoading(submitBtn, true);
-    }
-});
 </script>
 </body>
 </html>
