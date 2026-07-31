@@ -42,6 +42,10 @@ if (isset($pdo) && $pdo !== null) {
         $cat_stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
         $all_categories = $cat_stmt->fetchAll();
 
+        // Fetch all suppliers for the product form dropdown
+        $supp_stmt = $pdo->query("SELECT id, name FROM suppliers ORDER BY name ASC");
+        $all_suppliers = $supp_stmt->fetchAll();
+
         // Fetch all active products, joined with their category names
         $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband,
                                     COALESCE((SELECT SUM(quantity) FROM inventory WHERE product_id = p.id), 0) AS total_stock
@@ -51,21 +55,6 @@ if (isset($pdo) && $pdo !== null) {
         $prods = $stmt->fetchAll();
 
         foreach ($prods as $pr) {
-            /*
-            // [VIVA TASK 03: Tiered Pricing Max Limit Query]
-            $t_stmt = $pdo->prepare("SELECT min_qty AS q, max_qty AS max_q, price AS p FROM pricing_tiers WHERE product_id = ? ORDER BY min_qty ASC");
-            $t_stmt->execute([$pr['id']]);
-            $tiers = $t_stmt->fetchAll();
-
-            $formatted_tiers = [];
-            foreach ($tiers as $t) {
-                $formatted_tiers[] = [
-                    'q' => (int) $t['q'],
-                    'max_q' => !empty($t['max_q']) ? (int) $t['max_q'] : null,
-                    'p' => (float) $t['p']
-                ];
-            }
-            */
             $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ?");
             $t_stmt->execute([$pr['id']]);
             $tiers = $t_stmt->fetchAll();
@@ -77,6 +66,35 @@ if (isset($pdo) && $pdo !== null) {
                     'q' => (int) $t['q'],
                     'p' => (float) $t['p']
                 ];
+            }
+
+            // Fetch assigned supplier name if any
+            $supp_name_stmt = $pdo->prepare("SELECT s.name FROM suppliers s JOIN supplier_products sp ON s.id = sp.supplier_id WHERE sp.product_id = ? LIMIT 1");
+            $supp_name_stmt->execute([$pr['id']]);
+            $assigned_supplier = $supp_name_stmt->fetchColumn();
+            if (!$assigned_supplier) {
+                $si_stmt = $pdo->prepare("SELECT s.name FROM suppliers s JOIN supplier_items si ON s.id = si.supplier_id WHERE si.item_name = ? LIMIT 1");
+                $si_stmt->execute([$pr['name']]);
+                $assigned_supplier = $si_stmt->fetchColumn();
+            }
+
+            // Fetch per-color size variations from inventory
+            $inv_v_stmt = $pdo->prepare("SELECT colour, size FROM inventory WHERE product_id = ?");
+            $inv_v_stmt->execute([$pr['id']]);
+            $inv_v_rows = $inv_v_stmt->fetchAll();
+
+            $color_vars_map = [];
+            foreach ($inv_v_rows as $vr) {
+                $c_name = trim($vr['colour'] ?? '');
+                $s_name = trim($vr['size'] ?? '');
+                if (!empty($c_name) && !empty($s_name)) {
+                    if (!isset($color_vars_map[$c_name])) {
+                        $color_vars_map[$c_name] = [];
+                    }
+                    if (!in_array($s_name, $color_vars_map[$c_name])) {
+                        $color_vars_map[$c_name][] = $s_name;
+                    }
+                }
             }
 
             $total_stock = (int) $pr['total_stock'];
@@ -93,6 +111,7 @@ if (isset($pdo) && $pdo !== null) {
                 'name' => $pr['name'],
                 'sku' => $pr['sku'],
                 'cat' => $pr['cat'] ?? 'Uncategorized',
+                'supplier' => $assigned_supplier ?: '',
                 'moq' => (int) $pr['moq'],
                 'price' => (float) $pr['price'],
                 'status' => $status,
@@ -106,7 +125,8 @@ if (isset($pdo) && $pdo !== null) {
                 'discount_end' => $pr['discount_end'] ?? '',
                 'gsm' => $pr['gsm'] ?? '',
                 'waistband' => $pr['waistband'] ?? '',
-                'tiers' => $formatted_tiers
+                'tiers' => $formatted_tiers,
+                'color_variations' => $color_vars_map
             ];
         }
     } catch (\Exception $e) {
@@ -120,6 +140,10 @@ if (empty($admin_products)) {
 
 if (empty($all_categories)) {
     $all_categories = [];
+}
+
+if (empty($all_suppliers)) {
+    $all_suppliers = [];
 }
 ?>
 <!-- MAIN CONTENT AREA (SPLIT LAYOUT) -->
@@ -210,7 +234,9 @@ if (empty($all_categories)) {
                                     data-gsm="<?= htmlspecialchars($p['gsm']) ?>"
                                     data-waistband="<?= htmlspecialchars($p['waistband']) ?>"
                                     data-status="<?= htmlspecialchars($p['status']) ?>"
-                                    data-tiers="<?= htmlspecialchars(json_encode($p['tiers'])) ?>" onclick="selectProd(this, false)">
+                                    data-supplier="<?= htmlspecialchars($p['supplier']) ?>"
+                                    data-tiers="<?= htmlspecialchars(json_encode($p['tiers'])) ?>"
+                                    data-color-variations="<?= htmlspecialchars(json_encode($p['color_variations']), ENT_QUOTES, 'UTF-8') ?>" onclick="selectProd(this, false)">
                                     
                                     <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30 w-16">
                                         <div class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all overflow-hidden">
@@ -287,7 +313,7 @@ if (empty($all_categories)) {
                     <input type="text" id="f-name"
                         class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
                 </div>
-                <div class="grid grid-cols-2 gap-6">
+                <div class="grid grid-cols-3 gap-6">
                     <div class="space-y-2">
                         <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">SKU
                             Code</label>
@@ -301,6 +327,18 @@ if (empty($all_categories)) {
                             class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm appearance-none">
                             <?php foreach ($all_categories as $cat): ?>
                                 <option value="<?= htmlspecialchars($cat['name']) ?>"><?= htmlspecialchars($cat['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <label
+                            class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Supplier</label>
+                        <select id="f-supplier"
+                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm appearance-none">
+                            <option value="">Select Supplier...</option>
+                            <?php foreach ($all_suppliers as $supp): ?>
+                                <option value="<?= htmlspecialchars($supp['name']) ?>"><?= htmlspecialchars($supp['name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -345,51 +383,31 @@ if (empty($all_categories)) {
                 </div>
             </div>
 
-            <!-- Attributes -->
+            <!-- Variations (Color - Size Choices) -->
             <div class="space-y-6">
-                <h4
-                    class="text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em] border-b border-gray-100 pb-2">
-                    Variations</h4>
-                <div class="space-y-4">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Available
-                        Sizes</label>
-                    <div class="flex flex-wrap gap-2" id="size-chips">
-                        <button type="button" onclick="toggleSizeChip(this, 'XS')"
-                            class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">XS</button>
-                        <button type="button" onclick="toggleSizeChip(this, 'S')"
-                            class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">S</button>
-                        <button type="button" onclick="toggleSizeChip(this, 'M')"
-                            class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">M</button>
-                        <button type="button" onclick="toggleSizeChip(this, 'L')"
-                            class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">L</button>
-                        <button type="button" onclick="toggleSizeChip(this, 'XL')"
-                            class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">XL</button>
-                        <button type="button" onclick="toggleSizeChip(this, 'XXL')"
-                            class="size-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">XXL</button>
-                    </div>
-                    <input type="hidden" id="f-sizes" name="sizes" value="">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-2">
+                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Variations (Color & Size Choices)</h4>
+                    <span class="text-[10px] text-gray-400 font-semibold">Select sizes for each color</span>
                 </div>
-                <div class="space-y-4">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Available
-                        Colours</label>
-                    <div class="flex flex-wrap gap-2" id="color-chips">
-                        <button type="button" onclick="toggleColorChip(this, 'White')"
-                            class="color-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">White</button>
-                        <button type="button" onclick="toggleColorChip(this, 'Black')"
-                            class="color-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">Black</button>
-                        <button type="button" onclick="toggleColorChip(this, 'Grey')"
-                            class="color-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">Grey</button>
-                        <button type="button" onclick="toggleColorChip(this, 'Blue')"
-                            class="color-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">Blue</button>
-                        <button type="button" onclick="toggleColorChip(this, 'Red')"
-                            class="color-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">Red</button>
-                        <button type="button" onclick="toggleColorChip(this, 'Pink')"
-                            class="color-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">Pink</button>
-                        <button type="button" onclick="toggleColorChip(this, 'Navy')"
-                            class="color-chip px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold uppercase transition-all">Navy</button>
-                    </div>
-                    <input type="hidden" id="f-colors" name="colors" value="">
+
+                <!-- Container for Color Cards with Size Chips -->
+                <div id="variation-color-list" class="space-y-3">
+                    <!-- Injected dynamically by JS -->
                 </div>
+
+                <!-- Button to Add Custom Color -->
+                <div class="flex items-center gap-2 pt-2">
+                    <input type="text" id="new-custom-color-input" placeholder="Custom color name (e.g. Olive, Coral)"
+                        class="px-4 py-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand shadow-sm flex-1">
+                    <button type="button" onclick="addCustomColorVariation()"
+                        class="px-4 py-2.5 bg-brand/10 text-brand rounded-xl text-xs font-bold hover:bg-brand/20 transition-all flex items-center gap-1">
+                        <i class="ti ti-plus"></i> Add Color
+                    </button>
+                </div>
+
+                <input type="hidden" id="f-color-variations" name="color_variations" value="">
+                <input type="hidden" id="f-colors" name="colors" value="">
+                <input type="hidden" id="f-sizes" name="sizes" value="">
             </div>
 
             <!-- Pricing Tiers -->
@@ -492,6 +510,16 @@ if (empty($all_categories)) {
 
 
 <script>
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
     var selectedIdx = -1;
 
     function selectProd(el, openDrawer = true) {
@@ -509,6 +537,7 @@ if (empty($all_categories)) {
         document.getElementById('f-name').value = el.dataset.originalName || '';
         document.getElementById('f-sku').value = el.dataset.originalSku || '';
         document.getElementById('f-cat').value = el.dataset.originalCat || '';
+        document.getElementById('f-supplier').value = el.dataset.supplier || '';
         document.getElementById('f-desc').value = el.dataset.desc || '';
         document.getElementById('f-discount').value = el.dataset.discount || '0';
         document.getElementById('f-discount-start').value = el.dataset.discountStart || '';
@@ -525,31 +554,10 @@ if (empty($all_categories)) {
             document.getElementById('f-image-file-' + i).value = ''; // Reset file input
             updateProductPreviewFromUrl(imgUrl, i);
         }
-        // Set colors
-        var colors = el.dataset.colors ? el.dataset.colors.split(',').map(c => c.trim()) : [];
-        document.getElementById('f-colors').value = el.dataset.colors || '';
-        document.querySelectorAll('.color-chip').forEach(btn => {
-            if (colors.includes(btn.textContent.trim())) {
-                btn.classList.add('bg-brand', 'text-white', 'border-brand');
-                btn.classList.remove('bg-white');
-            } else {
-                btn.classList.remove('bg-brand', 'text-white', 'border-brand');
-                btn.classList.add('bg-white');
-            }
-        });
-
-        // Set sizes
-        var sizes = el.dataset.sizes ? el.dataset.sizes.split(',').map(s => s.trim()) : [];
-        document.getElementById('f-sizes').value = el.dataset.sizes || '';
-        document.querySelectorAll('.size-chip').forEach(btn => {
-            if (sizes.includes(btn.textContent.trim())) {
-                btn.classList.add('bg-brand', 'text-white', 'border-brand');
-                btn.classList.remove('bg-white');
-            } else {
-                btn.classList.remove('bg-brand', 'text-white', 'border-brand');
-                btn.classList.add('bg-white');
-            }
-        });
+        // Set color variations
+        var colorVars = {};
+        try { colorVars = JSON.parse(el.dataset.colorVariations || '{}'); } catch(e) {}
+        renderColorVariationsUI(colorVars);
 
         // Set tiers
         if (id > 0) {
@@ -606,6 +614,7 @@ if (empty($all_categories)) {
         document.getElementById('f-id').value = '';
         document.getElementById('f-name').value = '';
         document.getElementById('f-sku').value = '';
+        document.getElementById('f-supplier').value = '';
         document.getElementById('f-desc').value = '';
         document.getElementById('f-discount').value = '0';
         document.getElementById('f-discount-start').value = '';
@@ -622,18 +631,8 @@ if (empty($all_categories)) {
             updateProductPreviewFromUrl('', i);
         }
 
-        // Reset colors
-        document.getElementById('f-colors').value = '';
-        document.querySelectorAll('.color-chip').forEach(btn => {
-            btn.classList.remove('bg-brand', 'text-white', 'border-brand');
-            btn.classList.add('bg-white');
-        });
-
-        document.getElementById('f-sizes').value = '';
-        document.querySelectorAll('.size-chip').forEach(btn => {
-            btn.classList.remove('bg-brand', 'text-white', 'border-brand');
-            btn.classList.add('bg-white');
-        });
+        // Reset color variations
+        renderColorVariationsUI({});
 
         document.getElementById('btn-prod-delete').classList.add('hidden');
 
@@ -647,29 +646,143 @@ if (empty($all_categories)) {
         }
     }
 
-    function toggleColorChip(btn, color) {
-        btn.classList.toggle('bg-brand');
-        btn.classList.toggle('text-white');
-        btn.classList.toggle('border-brand');
-        btn.classList.toggle('bg-white');
+    // Global standard list of colors and sizes for variations
+    var standardColorList = ['White', 'Black', 'Grey', 'Blue', 'Red', 'Pink', 'Navy'];
+    var standardSizeList = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+    var currentProductColorVariations = {}; // { "White": ["S", "M", "L"], "Black": ["M", "L"] }
 
-        updateHiddenField('color-chips', 'f-colors');
+    function renderColorVariationsUI(existingMap = {}) {
+        currentProductColorVariations = {};
+        if (existingMap && typeof existingMap === 'object') {
+            for (let c in existingMap) {
+                if (Array.isArray(existingMap[c])) {
+                    currentProductColorVariations[c] = [...existingMap[c]];
+                }
+            }
+        }
+
+        // Combine standard colors with any custom colors from existingMap
+        var allColors = [...standardColorList];
+        for (let c in currentProductColorVariations) {
+            if (!allColors.includes(c)) {
+                allColors.push(c);
+            }
+        }
+
+        var container = document.getElementById('variation-color-list');
+        if (!container) return;
+        container.innerHTML = '';
+
+        allColors.forEach(color => {
+            var isEnabled = currentProductColorVariations.hasOwnProperty(color);
+            var selectedSizes = isEnabled ? currentProductColorVariations[color] : [];
+
+            var card = document.createElement('div');
+            card.className = `p-4 border rounded-2xl space-y-3 shadow-sm transition-all ${isEnabled ? 'bg-white border-brand/20 shadow-brand/5' : 'bg-gray-50/50 border-gray-100'}`;
+            
+            // Color Header
+            var headerHtml = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="w-3.5 h-3.5 rounded-full border shadow-sm" style="background-color: ${getColorHex(color)};"></span>
+                        <span class="text-xs font-bold text-gray-900">${escapeHtml(color)}</span>
+                    </div>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="toggleColorEnabled('${escapeHtml(color)}', this.checked)" class="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand cursor-pointer">
+                        <span class="text-[11px] font-bold ${isEnabled ? 'text-brand' : 'text-gray-400'}">Enable Color</span>
+                    </label>
+                </div>
+            `;
+
+            // Size Chips Row (only displayed if color enabled)
+            var sizesHtml = '';
+            if (isEnabled) {
+                var chipsHtml = standardSizeList.map(sz => {
+                    var isSelected = selectedSizes.includes(sz);
+                    var chipClass = isSelected 
+                        ? 'bg-brand text-white border-brand shadow-sm shadow-brand/20' 
+                        : 'bg-white text-gray-600 border-gray-100 hover:border-gray-300';
+                    return `<button type="button" onclick="toggleColorSizeChoice('${escapeHtml(color)}', '${sz}')" class="px-3 py-1.5 border rounded-xl text-[10px] font-bold uppercase transition-all ${chipClass}">${sz}</button>`;
+                }).join('');
+
+                sizesHtml = `
+                    <div class="pt-2 border-t border-gray-100 space-y-2">
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest block">Sizes for ${escapeHtml(color)}</label>
+                        <div class="flex flex-wrap gap-2">${chipsHtml}</div>
+                    </div>
+                `;
+            }
+
+            card.innerHTML = headerHtml + sizesHtml;
+            container.appendChild(card);
+        });
+
+        syncColorVariationFields();
     }
 
-    function toggleSizeChip(btn, size) {
-        btn.classList.toggle('bg-brand');
-        btn.classList.toggle('text-white');
-        btn.classList.toggle('border-brand');
-        btn.classList.toggle('bg-white');
-
-        updateHiddenField('size-chips', 'f-sizes');
+    function getColorHex(colorName) {
+        var map = {
+            'White': '#ffffff',
+            'Black': '#111827',
+            'Grey': '#9ca3af',
+            'Blue': '#3b82f6',
+            'Red': '#ef4444',
+            'Pink': '#ec4899',
+            'Navy': '#1e3a8a'
+        };
+        return map[colorName] || '#d1d5db';
     }
 
-    function updateHiddenField(containerId, inputId) {
-        var container = document.getElementById(containerId);
-        var activeBtns = container.querySelectorAll('button.bg-brand');
-        var values = Array.from(activeBtns).map(b => b.textContent.trim());
-        document.getElementById(inputId).value = values.join(',');
+    function toggleColorEnabled(colorName, isEnabled) {
+        if (isEnabled) {
+            if (!currentProductColorVariations[colorName]) {
+                currentProductColorVariations[colorName] = ['M'];
+            }
+        } else {
+            delete currentProductColorVariations[colorName];
+        }
+        renderColorVariationsUI(currentProductColorVariations);
+    }
+
+    function toggleColorSizeChoice(colorName, sizeName) {
+        if (!currentProductColorVariations[colorName]) {
+            currentProductColorVariations[colorName] = [];
+        }
+        var idx = currentProductColorVariations[colorName].indexOf(sizeName);
+        if (idx > -1) {
+            currentProductColorVariations[colorName].splice(idx, 1);
+        } else {
+            currentProductColorVariations[colorName].push(sizeName);
+        }
+        renderColorVariationsUI(currentProductColorVariations);
+    }
+
+    function addCustomColorVariation() {
+        var input = document.getElementById('new-custom-color-input');
+        var val = input ? input.value.trim() : '';
+        if (!val) return;
+        
+        var formatted = val.charAt(0).toUpperCase() + val.slice(1);
+        if (!currentProductColorVariations[formatted]) {
+            currentProductColorVariations[formatted] = ['M'];
+        }
+        if (input) input.value = '';
+        renderColorVariationsUI(currentProductColorVariations);
+    }
+
+    function syncColorVariationFields() {
+        document.getElementById('f-color-variations').value = JSON.stringify(currentProductColorVariations);
+        
+        var activeColors = Object.keys(currentProductColorVariations);
+        document.getElementById('f-colors').value = activeColors.join(',');
+
+        var activeSizesSet = new Set();
+        activeColors.forEach(c => {
+            if (Array.isArray(currentProductColorVariations[c])) {
+                currentProductColorVariations[c].forEach(s => activeSizesSet.add(s));
+            }
+        });
+        document.getElementById('f-sizes').value = Array.from(activeSizesSet).join(',');
     }
 
     function closeProductFormPane() {
@@ -766,6 +879,7 @@ if (empty($all_categories)) {
         formData.append('name', name);
         formData.append('sku', sku);
         formData.append('category_name', category_name);
+        formData.append('supplier_name', document.getElementById('f-supplier') ? document.getElementById('f-supplier').value : '');
         formData.append('description', description);
         formData.append('moq', tiers.length > 0 ? tiers[0].q : 50);
         formData.append('base_price', tiers.length > 0 ? tiers[0].p : 0);
@@ -773,6 +887,7 @@ if (empty($all_categories)) {
         formData.append('tiers', JSON.stringify(tiers));
         formData.append('colors', document.getElementById('f-colors').value);
         formData.append('sizes', document.getElementById('f-sizes').value);
+        formData.append('color_variations', document.getElementById('f-color-variations') ? document.getElementById('f-color-variations').value : '');
         formData.append('discount', discount);
         formData.append('discount_start', discountStart);
         formData.append('discount_end', discountEnd);

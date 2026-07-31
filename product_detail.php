@@ -470,10 +470,12 @@ require_once __DIR__ . "/layouts/header.php";
                                     continue;
                                 $is_selected = ($so === $default_size);
 
-                                // Find initial stock quantity for default colour and size
+                                // Check if size variant exists for default colour
+                                $has_variant = false;
                                 $initial_qty = 0;
                                 foreach ($variations as $v) {
                                     if (strcasecmp(trim($v['colour'] ?? ''), trim($default_colour)) === 0 && strcasecmp(trim($v['size'] ?? ''), trim($so)) === 0) {
+                                        $has_variant = true;
                                         $initial_qty = (int) ($v['quantity'] ?? 0);
                                         break;
                                     }
@@ -482,7 +484,7 @@ require_once __DIR__ . "/layouts/header.php";
                                 ?>
                                 <div id="size-row-card-<?= htmlspecialchars($so) ?>"
                                     onclick="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')"
-                                    class="size-row-el flex items-center justify-between p-4 hover:bg-gray-50/50 cursor-pointer transition-colors <?= $is_selected ? 'bg-brand-light/10' : '' ?>">
+                                    class="size-row-el flex items-center justify-between p-4 hover:bg-gray-50/50 cursor-pointer transition-colors <?= $is_selected ? 'bg-brand-light/10' : '' ?> <?= !$has_variant ? 'hidden' : '' ?>">
                                     <div class="flex items-center gap-4">
                                         <span
                                             class="w-10 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-xs font-extrabold text-gray-900 bg-gray-50"><?= htmlspecialchars($so) ?></span>
@@ -935,7 +937,17 @@ require_once __DIR__ . "/layouts/header.php";
             const stockVal = document.getElementById('size-stock-val-' + size);
 
             let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === color.trim().toLowerCase() && (v.size || '').trim().toLowerCase() === size.trim().toLowerCase());
-            let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
+            const cardEl = document.getElementById('size-row-card-' + size);
+
+            if (!variant) {
+                if (cardEl) cardEl.classList.add('hidden');
+                if (selectedQuantities[color]) selectedQuantities[color][size] = 0;
+                return;
+            }
+
+            if (cardEl) cardEl.classList.remove('hidden');
+
+            let qtyAvailable = parseInt(variant.quantity) || 0;
 
             if (qtyAvailable <= 0) {
                 if (input) {

@@ -359,17 +359,112 @@ if ($method === 'POST') {
             }
 
             // Sync Inventory Variants
-            $inv_colors = !empty(trim($colors)) ? array_map('trim', explode(',', $colors)) : ['Standard'];
-            $inv_sizes = !empty(trim($sizes)) ? array_map('trim', explode(',', $sizes)) : ['M'];
+            $color_variations_json = $input['color_variations'] ?? $_POST['color_variations'] ?? '';
+            $color_variations = !empty($color_variations_json) ? json_decode($color_variations_json, true) : null;
 
             $check_inv = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? AND colour = ? AND size = ?");
             $ins_inv = $pdo->prepare("INSERT INTO inventory (product_id, colour, size, quantity, restock_min) VALUES (?, ?, ?, 0, 50)");
 
-            foreach ($inv_colors as $c) {
-                foreach ($inv_sizes as $s) {
-                    $check_inv->execute([$product_id, $c, $s]);
-                    if (!$check_inv->fetch()) {
-                        $ins_inv->execute([$product_id, $c, $s]);
+            if (is_array($color_variations) && !empty($color_variations)) {
+                // If updating existing product, remove inventory items no longer selected in color_variations
+                if ($id > 0) {
+                    $existing_inv = $pdo->prepare("SELECT id, colour, size FROM inventory WHERE product_id = ?");
+                    $existing_inv->execute([$id]);
+                    $all_existing = $existing_inv->fetchAll();
+
+                    foreach ($all_existing as $e_row) {
+                        $e_color = trim($e_row['colour'] ?? '');
+                        $e_size = trim($e_row['size'] ?? '');
+                        $still_exists = isset($color_variations[$e_color]) && is_array($color_variations[$e_color]) && in_array($e_size, $color_variations[$e_color]);
+                        if (!$still_exists) {
+                            $del_inv = $pdo->prepare("DELETE FROM inventory WHERE id = ?");
+                            $del_inv->execute([$e_row['id']]);
+                        }
+                    }
+                }
+
+                // Insert specific color-size pairs
+                $derived_colors_arr = [];
+                $derived_sizes_set = [];
+
+                foreach ($color_variations as $c_name => $sizes_arr) {
+                    if (!is_array($sizes_arr)) continue;
+                    $c_clean = trim($c_name);
+                    if (empty($c_clean)) continue;
+                    $derived_colors_arr[] = $c_clean;
+
+                    foreach ($sizes_arr as $s_name) {
+                        $s_clean = trim($s_name);
+                        if (empty($s_clean)) continue;
+                        if (!in_array($s_clean, $derived_sizes_set)) {
+                            $derived_sizes_set[] = $s_clean;
+                        }
+
+                        $check_inv->execute([$product_id, $c_clean, $s_clean]);
+                        if (!$check_inv->fetch()) {
+                            $ins_inv->execute([$product_id, $c_clean, $s_clean]);
+                        }
+                    }
+                }
+
+                $derived_colors_str = implode(',', $derived_colors_arr);
+                $derived_sizes_str = implode(',', $derived_sizes_set);
+
+                $upd_p_attrs = $pdo->prepare("UPDATE products SET colors = ?, sizes = ? WHERE id = ?");
+                $upd_p_attrs->execute([$derived_colors_str, $derived_sizes_str, $product_id]);
+
+            } else {
+                // Fallback to Cartesian product if color_variations object is omitted
+                $inv_colors = !empty(trim($colors)) ? array_map('trim', explode(',', $colors)) : ['Standard'];
+                $inv_sizes = !empty(trim($sizes)) ? array_map('trim', explode(',', $sizes)) : ['M'];
+
+                foreach ($inv_colors as $c) {
+                    foreach ($inv_sizes as $s) {
+                        $check_inv->execute([$product_id, $c, $s]);
+                        if (!$check_inv->fetch()) {
+                            $ins_inv->execute([$product_id, $c, $s]);
+                        }
+                    }
+                }
+            }
+
+            // Sync Supplier Assignment if specified
+            $supplier_name = trim($input['supplier_name'] ?? $_POST['supplier_name'] ?? '');
+            if (!empty($supplier_name)) {
+                // Ensure supplier_items has unit_cost column
+                try {
+                    $checkUC = $pdo->query("SHOW COLUMNS FROM supplier_items LIKE 'unit_cost'");
+                    if (!$checkUC->fetch()) {
+                        $pdo->exec("ALTER TABLE supplier_items ADD COLUMN unit_cost DECIMAL(10,2) DEFAULT NULL");
+                    }
+                } catch (\Exception $e) {}
+
+                $s_stmt = $pdo->prepare("SELECT id FROM suppliers WHERE name = ?");
+                $s_stmt->execute([$supplier_name]);
+                $supp_res = $s_stmt->fetch();
+                if ($supp_res) {
+                    $supp_id = (int)$supp_res['id'];
+
+                    // Sync supplier_items
+                    $chk_si = $pdo->prepare("SELECT id FROM supplier_items WHERE supplier_id = ? AND item_name = ?");
+                    $chk_si->execute([$supp_id, $name]);
+                    if (!$chk_si->fetch()) {
+                        $ins_si = $pdo->prepare("INSERT INTO supplier_items (supplier_id, item_name, unit_cost) VALUES (?, ?, ?)");
+                        $ins_si->execute([$supp_id, $name, $base_price]);
+                    } else {
+                        $upd_si = $pdo->prepare("UPDATE supplier_items SET unit_cost = ? WHERE supplier_id = ? AND item_name = ?");
+                        $upd_si->execute([$base_price, $supp_id, $name]);
+                    }
+
+                    // Sync supplier_products
+                    $chk_sp = $pdo->prepare("SELECT id FROM supplier_products WHERE supplier_id = ? AND product_id = ?");
+                    $chk_sp->execute([$supp_id, $product_id]);
+                    if (!$chk_sp->fetch()) {
+                        $ins_sp = $pdo->prepare("INSERT INTO supplier_products (supplier_id, product_id, unit_cost) VALUES (?, ?, ?)");
+                        $ins_sp->execute([$supp_id, $product_id, $base_price]);
+                    } else {
+                        $upd_sp = $pdo->prepare("UPDATE supplier_products SET unit_cost = ? WHERE supplier_id = ? AND product_id = ?");
+                        $upd_sp->execute([$base_price, $supp_id, $product_id]);
                     }
                 }
             }

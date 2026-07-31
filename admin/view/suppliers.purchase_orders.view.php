@@ -7,6 +7,18 @@
 $success_msg = "";
 $error_msg = "";
 
+// Self-Healing DB: Ensure supplier_items has unit_cost column
+if (isset($pdo) && $pdo !== null) {
+    try {
+        $checkUnitCost = $pdo->query("SHOW COLUMNS FROM supplier_items LIKE 'unit_cost'");
+        if (!$checkUnitCost->fetch()) {
+            $pdo->exec("ALTER TABLE supplier_items ADD COLUMN unit_cost DECIMAL(10,2) DEFAULT NULL");
+        }
+    } catch (\Exception $e) {
+        // Ignored
+    }
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
     $po_id = (int) ($_POST['po_id'] ?? 0);
@@ -188,6 +200,23 @@ if (isset($pdo) && $pdo !== null) {
             ];
         }
 
+        // Build product variants map using exact existing inventory colour & size pairs
+        $inv_by_prod = [];
+        foreach ($inventory_db as $inv) {
+            $pid = (int)$inv['product_id'];
+            if (!isset($inv_by_prod[$pid])) {
+                $inv_by_prod[$pid] = [];
+            }
+            $c = trim($inv['colour'] ?? '');
+            $s = trim($inv['size'] ?? '');
+            if (!empty($c) && !empty($s)) {
+                $inv_by_prod[$pid][] = [
+                    'c' => $c,
+                    's' => $s
+                ];
+            }
+        }
+
         $all_product_variants = [];
         $inv_options = '<option value="">Select an Item...</option>';
         foreach ($prod_list as $prod) {
@@ -196,40 +225,50 @@ if (isset($pdo) && $pdo !== null) {
             if (!isset($all_product_variants[$pNameRaw])) {
                 $all_product_variants[$pNameRaw] = [];
             }
-            $colors = !empty($prod['colors']) ? array_map('trim', explode(',', $prod['colors'])) : ['Default'];
-            $sizes = !empty($prod['sizes']) ? array_map('trim', explode(',', $prod['sizes'])) : ['Default'];
 
-            foreach ($colors as $c) {
-                foreach ($sizes as $s) {
-                    if (empty($c))
-                        $c = 'Default';
-                    if (empty($s))
-                        $s = 'Default';
-                    $comboName = htmlspecialchars($prod['p_name'] . ' · ' . $c . ' · ' . $s);
+            $pid = (int)$prod['p_id'];
+            $variants_to_render = [];
 
-                    $key = $prod['p_id'] . '_' . $c . '_' . $s;
-                    $value_str = $prod['p_id'] . '|||' . trim($c) . '|||' . trim($s) . '|||' . $comboName;
+            if (!empty($inv_by_prod[$pid])) {
+                foreach ($inv_by_prod[$pid] as $ivar) {
+                    $variants_to_render[] = ['c' => $ivar['c'], 's' => $ivar['s']];
+                }
+            } else {
+                $colors = !empty($prod['colors']) ? array_map('trim', explode(',', $prod['colors'])) : ['Default'];
+                $sizes = !empty($prod['sizes']) ? array_map('trim', explode(',', $prod['sizes'])) : ['Default'];
+                foreach ($colors as $c) {
+                    foreach ($sizes as $s) {
+                        $variants_to_render[] = ['c' => empty($c) ? 'Default' : $c, 's' => empty($s) ? 'Default' : $s];
+                    }
+                }
+            }
 
-                    $is_critical = false;
+            foreach ($variants_to_render as $vitem) {
+                $c = $vitem['c'];
+                $s = $vitem['s'];
+                $comboName = htmlspecialchars($prod['p_name'] . ' · ' . $c . ' · ' . $s);
 
-                    if (isset($stock_map[$key])) {
-                        if ($stock_map[$key]['quantity'] <= $stock_map[$key]['restock_min']) {
-                            $is_critical = true;
-                        }
-                    } else {
-                        // Not in inventory table means 0 stock, so it's critical
+                $key = $prod['p_id'] . '_' . $c . '_' . $s;
+                $value_str = $prod['p_id'] . '|||' . trim($c) . '|||' . trim($s) . '|||' . $comboName;
+
+                $is_critical = false;
+
+                if (isset($stock_map[$key])) {
+                    if ($stock_map[$key]['quantity'] <= $stock_map[$key]['restock_min']) {
                         $is_critical = true;
                     }
-
-                    $option_html = '';
-                    if ($is_critical) {
-                        $option_html = '<option value="' . htmlspecialchars($value_str) . '" class="bg-red-50 text-red-700 font-bold">' . $comboName . ' (Low Stock)</option>';
-                    } else {
-                        $option_html = '<option value="' . htmlspecialchars($value_str) . '">' . $comboName . '</option>';
-                    }
-                    $inv_options .= $option_html;
-                    $all_product_variants[$pNameRaw][] = $option_html;
+                } else {
+                    $is_critical = true;
                 }
+
+                $option_html = '';
+                if ($is_critical) {
+                    $option_html = '<option value="' . htmlspecialchars($value_str) . '" class="bg-red-50 text-red-700 font-bold">' . $comboName . ' (Low Stock)</option>';
+                } else {
+                    $option_html = '<option value="' . htmlspecialchars($value_str) . '">' . $comboName . '</option>';
+                }
+                $inv_options .= $option_html;
+                $all_product_variants[$pNameRaw][] = $option_html;
             }
         }
         $critical_stock_items = [];
