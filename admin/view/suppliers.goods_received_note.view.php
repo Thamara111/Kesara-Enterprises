@@ -1,7 +1,9 @@
 <?php
 /**
  * Goods Received Note View - Database Integration & Form Processing
- * Handles the creation of GRNs when a purchase order is fulfilled by a supplier.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting purchase order details, open purchase orders list, line items, and past GRN records.
+ * 2. Processing -> Recording new GRN entry, updating inventory stock levels, logging changes, and updating PO delivery status.
  */
 
 $success_msg = "";
@@ -9,7 +11,7 @@ $error_msg = "";
 
 $po_id = isset($_POST['po_id']) ? (int)$_POST['po_id'] : (isset($_GET['po_id']) ? (int)$_GET['po_id'] : 0);
 
-// Handle Form Submission
+// Processing -> Recording GRN entry, incrementing line item received quantities, and updating inventory stock levels
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_grn' && isset($pdo)) {
     $received_by = trim($_POST['received_by'] ?? '');
     $received_at = trim($_POST['received_date'] ?? date('Y-m-d'));
@@ -128,7 +130,7 @@ if ($po_id === 0 && isset($pdo) && $pdo !== null) {
     } catch (\Exception $e) {}
 }
 
-// Fetch ALL open POs for the selector dropdown
+// Fetching Data -> Fetching list of open purchase orders (sent, partial, overdue) for selection dropdown
 $open_pos_list = [];
 if (isset($pdo) && $pdo !== null) {
     try {
@@ -141,6 +143,7 @@ if (isset($pdo) && $pdo !== null) {
     } catch (\Exception $e) {}
 }
 
+// Fetching Data -> Fetching specific purchase order details, items, line inventory totals, and past GRN receipts
 $po_data = null;
 $po_items = [];
 $past_grns = [];
@@ -424,6 +427,7 @@ $grn_ref = 'GRN-' . $po_year . '-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B'
 </form>
 
 <script>
+// Form Handler -> Recalculating received quantities, line status badges, and previewing inventory stock level impacts
 function updateLine(idx) {
   var lineEl = document.getElementById('grn-line-'+idx);
   if (!lineEl) return;
@@ -478,6 +482,7 @@ function updateLine(idx) {
   updateShortageWarn();
 }
 
+// Validation -> Checking line item quantities to display delivery shortage warnings
 function updateShortageWarn() {
   var shortages = [];
   document.querySelectorAll('.grn-line-item').forEach(lineEl => {
@@ -499,6 +504,7 @@ function updateShortageWarn() {
   }
 }
 
+// Controls -> Closing right-side PO reference and inventory impact preview drawer
 function closeGRNRefPane() {
   var pane = document.getElementById('grn-ref-pane');
   var backdrop = document.getElementById('grn-ref-backdrop');
@@ -509,6 +515,7 @@ function closeGRNRefPane() {
   }
 }
 
+// Controls -> Opening right-side PO reference and inventory impact preview drawer
 function openGRNRefPane() {
   var pane = document.getElementById('grn-ref-pane');
   var backdrop = document.getElementById('grn-ref-backdrop');

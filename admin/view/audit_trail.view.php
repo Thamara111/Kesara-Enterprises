@@ -1,11 +1,14 @@
 <?php
 /**
  * Audit Trail View (Admin Only)
- * Allows System Admins to view the activity log of all managers and admins.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting system activity log history joined with admin username and role details.
+ * 2. Processing -> Styling audit log entries, badge colors, and generating navigation links based on entity types.
  */
 
 $logs = [];
 
+// Fetching Data -> Fetching audit log entries joined with admin names and roles sorted newest first
 if (isset($pdo) && $pdo !== null) {
     try {
         $stmt = $pdo->query("
@@ -20,7 +23,7 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
-// Role label & badge class helpers for styling
+// Processing -> Role label and badge styling helper function
 function getRoleMetaBadge($role) {
     $meta = [
         'admin' => ['label' => 'System Admin', 'class' => 'bg-red-50 text-red-700 border-red-100'],
@@ -31,6 +34,7 @@ function getRoleMetaBadge($role) {
     return $meta[$role] ?? ['label' => ucwords(str_replace('_', ' ', $role ?? 'System')), 'class' => 'bg-gray-50 text-gray-700 border-gray-100'];
 }
 
+// Processing -> Navigation link mapper based on entity type (product, order, customer, etc.)
 function getEntityLink($type) {
     $type = strtolower($type);
     if ($type === 'product') return '/admin-products';
@@ -41,6 +45,7 @@ function getEntityLink($type) {
     return '/admin-dashboard';
 }
 
+// Processing -> Action badge color selector (create, update, delete)
 function getActionColor($action) {
     $action = strtolower($action);
     if (strpos($action, 'delete') !== false) return 'text-red-600 bg-red-50';
@@ -185,11 +190,13 @@ function getActionColor($action) {
 var currentPage = 1;
 var itemsPerPage = 15;
 
+// Pagination -> Changing current active audit log page number
 function goToPage(page) {
     currentPage = page;
     applyFilters();
 }
 
+// Pagination -> Rendering page numbers and navigation controls at the bottom
 function renderPagination(totalItems, totalPages) {
     var info = document.getElementById('pagination-info');
     var buttons = document.getElementById('pagination-buttons');
@@ -207,9 +214,11 @@ function renderPagination(totalItems, totalPages) {
 
     var html = '';
     
+    // Prev button
     var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
     html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
 
+    // Page numbers
     for (let i = 1; i <= totalPages; i++) {
         if (i === currentPage) {
             html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
@@ -224,12 +233,14 @@ function renderPagination(totalItems, totalPages) {
         }
     }
 
+    // Next button
     var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
     html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
 
     buttons.innerHTML = html;
 }
 
+// Pagination -> Displaying visible audit log rows for the selected page
 function applyFilters() {
     var list = document.getElementById('audit-list');
     if (!list) return;

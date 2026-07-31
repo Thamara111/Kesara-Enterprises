@@ -1,14 +1,17 @@
 <?php
 /**
  * Delivery Assignments View - Database Integration
- * Manages assigning pending orders to delivery drivers.
- * Fetches order assignments and lists available drivers.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting delivery assignments, driver details, vehicle information, and unassigned processing orders.
+ * 2. Self-Healing -> Ensuring assigned_area column exists in delivery_personnel table.
+ * 3. Processing -> Grouping assignments by driver and timestamp, and calculating status metrics (Active, Completed, Pending).
  */
 $admin_assignments = [];
 $available_drivers = [];
 $unassigned_orders = [];
 $driver_info_map = [];
 
+// Fetching Data -> Fetching grouped delivery assignments, driver profiles, vehicle numbers, and customer addresses
 if (isset($pdo) && $pdo !== null) {
     try {
         // Fetch all assignments with driver and order info
@@ -90,7 +93,7 @@ if (isset($pdo) && $pdo !== null) {
             $pdo->exec("ALTER TABLE delivery_personnel ADD COLUMN assigned_area VARCHAR(100) DEFAULT 'Colombo'");
         }
 
-        // Fetch available drivers with assigned area
+        // Fetching Data -> Fetching active available delivery drivers and driver performance metrics
         $driver_stmt = $pdo->query("SELECT id, name, vehicle_type, vehicle_number, status, COALESCE(assigned_area, 'Colombo') AS assigned_area FROM delivery_personnel WHERE status != 'inactive' ORDER BY status ASC, name ASC");
         $available_drivers = $driver_stmt->fetchAll();
 
@@ -117,7 +120,7 @@ if (isset($pdo) && $pdo !== null) {
             ];
         }
 
-        // Fetch unassigned orders with customer address details
+        // Fetching Data -> Fetching unassigned processing orders with delivery street addresses
         $unassigned_stmt = $pdo->query("SELECT o.id, u.business_name, u.address 
                                         FROM orders o 
                                         JOIN users u ON o.user_id = u.id
@@ -153,6 +156,7 @@ if (empty($unassigned_orders)) {
     $unassigned_orders = [];
 }
 
+// Processing -> Calculating assignment status metrics (Active, Completed, Pending)
 $today_total = count($admin_assignments);
 $in_progress_cnt = 0;
 $completed_cnt = 0;
@@ -798,6 +802,7 @@ foreach ($admin_assignments as $a) {
         updateAddressPreview();
     }
 
+    // Controls -> Updating delivery address preview card based on selected order chips
     function updateAddressPreview() {
         var selectedChips = document.querySelectorAll('.order-chip.sel');
         var previewCompany = document.getElementById('preview-company');
@@ -842,6 +847,7 @@ foreach ($admin_assignments as $a) {
         }
     }
 
+    // Filtering -> Filtering assignments by active status chip tab
     function chipFilter(el) {
         document.querySelectorAll('.chip').forEach(c => {
             c.classList.remove('bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'on');
@@ -861,6 +867,7 @@ foreach ($admin_assignments as $a) {
         }
     }
 
+    // Action -> Redirecting to live tracking view for selected assignment
     function trackLiveRun() {
         var currentId = document.getElementById('d-id').textContent;
         if (currentId) {
@@ -870,6 +877,7 @@ foreach ($admin_assignments as $a) {
         }
     }
 
+    // API Dispatch -> Creating new delivery assignment and dispatching orders to driver via backend API
     function dispatchNewAssignment() {
         var driverSelect = document.getElementById('driver-select');
         var driverVal = driverSelect.value;
@@ -915,6 +923,7 @@ foreach ($admin_assignments as $a) {
             });
     }
 
+    // Controls -> Closing right-side assignment detail pane
     function closeAsgnDetailPane() {
         var pane = document.getElementById('asgn-detail-pane');
         var backdrop = document.getElementById('asgn-detail-backdrop');

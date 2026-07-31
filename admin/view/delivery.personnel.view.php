@@ -1,13 +1,15 @@
 <?php
 /**
  * Delivery Personnel Management View
- * Handles adding, editing, and viewing details of delivery drivers.
- * Also processes POST actions for driver operations directly in the view.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting delivery personnel profiles, pending driver leave requests, and assignment metrics from database.
+ * 2. Processing -> Handling POST actions for adding/editing drivers, toggling active status, and approving/denying leave requests.
  */
 
 $success_msg = "";
 $error_msg = "";
 
+// Processing -> Handling POST actions for adding drivers, updating profiles, toggling status, and leave approvals
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
     $driver_id = (int) ($_POST['driver_id'] ?? 0);
@@ -114,6 +116,7 @@ if (!empty($_SESSION['flash_success'])) {
     unset($_SESSION['flash_success']);
 }
 
+// Fetching Data -> Fetching pending driver leave requests, delivery personnel list, assignment metrics, and recent runs
 $admin_drivers = [];
 $pending_leaves = [];
 if (isset($pdo) && $pdo !== null) {
@@ -277,6 +280,7 @@ if (empty($admin_drivers)) {
     $admin_drivers = [];
 }
 
+// Processing -> Calculating driver status totals (Available, On run, Day off)
 $total_drivers = count($admin_drivers);
 $available_drivers = 0;
 $on_run_drivers = 0;
@@ -839,6 +843,7 @@ foreach ($admin_drivers as $d) {
         renderPagination(totalItems, totalPages);
     }
 
+    // Filtering -> Filtering delivery personnel list rows based on status chip selection
     function chipFilter(btn) {
         document.querySelectorAll('.chip').forEach(c => {
             c.classList.remove('on', 'bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'border-transparent');
@@ -858,6 +863,7 @@ foreach ($admin_drivers as $d) {
         }
     }
 
+    // Controls -> Selecting a driver row and displaying detailed stats in right-side pane
     function selectRow(el, openDrawer = true) {
         if (!el) return;
         document.querySelectorAll('.driver-row').forEach(r => {
@@ -975,6 +981,7 @@ foreach ($admin_drivers as $d) {
   `).join('');
     }
 
+    // Controls -> Closing right-side driver detail pane
     function closeDriverDetailPane() {
         var pane = document.getElementById('driver-detail-pane');
         var backdrop = document.getElementById('driver-detail-backdrop');
@@ -989,7 +996,7 @@ foreach ($admin_drivers as $d) {
         });
     }
 
-    // Add/Edit Modals logic
+    // Modal -> Opening driver modal dialog for adding new personnel
     function openAddDriverModal() {
         document.getElementById('modalTitle').textContent = 'Add New Personnel';
         document.getElementById('driverActionInput').value = 'add_driver';
@@ -1010,6 +1017,7 @@ foreach ($admin_drivers as $d) {
         document.getElementById('driverModal').classList.add('flex');
     }
 
+    // Modal -> Opening driver modal dialog for editing an existing profile
     function openEditDriverModal() {
         if (!currentSelectedDriver) return;
 
@@ -1032,11 +1040,13 @@ foreach ($admin_drivers as $d) {
         document.getElementById('driverModal').classList.add('flex');
     }
 
+    // Modal -> Closing driver modal dialog
     function closeDriverModal() {
         document.getElementById('driverModal').classList.add('hidden');
         document.getElementById('driverModal').classList.remove('flex');
     }
 
+    // Processing -> Handling driver leave approval / denial via AJAX request
     function handleLeaveAction(btn, action, leaveId, personnelId) {
         if (typeof setButtonLoading === 'function') {
             setButtonLoading(btn, true);
@@ -1085,6 +1095,7 @@ foreach ($admin_drivers as $d) {
         });
     }
 
+    // Processing -> Toggling driver active / inactive status via AJAX request
     function toggleDriverStatus() {
         if (currentSelectedDriver) {
             uiConfirm(`Are you sure you want to change the status of ${currentSelectedDriver.name}?`, () => {
@@ -1111,6 +1122,7 @@ foreach ($admin_drivers as $d) {
         }
     }
 
+    // Processing -> Submitting driver profile form (Add / Edit) via AJAX request
     document.getElementById('driverForm')?.addEventListener('submit', function(e) {
         e.preventDefault();
         const submitBtn = this.querySelector('button[type="submit"]');

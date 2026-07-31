@@ -1,19 +1,20 @@
 <?php
 /**
  * Admin Orders Management View
- * Handles listing, filtering, and displaying detailed views of customer orders.
- * Fetches order details, items, and status timeline from the database.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting customer orders, order items, timeline status logs, and payment receipts from the database.
+ * 2. Self-Healing -> Ensuring database columns like deleted_at and cancellation_reason exist.
+ * 3. Processing -> Formatting order IDs, calculating totals, building tracking timelines, and computing dashboard metrics.
  */
 
 $admin_orders = [];
 if (isset($pdo) && $pdo !== null) {
     try {
-        /*
+         /*
         // STEP 1]: Extract Date Range Filter parameters
         $filter_start_date = trim($_GET['start_date'] ?? '');
         $filter_end_date = trim($_GET['end_date'] ?? '');
         */
-
         // Self-heal: ensure deleted_at column exists in the orders table for soft deletes
         $chk = $pdo->query("SHOW COLUMNS FROM orders LIKE 'deleted_at'");
         if (!$chk->fetch())
@@ -24,7 +25,7 @@ if (isset($pdo) && $pdo !== null) {
         if (!$chk_cancel->fetch())
             $pdo->exec("ALTER TABLE orders ADD COLUMN cancellation_reason VARCHAR(255) DEFAULT NULL AFTER status");
 
-        /*
+         /*
         // STEP 2]: Self-Healing DB - Auto-create index on orders(created_at) if missing
         $checkDateIdx = $pdo->query("SHOW INDEX FROM orders WHERE Key_name = 'idx_orders_created_at'");
         if (!$checkDateIdx || !$checkDateIdx->fetch()) {
@@ -56,9 +57,8 @@ if (isset($pdo) && $pdo !== null) {
         $stmt->execute($params);
         $orders_db = $stmt->fetchAll();
         */
-
-
-        // Fetch all active orders along with the associated customer's details (newest first)
+        
+        // Fetching -> Fetch all active orders along with the associated customer's details (newest first)
         $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, o.payment_receipt, o.cancellation_reason, u.business_name AS company, u.first_name, u.last_name, u.email, u.address 
                              FROM orders o 
                              JOIN users u ON o.user_id = u.id 
@@ -66,7 +66,7 @@ if (isset($pdo) && $pdo !== null) {
                              ORDER BY o.created_at DESC, o.id DESC");
         $orders_db = $stmt->fetchAll();
 
-        // Process each order for display logic
+        // Processing -> Process each order for display logic
         foreach ($orders_db as $ord) {
             // Generate zero-padded KE order ID format
             $order_id_formatted = 'KE-2025-' . str_pad($ord['id'], 5, '0', STR_PAD_LEFT);
@@ -91,6 +91,7 @@ if (isset($pdo) && $pdo !== null) {
                 $badgeClass = 'bg-red-50 text-red-600 border-red-100';
             }
 
+            // Fetching -> Fetch order items, quantities, and prices for this order
             $item_stmt = $pdo->prepare("SELECT p.name AS n, oi.quantity AS q, (oi.quantity * oi.unit_price) AS p 
                                         FROM order_items oi 
                                         JOIN products p ON oi.product_id = p.id 
@@ -106,6 +107,7 @@ if (isset($pdo) && $pdo !== null) {
                 ];
             }
 
+            // Fetching -> Fetch status change timeline log history for this order
             $timeline_stmt = $pdo->prepare("SELECT status AS t, changed_at AS d, note FROM order_status_log WHERE order_id = ? ORDER BY changed_at ASC");
             $timeline_stmt->execute([$ord['id']]);
             $raw_timeline = $timeline_stmt->fetchAll();
@@ -186,7 +188,7 @@ if (empty($admin_orders)) {
 }
 
 
-// Calculate dynamic stats
+// Processing -> Calculate dynamic status counts for top summary metric cards
 $total_orders = count($admin_orders);
 $pending_orders = 0;
 $processing_orders = 0;
@@ -932,9 +934,7 @@ if (isset($pdo) && $pdo !== null) {
         document.getElementById('d-client').textContent = el.dataset.clientname;
         document.getElementById('d-email').textContent = el.dataset.clientemail;
 
-        document.getElementById('d-total').textContent = 'LKR ' + el.dataset.total;
-
-        // Render Payment Receipt
+        document.getElementById('d-total').textContent = 'LKR '        // Displaying -> Render Payment Receipt preview or PDF download link
         var receiptPath = el.dataset.paymentReceipt;
         var receiptContainer = document.getElementById('d-receipt-container');
         var receiptBtn = document.getElementById('d-receipt-btn');
@@ -958,7 +958,7 @@ if (isset($pdo) && $pdo !== null) {
             receiptContainer.classList.add('hidden');
         }
 
-        // Render Cancellation Reason
+        // Displaying -> Render Cancellation Reason if order was cancelled
         var cancelContainer = document.getElementById('d-cancellation-reason-container');
         var cancelReasonEl = document.getElementById('d-cancellation-reason');
         if (el.dataset.status.toLowerCase() === 'cancelled' && el.dataset.cancellationReason && el.dataset.cancellationReason.trim() !== '') {
@@ -971,7 +971,7 @@ if (isset($pdo) && $pdo !== null) {
         renderOrderDetails(el);
     }
 
-    // Modal Helpers (Global Scope)
+    // Modals -> Functions to open and close payment receipt preview popup
     function openReceiptModal() {
         var receiptBtn = document.getElementById('d-receipt-btn');
         if (!receiptBtn) return;
@@ -1004,10 +1004,10 @@ if (isset($pdo) && $pdo !== null) {
         if (contentEl) contentEl.innerHTML = '';
     }
 
-    // Continue selectOrder items and timeline rendering inside selectOrder function body
+    // Rendering -> Drawing item details, pricing breakdown, and status timeline
     function renderOrderDetails(el) {
 
-        // Render Items
+        // Render Items -> Drawing ordered items list and unit costs
         var itemsContainer = document.getElementById('d-items');
         var items = [];
         try { items = JSON.parse(el.dataset.items || '[]'); } catch (e) { }
@@ -1021,7 +1021,7 @@ if (isset($pdo) && $pdo !== null) {
         </div>
     `).join('');
 
-        // Render Timeline
+        // Render Timeline -> Drawing tracking progress timeline steps
         var timelineContainer = document.getElementById('d-timeline');
         var timeline = [];
         try { timeline = JSON.parse(el.dataset.timeline || '[]'); } catch (e) { }
@@ -1051,7 +1051,7 @@ if (isset($pdo) && $pdo !== null) {
         `;
         }).join('');
 
-        // Actions Footer
+        // Actions Footer -> Rendering action buttons based on current order status
         var actionContainer = document.getElementById('d-actions');
         var status_lower = el.dataset.status.toLowerCase();
         var oid = el.dataset.id;
@@ -1109,18 +1109,20 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
-    // Filter state
+    // Filtering & Pagination -> Global filter state variables
     var activeStatus = 'all';
     var searchQuery = '';
     var sortOrder = 'newest';
     var currentPage = 1;
     var itemsPerPage = 15;
 
+    // Pagination -> Change active page number
     function goToPage(page) {
         currentPage = page;
         applyFilters();
     }
 
+    // Pagination -> Draw page numbers and navigation arrows
     function renderPagination(totalItems, totalPages) {
         var info = document.getElementById('pagination-info');
         var buttons = document.getElementById('pagination-buttons');
@@ -1164,6 +1166,7 @@ if (isset($pdo) && $pdo !== null) {
         buttons.innerHTML = html;
     }
 
+    // Filtering -> Filtering order cards live based on search box input, status tab, and date sorting
     function applyFilters() {
         var q = searchQuery.toLowerCase().trim();
         var list = document.getElementById('order-list');
@@ -1195,8 +1198,9 @@ if (isset($pdo) && $pdo !== null) {
             }
         });
 
+        // Sort latest first (highest id)
         visibleRows.sort((a, b) => {
-            // "newest" means largest ID first.
+             // "newest" means largest ID first.
             var aId = parseInt(a.dataset.id) || 0;
             var bId = parseInt(b.dataset.id) || 0;
             return sortOrder === 'newest' ? bId - aId : aId - bId;
@@ -1264,6 +1268,7 @@ if (isset($pdo) && $pdo !== null) {
         applyFilters();
     });
 
+    // Notification -> Displaying floating toast pop-up alerts
     function showToast(message, variant = 'success', duration = 3500) {
         var icons = {
             success: '<i class="ti ti-circle-check"></i>',
@@ -1297,6 +1302,7 @@ if (isset($pdo) && $pdo !== null) {
     let pendingCancelOrderId = null;
     let pendingCancelBtnElement = null;
 
+    // Modals -> Opening cancellation modal and entering customer cancellation reason
     function openCancelOrderModal(id, btnElement) {
         pendingCancelOrderId = id;
         pendingCancelBtnElement = btnElement;
@@ -1320,6 +1326,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
+    // Modals -> Closing cancellation modal box
     function closeCancelOrderModal() {
         pendingCancelOrderId = null;
         pendingCancelBtnElement = null;
@@ -1331,6 +1338,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
+    // API Cancellation -> Submitting cancellation request to server API and notifying customer via email
     function submitOrderCancellation() {
         if (!pendingCancelOrderId) return;
 
@@ -1379,6 +1387,7 @@ if (isset($pdo) && $pdo !== null) {
         });
     }
 
+    // API Status Update -> Updating status (e.g. Processing, Shipped, Delivered) via backend API
     function updateStatus(id, status, btnElement) {
         if (status === 'cancelled') {
             openCancelOrderModal(id, btnElement);
@@ -1418,6 +1427,7 @@ if (isset($pdo) && $pdo !== null) {
             });
     }
 
+    // Driver Assignment -> Dispatching order to delivery system
     function dispatchOrder(oid, btnElement) {
         var driverSelect = document.getElementById('assign-driver-select');
         var driverId = driverSelect ? driverSelect.value : '';
@@ -1455,6 +1465,7 @@ if (isset($pdo) && $pdo !== null) {
     var activeAssignOrderId = null;
     var activeAssignOrderFormattedId = null;
 
+    // Driver Modal -> Opening driver assignment popup window with customer address pre-filled
     function openAssignModalFromOrders(oid, company, address, formattedId) {
         if (!oid) {
             var selCard = document.querySelector('.order-card.selected');
@@ -1501,6 +1512,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
+    // Driver Modal -> Closing driver assignment popup window
     function closeAssignModalFromOrders() {
         var modal = document.getElementById('assign-driver-modal');
         if (modal) {
@@ -1509,6 +1521,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
+    // Driver Modal -> Filtering available drivers matching selected delivery area
     function filterOrdersDriversByArea() {
         var selectedArea = document.getElementById('orders-area-select').value;
         var driverSelect = document.getElementById('orders-driver-select');
@@ -1544,6 +1557,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
+    // Driver Modal -> Updating driver vehicle and zone info display
     function updateOrdersDriverInfo() {
         var val = document.getElementById('orders-driver-select').value;
         var info = document.getElementById('orders-driver-info');
@@ -1557,6 +1571,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
+    // API Delivery -> Creating assignment record and linking driver to order
     function dispatchAssignmentFromOrders() {
         var driverSelect = document.getElementById('orders-driver-select');
         var driverVal = driverSelect ? driverSelect.value : '';
@@ -1595,16 +1610,28 @@ if (isset($pdo) && $pdo !== null) {
             });
     }
 
+    // Action -> Closing the right side order detail panel
     function closeOrderDetailPane() {
         var pane = document.getElementById('order-detail-pane');
         var backdrop = document.getElementById('order-detail-backdrop');
         if (pane) pane.classList.add('translate-x-full');
         if (backdrop) backdrop.classList.add('hidden');
-        // Deselect cards
-        document.querySelectorAll('.order-card').forEach(c => c.classList.remove('selected'));
+        document.querySelectorAll('.order-card').forEach(c => c.classList.remove('selected')); // Deselect cards
     }
 
     // ── Initial render ─────────────────────────────────────────────────────────
+    var urlParams = new URLSearchParams(window.location.search);
+    var tabParam = urlParams.get('tab');
+    if (tabParam) {
+        var targetTab = document.querySelector(`.status-tab[data-status="${tabParam}"]`);
+        if (targetTab) {
+            document.querySelectorAll('.status-tab').forEach(b => b.classList.remove('on'));
+            targetTab.classList.add('on');
+            activeStatus = tabParam;
+        }
+    }
+    applyFilters();
+</script>�────────────────
     var urlParams = new URLSearchParams(window.location.search);
     var tabParam = urlParams.get('tab');
     if (tabParam) {

@@ -1,8 +1,10 @@
 <?php
 /**
  * Suppliers Management View
- * Handles the display and management of vendor/supplier profiles.
- * Includes status tracking (Active, On Hold) and contact details.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting supplier profiles, supplied raw materials, lead times, and purchase order expenditures from the database.
+ * 2. Self-Healing -> Ensuring unit_cost, deleted_at, and lead_time columns exist on supplier tables.
+ * 3. Processing -> Handling POST actions for saving, updating, and soft-deleting supplier profiles.
  */
 
 // Self-Healing DB: Ensure supplier_items has unit_cost column & suppliers has deleted_at and lead_time columns
@@ -27,7 +29,7 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
-// Handle Form Submission
+// Processing -> Handling POST actions for saving, updating, and soft-deleting supplier profiles
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'save') {
         $supplier_id = isset($_POST['supplier_id']) ? (int) $_POST['supplier_id'] : 0;
@@ -128,6 +130,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
+// Fetching Data -> Getting supplier profiles, supplied raw materials, lead times, and purchase order expenditures
 $admin_suppliers = [];
 if (isset($pdo) && $pdo !== null) {
     try {
@@ -259,7 +262,7 @@ if (isset($pdo) && $pdo !== null) {
 }
 
 
-// Calculate dynamic stats
+// Processing -> Calculating dynamic supplier statistics (Active, Preferred, On Hold)
 $total_suppliers = count($admin_suppliers);
 $active_suppliers = 0;
 $preferred_suppliers = 0;
@@ -746,6 +749,7 @@ foreach ($admin_suppliers as $s) {
                 .replace(/'/g, "&#039;");
         }
 
+        // Modal -> Rendering supplied items tag chips in supplier edit form
         function renderModalTags() {
             var container = document.getElementById('modalSuppliedItemsContainer');
             if (!container) return;
@@ -760,6 +764,7 @@ foreach ($admin_suppliers as $s) {
             document.getElementById('suppliedItemsInput').value = JSON.stringify(modalSuppliedItems);
         }
 
+        // Modal -> Adding a new supplied raw material item with optional unit cost
         function modalAddSuppliedItem() {
             var input = document.getElementById('modalAddItemInput');
             var costInput = document.getElementById('modalAddItemCost');
@@ -776,11 +781,13 @@ foreach ($admin_suppliers as $s) {
             }
         }
 
+        // Modal -> Removing a supplied raw material tag chip
         function modalRemoveTag(idx) {
             modalSuppliedItems.splice(idx, 1);
             renderModalTags();
         }
 
+        // Modal -> Opening supplier modal dialog for adding or editing vendor details
         function openSupplierModal(mode, id = null) {
             var form = document.getElementById('supplierForm');
             form.reset();
@@ -838,10 +845,12 @@ foreach ($admin_suppliers as $s) {
             document.getElementById('supplierModal').classList.remove('hidden');
         }
 
+        // Modal -> Closing supplier modal dialog
         function closeSupplierModal() {
             document.getElementById('supplierModal').classList.add('hidden');
         }
 
+        // Modal -> Toggling hold reason input field visibility based on status selection
         function toggleHoldReason() {
             var status = document.getElementById('modalStatusSelect');
             var container = document.getElementById('holdReasonContainer');
@@ -855,6 +864,7 @@ foreach ($admin_suppliers as $s) {
             }
         }
 
+        // Action -> Confirming and triggering soft deletion of a supplier profile
         function modalDeleteSupplier() {
             uiConfirm("Are you sure you want to delete this supplier?", () => {
                 document.getElementById('formAction').value = 'delete';
@@ -865,11 +875,13 @@ foreach ($admin_suppliers as $s) {
         var currentPage = 1;
         var itemsPerPage = 15;
 
+        // Pagination -> Changing active page number
         function goToPage(page) {
             currentPage = page;
             applyFilters();
         }
 
+        // Pagination -> Rendering page numbers and navigation controls at the bottom
         function renderPagination(totalItems, totalPages) {
             var info = document.getElementById('pagination-info');
             var buttons = document.getElementById('pagination-buttons');
@@ -910,6 +922,7 @@ foreach ($admin_suppliers as $s) {
             buttons.innerHTML = html;
         }
 
+        // Filtering -> Filtering suppliers by search query, category, and status
         function applyFilters() {
             var q = (document.getElementById('supp-search')?.value || '').toLowerCase().trim();
             var cat = (document.getElementById('supp-cat')?.value || 'all').toLowerCase();
@@ -981,6 +994,7 @@ foreach ($admin_suppliers as $s) {
         document.getElementById('supp-cat')?.addEventListener('change', () => { currentPage = 1; applyFilters(); });
         document.getElementById('supp-status')?.addEventListener('change', () => { currentPage = 1; applyFilters(); });
 
+        // Controls -> Closing right-side supplier detail pane
         function closeSupplierDetailPane() {
             var pane = document.getElementById('supplier-detail-pane');
             var backdrop = document.getElementById('supplier-detail-backdrop');

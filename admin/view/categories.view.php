@@ -1,8 +1,10 @@
 <?php
 /**
  * Admin Categories View
- * Handles displaying and filtering product categories.
- * API integration is used for adding, editing, and deleting categories.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting product categories and calculating product counts per category from the database.
+ * 2. Self-Healing -> Ensuring the 'image' column exists in the categories table.
+ * 3. Processing -> Handling REST API calls for adding, editing, and soft-deleting categories via side-panel form.
  */
 
 $error_msg = '';
@@ -21,7 +23,7 @@ if (isset($pdo) && $pdo !== null) {
 
 // POST actions are handled externally via /api/categories.php REST endpoint.
 
-// Fetch categories
+// Fetching -> Getting categories list along with matching active product counts
 $categories_data = [];
 if (isset($pdo) && $pdo !== null) {
     try {
@@ -225,11 +227,13 @@ if (empty($categories_data)) {
 var currentPage = 1;
 var itemsPerPage = 15;
 
+// Pagination -> Changing current active page number
 function goToPage(page) {
     currentPage = page;
     applyFilters();
 }
 
+// Pagination -> Rendering page navigation buttons at the bottom
 function renderPagination(totalItems, totalPages) {
     var info = document.getElementById('pagination-info');
     var buttons = document.getElementById('pagination-buttons');
@@ -247,9 +251,11 @@ function renderPagination(totalItems, totalPages) {
 
     var html = '';
     
+    // Prev button
     var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
     html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
 
+    // Page numbers
     for (let i = 1; i <= totalPages; i++) {
         if (i === currentPage) {
             html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
@@ -264,12 +270,14 @@ function renderPagination(totalItems, totalPages) {
         }
     }
 
+    // Next button
     var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
     html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
 
     buttons.innerHTML = html;
 }
 
+// Filtering -> Sorting categories newest first and displaying rows for current page
 function applyFilters() {
     var list = document.getElementById('cat-table-body');
     if (!list) return;
@@ -302,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyFilters();
 });
 
+// Selection -> Clicking a category row to fill the side form panel inputs
 function selectCat(el, openDrawer = true) {
     if (!el) return;
     document.querySelectorAll('.cat-row').forEach(r => {
@@ -335,6 +344,7 @@ function selectCat(el, openDrawer = true) {
     }
 }
 
+// Action -> Resetting form inputs to prepare for creating a new category
 function showNew() {
     document.querySelectorAll('.cat-row').forEach(r => {
         r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
@@ -362,6 +372,7 @@ function showNew() {
     }
 }
 
+// Image Preview -> Displaying preview when selecting a local image file
 function previewSelectedImage(input) {
     var file = input.files[0];
     if (file) {
@@ -379,6 +390,7 @@ function previewSelectedImage(input) {
     }
 }
 
+// Image Preview -> Updating image preview when typing a web link URL
 function updatePreviewFromUrl(url) {
     var previewImg = document.getElementById('form-image-preview');
     var placeholder = document.getElementById('upload-placeholder');
@@ -396,7 +408,7 @@ function updatePreviewFromUrl(url) {
     }
 }
 
-// Controls
+// Controls -> Closing the right side edit panel
 function closeCatFormPane() {
     var pane = document.getElementById('cat-form-pane');
     var backdrop = document.getElementById('cat-form-backdrop');
@@ -411,7 +423,7 @@ function closeCatFormPane() {
     });
 }
 
-// Intercept form submissions and route through our REST API
+// API Saving -> Intercepting form submissions and routing data to REST API endpoint
 document.getElementById('cat-form').addEventListener('submit', function(e) {
     e.preventDefault();
     var submitBtn = this.querySelector('button[type="submit"]');
@@ -444,6 +456,7 @@ document.getElementById('cat-form').addEventListener('submit', function(e) {
     });
 });
 
+// API Deleting -> Confirming deletion and sending delete request to REST API
 function submitDelete() {
     uiConfirm("Are you sure you want to delete this category?", () => {
         var deleteBtn = document.getElementById('btn-delete');

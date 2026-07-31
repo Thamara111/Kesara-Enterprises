@@ -1,8 +1,10 @@
 <?php
 /**
  * Inquiries View
- * Manages customer inquiries (e.g., from the Contact Us page).
- * Allows admins and finance managers to view, assign, and respond to messages.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting staff members list, customer inquiries, and pending inquiry counts from the database.
+ * 2. Processing -> Checking admin permissions (can_assign) and filtering inquiries by status (pending, in_progress, resolved).
+ * 3. Actions -> Assigning staff members to inquiries, updating status, and sending reply emails with optional file attachments.
  */
 
 $role = $_SESSION['admin_role'] ?? 'guest';
@@ -24,13 +26,13 @@ if (in_array($filter_status, ['pending', 'in_progress', 'resolved'])) {
 
 if (isset($pdo) && $pdo !== null) {
     try {
-        // Fetch staff members for the dropdown
+        // Fetching -> Getting staff members list for the assignment dropdown
         if ($can_assign) {
             $stmt = $pdo->query("SELECT id, username, role FROM admins WHERE deleted_at IS NULL ORDER BY username ASC");
             $staff_list = $stmt->fetchAll();
         }
 
-        // Fetch inquiries based on role
+        // Fetching -> Getting customer inquiries based on user role and filter status
         if ($can_assign) {
             $sql = "
                 SELECT i.*, a.username as assigned_name 
@@ -55,7 +57,7 @@ if (isset($pdo) && $pdo !== null) {
             $inquiries = $stmt->fetchAll();
         }
         
-        // Fetch pending count
+        // Fetching -> Getting total count of pending inquiries awaiting response
         if ($can_assign) {
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM inquiries WHERE status IS NULL OR status = 'pending'");
             $stmt->execute();
@@ -70,6 +72,7 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
+// Processing -> Helper function returning CSS badge styling based on inquiry status
 function getStatusBadgeClass($status) {
     switch(strtolower($status)) {
         case 'pending': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
@@ -262,6 +265,7 @@ function getStatusBadgeClass($status) {
 </div>
 
 <script>
+// Notification -> Displaying floating toast pop-up alerts
 function showToast(message, type = 'success') {
     var toast = document.getElementById('toast');
     var msgEl = document.getElementById('toast-message');
@@ -277,6 +281,7 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
+// Filtering -> Fetching and updating inquiry table when status filter chips are clicked
 function loadInquiries(status, btnElement) {
     if (btnElement) setButtonLoading(btnElement, true);
     
@@ -309,11 +314,13 @@ function loadInquiries(status, btnElement) {
 var currentPage = 1;
 var itemsPerPage = 15;
 
+// Pagination -> Changing current active page number
 function goToPage(page) {
     currentPage = page;
     applyFilters();
 }
 
+// Pagination -> Rendering page numbers (Prev, 1, 2, ..., Next) at the bottom
 function renderPagination(totalItems, totalPages) {
     var info = document.getElementById('pagination-info');
     var buttons = document.getElementById('pagination-buttons');
@@ -357,6 +364,7 @@ function renderPagination(totalItems, totalPages) {
     buttons.innerHTML = html;
 }
 
+// Filtering -> Showing visible rows for the current page and sorting newest first
 function applyFilters() {
     var list = document.getElementById('inquiry-table-body');
     if (!list) return; // if empty state
@@ -389,6 +397,7 @@ function applyFilters() {
 // Initial render
 applyFilters();
 
+// API Status Update -> Updating inquiry status (pending, in_progress, resolved) via backend API
 function updateStatus(id, status, btnElement) {
     if (btnElement) setButtonLoading(btnElement, true);
     fetch('/api/admin_inquiries.php', {
@@ -412,6 +421,7 @@ function updateStatus(id, status, btnElement) {
     });
 }
 
+// API Assignment -> Assigning customer inquiry to a staff member via backend API
 function assignInquiry(id, assigned_to, selectElement) {
     if (selectElement) selectElement.disabled = true;
     fetch('/api/admin_inquiries.php', {
@@ -434,6 +444,7 @@ function assignInquiry(id, assigned_to, selectElement) {
     });
 }
 
+// Modal -> Opening reply email dialog with pre-filled customer details
 function openReplyModal(id, email, name, type) {
     document.getElementById('reply-inquiry-id').value = id;
     document.getElementById('reply-email').value = email;
@@ -449,6 +460,7 @@ function openReplyModal(id, email, name, type) {
     modalInner.classList.add('scale-100');
 }
 
+// Modal -> Closing reply email dialog
 function closeReplyModal() {
     var modal = document.getElementById('reply-modal');
     var modalInner = modal.querySelector('.bg-white');
@@ -462,6 +474,7 @@ function closeReplyModal() {
     }, 300);
 }
 
+// API Email -> Submitting reply message and sending email response to customer via backend API
 function submitReply(e) {
     e.preventDefault();
     var form = document.getElementById('reply-form');

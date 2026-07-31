@@ -1,9 +1,13 @@
 <?php
 /**
  * WhatsApp Simulator View
- * Provides a mock interface to simulate WhatsApp messaging with customers.
+ * Natural Language Overview:
+ * 1. Access Control -> Checking admin session permissions before granting access to simulator.
+ * 2. Fetching Data -> Getting intercepted WhatsApp notifications and customer contact details from database.
+ * 3. Rendering -> Displaying chat card bubbles sorted newest first.
  */
 
+// Access Control -> Verifying that the current logged-in user is a System Admin
 $role = $_SESSION['admin_role'] ?? 'guest';
 $is_admin = ($role === 'admin');
 
@@ -12,6 +16,7 @@ if (!$is_admin) {
     return;
 }
 
+// Fetching Data -> Getting mock WhatsApp messages joined with customer names from database
 $messages = [];
 if (isset($pdo) && $pdo !== null) {
     try {

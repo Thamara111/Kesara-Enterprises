@@ -1,8 +1,9 @@
 <?php
 /**
  * Admin Sidebar Layout
- * Renders the navigation sidebar dynamically based on the user's role.
- * Includes badge notifications for pending approvals and orders.
+ * Natural Language Overview:
+ * 1. Role Evaluation -> Determining active page and evaluating current staff user permissions.
+ * 2. Fetching Data -> Getting notification badge counts for pending user approvals, pending orders, and unassigned inquiries.
  */
 
 // Determine the current page for active state highlighting
@@ -21,7 +22,7 @@ $pending_approvals_count = 0;
 $pending_verification_count = 0;
 $pending_inquiries_count = 0;
 
-// Fetch notification badge counts if the database connection is available
+// Fetching Data -> Fetching pending approval, payment verification, and inquiry counts for sidebar notification badges
 if (isset($pdo)) {
     try {
         // Count wholesale user accounts waiting for admin approval
@@ -238,6 +239,7 @@ if (isset($pdo)) {
         const sidebar = document.getElementById('admin-sidebar');
         const backdrop = document.getElementById('admin-sidebar-backdrop');
 
+        // Controls -> Toggling mobile sidebar drawer and backdrop overlay visibility
         function toggleSidebar() {
             if (sidebar && backdrop) {
                 sidebar.classList.toggle('-translate-x-full');

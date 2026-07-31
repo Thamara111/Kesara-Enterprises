@@ -40,23 +40,23 @@ $status_counts = ['Pending' => 0, 'Processing' => 0, 'Shipped' => 0, 'Delivered'
 
 if (isset($pdo) && $pdo !== null) {
     try {
-        // Calculate total revenue for the filtered date range (excluding cancelled orders)
+        // Fetching Data -> Calculating total revenue for the filtered date range (excluding cancelled orders)
         $stmt = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'cancelled' AND $date_where");
         $current_month_revenue = (float) $stmt->fetchColumn();
 
-        // Count total orders placed in the filtered date range
+        // Fetching Data -> Counting total orders placed in the filtered date range
         $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE $date_where");
         $current_month_orders = (int) $stmt->fetchColumn();
 
-        // Count orders that are awaiting payment verification
+        // Fetching Data -> Counting orders that are awaiting payment verification
         $stmt = $pdo->query("SELECT COUNT(*) FROM orders WHERE status = 'pending'");
         $pending_payment_count = (int) $stmt->fetchColumn();
 
-        // Count wholesale user accounts awaiting admin approval
+        // Fetching Data -> Counting wholesale user accounts awaiting admin approval
         $stmt = $pdo->query("SELECT COUNT(*) FROM users WHERE status = 'pending'");
         $pending_registration_count = (int) $stmt->fetchColumn();
 
-        // Fetch top 5 items critically low on stock (<= 15% of minimum restock level)
+        // Fetching Data -> Fetching top 5 items critically low on stock (<= 15% of minimum restock level)
         $stmt = $pdo->query("SELECT p.name, i.size, i.colour, i.quantity, i.restock_min 
                              FROM inventory i 
                              JOIN products p ON i.product_id = p.id 
@@ -64,7 +64,7 @@ if (isset($pdo) && $pdo !== null) {
                              LIMIT 5");
         $critical_stock_items = $stmt->fetchAll();
 
-        // Fetch top 5 items low on stock (> 15% and <= 100% of minimum restock level)
+        // Fetching Data -> Fetching top 5 items low on stock (> 15% and <= 100% of minimum restock level)
         $stmt = $pdo->query("SELECT p.name, i.size, i.colour, i.quantity, i.restock_min 
                              FROM inventory i 
                              JOIN products p ON i.product_id = p.id 
@@ -72,15 +72,15 @@ if (isset($pdo) && $pdo !== null) {
                              LIMIT 5");
         $low_stock_items = $stmt->fetchAll();
 
-        // Fetch the oldest pending order as a follow-up reminder
+        // Fetching Data -> Fetching the oldest pending order as a follow-up reminder
         $stmt = $pdo->query("SELECT o.id, u.business_name FROM orders o JOIN users u ON o.user_id = u.id WHERE o.status = 'pending' ORDER BY o.created_at ASC LIMIT 1");
         $pending_followup_orders = $stmt->fetchAll();
 
-        // Fetch the 5 most recent live orders
+        // Fetching Data -> Fetching the 5 most recent live orders
         $stmt = $pdo->query("SELECT o.id, o.status, u.business_name FROM orders o JOIN users u ON o.user_id = u.id ORDER BY o.created_at DESC LIMIT 5");
         $live_orders = $stmt->fetchAll();
 
-        // Calculate inventory pressure (items closest to running out relative to their restock thresholds)
+        // Fetching Data -> Calculating inventory pressure (items closest to running out relative to restock thresholds)
         $stmt = $pdo->query("SELECT p.name, i.size, i.colour, i.quantity, i.restock_min 
                              FROM inventory i 
                              JOIN products p ON i.product_id = p.id 
@@ -88,11 +88,11 @@ if (isset($pdo) && $pdo !== null) {
                              LIMIT 3");
         $inventory_pressure = $stmt->fetchAll();
 
-        // Fetch up to 3 recent pending wholesale registrations for quick approval/rejection
+        // Fetching Data -> Fetching up to 3 recent pending wholesale registrations for quick approval/rejection
         $stmt = $pdo->query("SELECT id, business_name, first_name, last_name, email, business_type, br_number, created_at FROM users WHERE status = 'pending' ORDER BY created_at DESC LIMIT 3");
         $pending_registrations = $stmt->fetchAll();
 
-        // Revenue chart
+        // Fetching Data -> Fetching monthly revenue trends for sales performance chart
         $stmt = $pdo->query("SELECT DATE_FORMAT(created_at, '%b') AS m, SUM(total_amount) AS rev 
                              FROM orders 
                              WHERE status != 'cancelled' 
@@ -105,7 +105,7 @@ if (isset($pdo) && $pdo !== null) {
             $chart_revenue[] = (float) $c['rev'];
         }
 
-        // Order status donut chart
+        // Fetching Data -> Fetching order status counts for status donut chart
         $stmt = $pdo->query("SELECT status, COUNT(*) AS count FROM orders GROUP BY status");
         $counts_db = $stmt->fetchAll();
         foreach ($counts_db as $c) {
@@ -477,6 +477,7 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
     var revenueChart = null;
     var statusChart = null;
 
+    // Chart Initialization -> Initializing and rendering Chart.js charts (Revenue Bar Chart & Order Status Donut Chart)
     function initDashboardCharts() {
         var revEl = document.getElementById('revenueChart');
         var statEl = document.getElementById('statusChart');
@@ -562,7 +563,7 @@ $revenue_formatted = 'LKR ' . ($current_month_revenue >= 1000000 ? number_format
     // Initialize on first load
     initDashboardCharts();
 
-    // AJAX Dynamic loading
+    // API Data Fetching -> Updating dashboard stats dynamically via AJAX when date filter changes
     async function loadDashboardAjax(filter) {
         var main = document.getElementById('dashboard-container');
         var sel = document.getElementById('dashboard-filter');

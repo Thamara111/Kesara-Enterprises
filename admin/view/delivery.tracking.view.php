@@ -199,6 +199,7 @@ var WAREHOUSES = {
 
 // Default Preseeded Assignments (aligned with assignments page)
 <?php
+// Fetching Data -> Fetching active delivery assignments, driver profiles, order details, and customer address coordinates
 $php_assignments = [];
 if (isset($pdo) && $pdo !== null) {
     try {
@@ -303,7 +304,7 @@ var currentLegIndex = 0; // index of stop we are moving towards (0 for Stop 1, e
 var currentStepIndex = 0; // index along interpolated leg path
 var legInterpolatedPaths = []; // array of coordinate arrays for each leg
 
-// Load Initial Data
+// Data Initialization -> Loading assignments from localStorage or falling back to PHP preseeded data
 function initData() {
     var stored = localStorage.getItem('ke_assignments');
     if (stored) {
@@ -320,7 +321,7 @@ function initData() {
     assignments = [...defaultAssignments];
 }
 
-// Stop any running simulation
+// Controls -> Stopping active route simulation interval
 function stopSimulation() {
     isSimulating = false;
     if (simInterval) {
@@ -329,7 +330,7 @@ function stopSimulation() {
     }
 }
 
-// Show Custom Toast
+// UI Feedback -> Displaying custom toast notification message
 function showToast(message, type = 'success') {
     var toast = document.getElementById('custom-toast');
     if (!toast) return;
@@ -357,7 +358,7 @@ function showToast(message, type = 'success') {
     }, 4000);
 }
 
-// Initialize Leaflet Map
+// Map Setup -> Initializing Leaflet.js map with CartoDB Positron tiles
 function initMap() {
     // Default center to Colombo
     map = L.map('map', {
@@ -380,7 +381,7 @@ function initMap() {
     }).addTo(map);
 }
 
-// Populate UI Elements
+// Selection -> Populating active delivery runs dropdown options
 function populateRunsDropdown() {
     var selector = document.getElementById('run-selector');
     if (!selector) return;
@@ -421,7 +422,7 @@ function interpolatePoints(p1, p2, steps) {
     return points;
 }
 
-// Populate the Sidebar & HUD Information
+// Controls -> Updating sidebar metrics, timeline progress, and map HUD card
 function updateUI(run) {
     if (!run) return;
 
@@ -528,7 +529,7 @@ function updateUI(run) {
     }
 }
 
-// Generate logs to the Activity telemetry window
+// Telemetry -> Appending real-time GPS telemetry log events to activity feed
 function logTelemetry(message, type = 'INFO') {
     var telDiv = document.getElementById('t-telemetry');
     if (!telDiv) return;
@@ -547,7 +548,7 @@ function logTelemetry(message, type = 'INFO') {
     telDiv.scrollTop = telDiv.scrollHeight;
 }
 
-// Draw Route, Warehouse, and Stop Markers on Leaflet Map
+// Map Rendering -> Drawing warehouse marker, stop pins, route polyline, and vehicle marker on map
 function drawRouteOnMap(run) {
     if (!map || !run) return;
 
@@ -669,7 +670,7 @@ function drawRouteOnMap(run) {
     }
 }
 
-// Change Tracking View target
+// Selection -> Changing active tracking target run and updating telemetry logs
 function changeActiveRun(runId) {
     // Clean up running simulation first
     stopSimulation();
@@ -715,7 +716,7 @@ function changeActiveRun(runId) {
     }
 }
 
-// Telemetry call simulated
+// Communication -> Simulating voice call link trigger to driver
 function triggerQuickCall() {
     if (!activeRun) return;
     var driverName = activeRun.driver || 'Driver';
@@ -758,17 +759,19 @@ window.addEventListener('storage', (e) => {
     }
 });
 
+// Controls -> Closing tracking sidebar on mobile viewports
 function closeTrackingSidebar() {
     var sidebar = document.getElementById('tracking-sidebar');
     if (sidebar) sidebar.classList.add('-translate-x-full');
 }
 
+// Controls -> Opening tracking sidebar on mobile viewports
 function openTrackingSidebar() {
     var sidebar = document.getElementById('tracking-sidebar');
     if (sidebar) sidebar.classList.remove('-translate-x-full');
 }
 
-// Initialization on load
+// Initialization -> Starting map application, populating runs, and attaching event listeners
 function startApp() {
     if (typeof L === 'undefined') {
         setTimeout(startApp, 50);

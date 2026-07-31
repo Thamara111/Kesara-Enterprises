@@ -1,12 +1,15 @@
 <?php
 /**
  * Admin Products Management View
- * Manages the product catalog, pricing tiers, stock attributes (GSM, waistband), and image assets.
- * Fetches product list and dynamic pricing data.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting product catalog, categories, suppliers, stock counts, and price tiers from the database.
+ * 2. Self-Healing -> Automatically creating missing database columns if needed.
+ * 3. Processing -> Formatting stock statuses, variation chips, and discounts for display.
  */
 
 $admin_products = [];
 $all_categories = [];
+
 if (isset($pdo) && $pdo !== null) {
     try {
         // Self-heal: Ensure all necessary columns exist for the product attributes and soft-delete features
@@ -38,15 +41,15 @@ if (isset($pdo) && $pdo !== null) {
         if (!$checkImages->fetch())
             $pdo->exec("ALTER TABLE products ADD COLUMN images VARCHAR(255) DEFAULT NULL");
 
-        // Fetch all categories for the filter dropdown
+        // Fetching -> Fetch all categories for the filter dropdown
         $cat_stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
         $all_categories = $cat_stmt->fetchAll();
 
-        // Fetch all suppliers for the product form dropdown
+        // Fetching -> Fetch all suppliers for the product form dropdown
         $supp_stmt = $pdo->query("SELECT id, name FROM suppliers ORDER BY name ASC");
         $all_suppliers = $supp_stmt->fetchAll();
 
-        // Fetch all active products, joined with their category names
+        // Fetching -> Fetch all active products, joined with their category names and inventory stock
         $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband,
                                     COALESCE((SELECT SUM(quantity) FROM inventory WHERE product_id = p.id), 0) AS total_stock
                              FROM products p 
@@ -54,7 +57,9 @@ if (isset($pdo) && $pdo !== null) {
                              WHERE p.deleted_at IS NULL");
         $prods = $stmt->fetchAll();
 
+        // Processing -> Preparing detailed information for each product
         foreach ($prods as $pr) {
+            // Fetching -> Fetch wholesale pricing tiers for this product
             $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ?");
             $t_stmt->execute([$pr['id']]);
             $tiers = $t_stmt->fetchAll();
@@ -68,7 +73,7 @@ if (isset($pdo) && $pdo !== null) {
                 ];
             }
 
-            // Fetch assigned supplier name if any
+            // Fetching -> Fetch assigned supplier name if any
             $supp_name_stmt = $pdo->prepare("SELECT s.name FROM suppliers s JOIN supplier_products sp ON s.id = sp.supplier_id WHERE sp.product_id = ? LIMIT 1");
             $supp_name_stmt->execute([$pr['id']]);
             $assigned_supplier = $supp_name_stmt->fetchColumn();
@@ -78,7 +83,7 @@ if (isset($pdo) && $pdo !== null) {
                 $assigned_supplier = $si_stmt->fetchColumn();
             }
 
-            // Fetch per-color size variations from inventory
+            // Fetching -> Fetch per-color size variations from inventory
             $inv_v_stmt = $pdo->prepare("SELECT colour, size FROM inventory WHERE product_id = ?");
             $inv_v_stmt->execute([$pr['id']]);
             $inv_v_rows = $inv_v_stmt->fetchAll();
@@ -97,6 +102,7 @@ if (isset($pdo) && $pdo !== null) {
                 }
             }
 
+            // Checking stock levels -> Setting status to 'In Stock' or 'Out of Stock'
             $total_stock = (int) $pr['total_stock'];
             if ($total_stock <= 50) {
                 $status = 'Out of Stock';
@@ -106,6 +112,7 @@ if (isset($pdo) && $pdo !== null) {
                 $badge = 'bg-green-50 text-green-600 border-green-100';
             }
 
+            // Bundling product data into array for frontend rendering
             $admin_products[] = [
                 'id' => (int) $pr['id'],
                 'name' => $pr['name'],
@@ -157,7 +164,7 @@ if (empty($all_suppliers)) {
                 <h1 class="text-2xl font-bold text-gray-900">Products</h1>
                 <p class="text-sm text-gray-500 mt-1">Manage catalog items, pricing, and availability.</p>
             </div>
-            
+
             <button onclick="showNew()"
                 class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand text-white text-xs font-bold hover:bg-brand-dark transition-all shadow-sm">
                 <i class="ti ti-plus text-lg"></i> Add Product
@@ -169,7 +176,8 @@ if (empty($all_suppliers)) {
             <!-- Search & Filters -->
             <div class="bg-gray-50/30 flex items-center gap-4">
                 <div class="relative flex-1 group">
-                    <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors"></i>
+                    <i
+                        class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors"></i>
                     <input type="text" id="prod-search" placeholder="Search SKU or Name..."
                         class="w-full pl-11 pr-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all">
                 </div>
@@ -206,7 +214,8 @@ if (empty($all_suppliers)) {
                             <tr id="empty-state">
                                 <td colspan="6">
                                     <div class="flex flex-col items-center justify-center py-24 text-center gap-4">
-                                        <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300">
+                                        <div
+                                            class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300">
                                             <i class="ti ti-shirt text-3xl"></i>
                                         </div>
                                         <p class="text-sm font-bold text-gray-400">No products found</p>
@@ -236,35 +245,49 @@ if (empty($all_suppliers)) {
                                     data-status="<?= htmlspecialchars($p['status']) ?>"
                                     data-supplier="<?= htmlspecialchars($p['supplier']) ?>"
                                     data-tiers="<?= htmlspecialchars(json_encode($p['tiers'])) ?>"
-                                    data-color-variations="<?= htmlspecialchars(json_encode($p['color_variations']), ENT_QUOTES, 'UTF-8') ?>" onclick="selectProd(this, false)">
-                                    
-                                    <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30 w-16">
-                                        <div class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all overflow-hidden">
+                                    data-color-variations="<?= htmlspecialchars(json_encode($p['color_variations']), ENT_QUOTES, 'UTF-8') ?>"
+                                    onclick="selectProd(this, false)">
+
+                                    <td
+                                        class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30 w-16">
+                                        <div
+                                            class="w-12 h-12 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all overflow-hidden">
                                             <?= (!empty($p['images']) && isset($p['images'][0])) ? '<img src="' . htmlspecialchars($p['images'][0]) . '" alt="' . htmlspecialchars($p['name']) . '" class="w-full h-full object-cover">' : '<i class="ti ti-shirt text-2xl"></i>' ?>
                                         </div>
                                     </td>
-                                    
+
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 min-w-0">
-                                        <h4 class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors truncate"><?= htmlspecialchars($p['name']) ?></h4>
-                                        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 truncate"><?= htmlspecialchars($p['sku']) ?> · <?= htmlspecialchars($p['cat']) ?></p>
+                                        <h4
+                                            class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors truncate">
+                                            <?= htmlspecialchars($p['name']) ?></h4>
+                                        <p
+                                            class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 truncate">
+                                            <?= htmlspecialchars($p['sku']) ?> · <?= htmlspecialchars($p['cat']) ?></p>
                                     </td>
-                                    
+
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-center">
                                         <span class="text-xs font-bold text-gray-500"><?= htmlspecialchars($p['moq']) ?></span>
                                     </td>
-                                    
+
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
-                                        <span class="text-xs font-black text-gray-900 truncate">LKR <?= htmlspecialchars($p['price']) ?></span>
+                                        <span class="text-xs font-black text-gray-900 truncate">LKR
+                                            <?= htmlspecialchars($p['price']) ?></span>
                                     </td>
-                                    
+
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
-                                        <span class="px-2.5 py-1 <?= $p['badge'] ?> text-[9px] font-bold rounded-full border uppercase tracking-tighter text-center truncate"><?= htmlspecialchars($p['status']) ?></span>
+                                        <span
+                                            class="px-2.5 py-1 <?= $p['badge'] ?> text-[9px] font-bold rounded-full border uppercase tracking-tighter text-center truncate"><?= htmlspecialchars($p['status']) ?></span>
                                     </td>
-                                    
-                                    <td class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
+
+                                    <td
+                                        class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
                                         <div class="flex justify-end gap-2 text-gray-300">
-                                            <button class="p-2 hover:text-brand transition-colors" onclick="event.stopPropagation(); selectProd(this.closest('.prod-card'), true);"><i class="ti ti-edit text-lg"></i></button>
-                                            <button class="p-2 hover:text-red-500 transition-colors" onclick="event.stopPropagation(); selectProd(this.closest('.prod-card'), false); deleteProduct();"><i class="ti ti-trash text-lg"></i></button>
+                                            <button class="p-2 hover:text-brand transition-colors"
+                                                onclick="event.stopPropagation(); selectProd(this.closest('.prod-card'), true);"><i
+                                                    class="ti ti-edit text-lg"></i></button>
+                                            <button class="p-2 hover:text-red-500 transition-colors"
+                                                onclick="event.stopPropagation(); selectProd(this.closest('.prod-card'), false); deleteProduct();"><i
+                                                    class="ti ti-trash text-lg"></i></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -274,7 +297,8 @@ if (empty($all_suppliers)) {
                 </table>
             </div>
             <!-- Pagination Controls -->
-            <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white" id="pagination-controls">
+            <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white"
+                id="pagination-controls">
                 <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
                 <div class="flex items-center gap-2" id="pagination-buttons">
                     <!-- Buttons injected by JS -->
@@ -338,7 +362,8 @@ if (empty($all_suppliers)) {
                             class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm appearance-none">
                             <option value="">Select Supplier...</option>
                             <?php foreach ($all_suppliers as $supp): ?>
-                                <option value="<?= htmlspecialchars($supp['name']) ?>"><?= htmlspecialchars($supp['name']) ?>
+                                <option value="<?= htmlspecialchars($supp['name']) ?>">
+                                    <?= htmlspecialchars($supp['name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -359,18 +384,21 @@ if (empty($all_suppliers)) {
                 </div>
                 <div class="grid grid-cols-3 gap-6">
                     <div class="space-y-2">
-                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Discount (%)</label>
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Discount
+                            (%)</label>
                         <input type="number" step="0.01" id="f-discount"
                             class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm"
                             value="0">
                     </div>
                     <div class="space-y-2">
-                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid From</label>
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid
+                            From</label>
                         <input type="date" id="f-discount-start" min="<?= date('Y-m-d') ?>"
                             class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm text-gray-500">
                     </div>
                     <div class="space-y-2">
-                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid To</label>
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid
+                            To</label>
                         <input type="date" id="f-discount-end" min="<?= date('Y-m-d') ?>"
                             class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm text-gray-500">
                     </div>
@@ -386,7 +414,8 @@ if (empty($all_suppliers)) {
             <!-- Variations (Color - Size Choices) -->
             <div class="space-y-6">
                 <div class="flex items-center justify-between border-b border-gray-100 pb-2">
-                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Variations (Color & Size Choices)</h4>
+                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Variations (Color & Size
+                        Choices)</h4>
                     <span class="text-[10px] text-gray-400 font-semibold">Select sizes for each color</span>
                 </div>
 
@@ -415,7 +444,7 @@ if (empty($all_suppliers)) {
                 <h4
                     class="text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em] border-b border-gray-100 pb-2">
                     Wholesale Tiers</h4>
-                
+
                 <div class="grid grid-cols-[1fr_1fr_40px] gap-3 px-1 -mb-4">
                     <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Min. Qty</label>
                     <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Unit Price</label>
@@ -510,6 +539,7 @@ if (empty($all_suppliers)) {
 
 
 <script>
+    // Utility -> Clean HTML characters from text to prevent broken formatting
     function escapeHtml(text) {
         if (!text) return '';
         return String(text)
@@ -522,6 +552,7 @@ if (empty($all_suppliers)) {
 
     var selectedIdx = -1;
 
+    // Selection -> Clicking a product row to highlight it and load its details into the side edit panel
     function selectProd(el, openDrawer = true) {
         if (el) {
             selectedIdx = parseInt(el.dataset.idx);
@@ -531,6 +562,7 @@ if (empty($all_suppliers)) {
             return;
         }
 
+        // Filling product form inputs with the selected product's information
         var id = parseInt(el.dataset.id || "0");
         document.getElementById('form-mode-label').textContent = 'Edit Product';
         document.getElementById('f-id').value = id;
@@ -545,21 +577,22 @@ if (empty($all_suppliers)) {
         document.getElementById('f-gsm').value = el.dataset.gsm || '';
         document.getElementById('f-waistband').value = el.dataset.waistband || '';
 
-        // Set existing images across 6 slots
+        // Image Preview -> Loading product image links into all 6 upload/preview slots
         var prodImages = [];
         try { prodImages = JSON.parse(el.dataset.images || '[]'); } catch (e) { }
         for (let i = 0; i < 6; i++) {
             var imgUrl = prodImages[i] || '';
             document.getElementById('f-image-url-' + i).value = imgUrl;
-            document.getElementById('f-image-file-' + i).value = ''; // Reset file input
+            document.getElementById('f-image-file-' + i).value = '';
             updateProductPreviewFromUrl(imgUrl, i);
         }
-        // Set color variations
+
+        // Variations -> Loading selected colors and sizes into variation chips
         var colorVars = {};
-        try { colorVars = JSON.parse(el.dataset.colorVariations || '{}'); } catch(e) {}
+        try { colorVars = JSON.parse(el.dataset.colorVariations || '{}'); } catch (e) { }
         renderColorVariationsUI(colorVars);
 
-        // Set tiers
+        // Price Tiers -> Loading wholesale quantity discount tiers
         if (id > 0) {
             document.getElementById('btn-prod-delete').classList.remove('hidden');
         } else {
@@ -569,7 +602,7 @@ if (empty($all_suppliers)) {
         try { tiers = JSON.parse(el.dataset.tiers || '[]'); } catch (e) { }
         renderTiers(tiers);
 
-        // Open drawer
+        // Drawer Animation -> Sliding open the right-side form panel
         if (openDrawer) {
             var pane = document.getElementById('product-form-pane');
             var backdrop = document.getElementById('product-form-backdrop');
@@ -581,6 +614,7 @@ if (empty($all_suppliers)) {
         }
     }
 
+    // Rendering -> Drawing wholesale price tier input rows
     function renderTiers(tiers) {
         var cont = document.getElementById('tier-rows');
         cont.innerHTML = tiers.map((t, i) => `
@@ -594,6 +628,7 @@ if (empty($all_suppliers)) {
     `).join('');
     }
 
+    // Action -> Adding a new empty wholesale price tier row
     function addTier() {
         var div = document.createElement('div');
         div.className = 'grid grid-cols-[1fr_1fr_40px] gap-3';
@@ -607,6 +642,7 @@ if (empty($all_suppliers)) {
         document.getElementById('tier-rows').appendChild(div);
     }
 
+    // Action -> Resetting the form and opening the drawer to add a brand new product
     function showNew() {
         selectedIdx = -1;
         document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected', 'shadow-lg'));
@@ -624,19 +660,19 @@ if (empty($all_suppliers)) {
         document.getElementById('tier-rows').innerHTML = '';
         addTier();
 
-        // Reset all 6 image slots
+        // Reset all image slots
         for (let i = 0; i < 6; i++) {
             document.getElementById('f-image-url-' + i).value = '';
             document.getElementById('f-image-file-' + i).value = '';
             updateProductPreviewFromUrl('', i);
         }
 
-        // Reset color variations
+        // Reset variation selections
         renderColorVariationsUI({});
 
         document.getElementById('btn-prod-delete').classList.add('hidden');
 
-        // Open drawer
+        // Slide open the form panel
         var pane = document.getElementById('product-form-pane');
         var backdrop = document.getElementById('product-form-backdrop');
         if (pane) pane.classList.remove('translate-x-full');
@@ -646,11 +682,12 @@ if (empty($all_suppliers)) {
         }
     }
 
-    // Global standard list of colors and sizes for variations
+    // Data Defaults -> Standard options for colors and sizes
     var standardColorList = ['White', 'Black', 'Grey', 'Blue', 'Red', 'Pink', 'Navy'];
     var standardSizeList = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-    var currentProductColorVariations = {}; // { "White": ["S", "M", "L"], "Black": ["M", "L"] }
+    var currentProductColorVariations = {};// { "White": ["S", "M", "L"], "Black": ["M", "L"] }
 
+    // Rendering -> Drawing color cards and clickable size chips in the form
     function renderColorVariationsUI(existingMap = {}) {
         currentProductColorVariations = {};
         if (existingMap && typeof existingMap === 'object') {
@@ -660,7 +697,6 @@ if (empty($all_suppliers)) {
                 }
             }
         }
-
         // Combine standard colors with any custom colors from existingMap
         var allColors = [...standardColorList];
         for (let c in currentProductColorVariations) {
@@ -679,7 +715,7 @@ if (empty($all_suppliers)) {
 
             var card = document.createElement('div');
             card.className = `p-4 border rounded-2xl space-y-3 shadow-sm transition-all ${isEnabled ? 'bg-white border-brand/20 shadow-brand/5' : 'bg-gray-50/50 border-gray-100'}`;
-            
+
             // Color Header
             var headerHtml = `
                 <div class="flex items-center justify-between">
@@ -699,8 +735,8 @@ if (empty($all_suppliers)) {
             if (isEnabled) {
                 var chipsHtml = standardSizeList.map(sz => {
                     var isSelected = selectedSizes.includes(sz);
-                    var chipClass = isSelected 
-                        ? 'bg-brand text-white border-brand shadow-sm shadow-brand/20' 
+                    var chipClass = isSelected
+                        ? 'bg-brand text-white border-brand shadow-sm shadow-brand/20'
                         : 'bg-white text-gray-600 border-gray-100 hover:border-gray-300';
                     return `<button type="button" onclick="toggleColorSizeChoice('${escapeHtml(color)}', '${sz}')" class="px-3 py-1.5 border rounded-xl text-[10px] font-bold uppercase transition-all ${chipClass}">${sz}</button>`;
                 }).join('');
@@ -720,6 +756,7 @@ if (empty($all_suppliers)) {
         syncColorVariationFields();
     }
 
+    // Helper -> Returning color hex code for color previews
     function getColorHex(colorName) {
         var map = {
             'White': '#ffffff',
@@ -733,6 +770,7 @@ if (empty($all_suppliers)) {
         return map[colorName] || '#d1d5db';
     }
 
+    // Action -> Enabling or disabling a color choice for the product
     function toggleColorEnabled(colorName, isEnabled) {
         if (isEnabled) {
             if (!currentProductColorVariations[colorName]) {
@@ -744,6 +782,7 @@ if (empty($all_suppliers)) {
         renderColorVariationsUI(currentProductColorVariations);
     }
 
+    // Action -> Toggling a specific size (e.g. S, M, L) on or off for a chosen color
     function toggleColorSizeChoice(colorName, sizeName) {
         if (!currentProductColorVariations[colorName]) {
             currentProductColorVariations[colorName] = [];
@@ -757,11 +796,12 @@ if (empty($all_suppliers)) {
         renderColorVariationsUI(currentProductColorVariations);
     }
 
+    // Action -> Adding a custom color name (e.g. Olive, Coral)
     function addCustomColorVariation() {
         var input = document.getElementById('new-custom-color-input');
         var val = input ? input.value.trim() : '';
         if (!val) return;
-        
+
         var formatted = val.charAt(0).toUpperCase() + val.slice(1);
         if (!currentProductColorVariations[formatted]) {
             currentProductColorVariations[formatted] = ['M'];
@@ -770,9 +810,10 @@ if (empty($all_suppliers)) {
         renderColorVariationsUI(currentProductColorVariations);
     }
 
+    // Syncing -> Saving variation choices into hidden form fields before submit
     function syncColorVariationFields() {
         document.getElementById('f-color-variations').value = JSON.stringify(currentProductColorVariations);
-        
+
         var activeColors = Object.keys(currentProductColorVariations);
         document.getElementById('f-colors').value = activeColors.join(',');
 
@@ -785,6 +826,7 @@ if (empty($all_suppliers)) {
         document.getElementById('f-sizes').value = Array.from(activeSizesSet).join(',');
     }
 
+    // Action -> Closing the right side edit panel
     function closeProductFormPane() {
         var pane = document.getElementById('product-form-pane');
         var backdrop = document.getElementById('product-form-backdrop');
@@ -797,6 +839,7 @@ if (empty($all_suppliers)) {
         document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected', 'shadow-lg'));
     }
 
+    // Image Upload -> Displaying a preview when a user picks an image file from disk
     function previewProductImage(input, index) {
         var file = input.files[0];
         if (file) {
@@ -809,12 +852,13 @@ if (empty($all_suppliers)) {
                 previewImg.classList.remove('hidden');
                 placeholder.classList.add('hidden');
                 if (actions) actions.classList.remove('hidden');
-                document.getElementById('f-image-url-' + index).value = ''; // Reset url
+                document.getElementById('f-image-url-' + index).value = '';// Reset url
             }
             reader.readAsDataURL(file);
         }
     }
 
+    // Image URL -> Updating image preview when a web link URL is typed
     function updateProductPreviewFromUrl(url, index) {
         var previewImg = document.getElementById('form-image-preview-' + index);
         var placeholder = document.getElementById('upload-placeholder-' + index);
@@ -824,7 +868,7 @@ if (empty($all_suppliers)) {
             previewImg.classList.remove('hidden');
             placeholder.classList.add('hidden');
             if (actions) actions.classList.remove('hidden');
-            document.getElementById('f-image-file-' + index).value = ''; // Reset file input
+            document.getElementById('f-image-file-' + index).value = '';// Reset file input
         } else {
             previewImg.src = '';
             previewImg.classList.add('hidden');
@@ -833,14 +877,14 @@ if (empty($all_suppliers)) {
         }
     }
 
+    // Image Clear -> Clearing selected image from slot
     function clearProductImage(index) {
         document.getElementById('f-image-file-' + index).value = '';
         document.getElementById('f-image-url-' + index).value = '';
         updateProductPreviewFromUrl('', index);
     }
 
-
-
+    // API Saving -> Submitting product form data (info, pricing tiers, images) to the server via API
     function saveProduct() {
         var id = document.getElementById('f-id').value;
         var name = document.getElementById('f-name').value;
@@ -853,7 +897,7 @@ if (empty($all_suppliers)) {
         var gsm = document.getElementById('f-gsm').value;
         var waistband = document.getElementById('f-waistband').value;
 
-        // Get pricing tiers from inputs
+        // Collecting wholesale pricing tiers
         var tiers = [];
         var tierRows = document.getElementById('tier-rows').children;
         for (let row of tierRows) {
@@ -871,7 +915,7 @@ if (empty($all_suppliers)) {
             showToast("Product Title and SKU Code are required.", "error");
             return;
         }
-        
+
         setButtonLoading('btn-prod-save', true);
 
         var formData = new FormData();
@@ -894,7 +938,7 @@ if (empty($all_suppliers)) {
         formData.append('gsm', gsm);
         formData.append('waistband', waistband);
 
-        // Append 6 slots
+        // Uploading up to 6 product images
         for (let i = 0; i < 6; i++) {
             var urlVal = document.getElementById('f-image-url-' + i).value;
             formData.append('image_url_' + i, urlVal);
@@ -905,6 +949,7 @@ if (empty($all_suppliers)) {
             }
         }
 
+        // Sending data to backend API endpoint
         fetch('/api/products.php', {
             method: 'POST',
             body: formData
@@ -928,10 +973,10 @@ if (empty($all_suppliers)) {
             });
     }
 
+    // Modal -> Opening the delete confirmation modal box
     function deleteProduct() {
         var id = document.getElementById('f-id').value;
         if (!id) return;
-
         // Show custom modal instead of alert
         var modal = document.getElementById('delete-confirm-modal');
         var content = document.getElementById('delete-confirm-content');
@@ -942,6 +987,7 @@ if (empty($all_suppliers)) {
         }, 10);
     }
 
+    // Modal -> Closing the delete confirmation modal box
     function closeDeleteModal() {
         var modal = document.getElementById('delete-confirm-modal');
         var content = document.getElementById('delete-confirm-content');
@@ -952,6 +998,7 @@ if (empty($all_suppliers)) {
         }, 200);
     }
 
+    // API Deleting -> Confirming deletion and sending request to delete API
     function confirmDeleteProduct() {
         var id = document.getElementById('f-id').value;
         if (!id) return;
@@ -986,11 +1033,13 @@ if (empty($all_suppliers)) {
     var currentPage = 1;
     var itemsPerPage = 15;
 
+    // Pagination -> Changing current active page number
     function goToPage(page) {
         currentPage = page;
         applyFilters();
     }
 
+    // Pagination -> Rendering page numbers (Prev, 1, 2, ..., Next) at the bottom
     function renderPagination(totalItems, totalPages) {
         var info = document.getElementById('pagination-info');
         var buttons = document.getElementById('pagination-buttons');
@@ -1007,18 +1056,16 @@ if (empty($all_suppliers)) {
         info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
 
         var html = '';
-        
         // Prev button
         var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
         html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
-
         // Page numbers
         for (let i = 1; i <= totalPages; i++) {
             if (i === currentPage) {
                 html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
             } else if (
-                i === 1 || 
-                i === totalPages || 
+                i === 1 ||
+                i === totalPages ||
                 (i >= currentPage - 1 && i <= currentPage + 1)
             ) {
                 html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
@@ -1026,7 +1073,6 @@ if (empty($all_suppliers)) {
                 html += `<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">...</span>`;
             }
         }
-
         // Next button
         var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
         html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
@@ -1034,6 +1080,7 @@ if (empty($all_suppliers)) {
         buttons.innerHTML = html;
     }
 
+    // Filtering -> Filtering product rows live based on search box input or selected category
     function applyFilters() {
         var q = (document.getElementById('prod-search')?.value || '').toLowerCase().trim();
         var cat = (document.getElementById('prod-cat-filter')?.value || '').toLowerCase();
@@ -1058,7 +1105,6 @@ if (empty($all_suppliers)) {
             }
         });
 
-        // Sort latest first (highest id)
         visibleRows.sort((a, b) => parseInt(b.dataset.id) - parseInt(a.dataset.id));
 
         var totalItems = visibleRows.length;
@@ -1083,10 +1129,11 @@ if (empty($all_suppliers)) {
         renderPagination(totalItems, totalPages);
     }
 
+    // Event Listeners -> Triggering filter when typing in search or selecting category dropdown
     document.getElementById('prod-search')?.addEventListener('input', () => { currentPage = 1; applyFilters(); });
     document.getElementById('prod-cat-filter')?.addEventListener('change', () => { currentPage = 1; applyFilters(); });
 
-    // Initial render logic
+    // Startup -> Run initial filtering and select first product
     applyFilters();
     var firstRow = document.querySelector('.prod-card');
     if (firstRow) {
@@ -1095,7 +1142,7 @@ if (empty($all_suppliers)) {
     closeProductFormPane();
 </script>
 
-<!-- Delete Confirmation Modal -->
+<!-- Modals & Notifications -> Popup box for delete confirmation -->
 <div id="delete-confirm-modal"
     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-200"
     style="display: none;">
@@ -1116,27 +1163,30 @@ if (empty($all_suppliers)) {
     </div>
 </div>
 
-<!-- Toast Notification -->
-<div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 z-50 pointer-events-none">
-    <div id="toast-content" class="bg-gray-900 text-white px-6 py-4 rounded-2xl shadow-2xl font-bold text-sm flex items-center gap-3">
+<!-- Modals & Notifications -> Pop-up toast notification message -->
+<div id="toast"
+    class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 z-50 pointer-events-none">
+    <div id="toast-content"
+        class="bg-gray-900 text-white px-6 py-4 rounded-2xl shadow-2xl font-bold text-sm flex items-center gap-3">
         <i id="toast-icon" class="ti ti-check text-green-400 text-xl"></i>
         <span id="toast-message">Action successful</span>
     </div>
 </div>
 
 <script>
-function showToast(message, type = 'success') {
-    var toast = document.getElementById('toast');
-    var msgEl = document.getElementById('toast-message');
-    var icon = document.getElementById('toast-icon');
-    
-    msgEl.textContent = message;
-    icon.className = type === 'success' ? 'ti ti-check text-green-400 text-xl' : 'ti ti-alert-triangle text-red-400 text-xl';
-    
-    toast.classList.remove('translate-y-20', 'opacity-0');
-    
-    setTimeout(() => {
-        toast.classList.add('translate-y-20', 'opacity-0');
-    }, 3000);
-}
+    // Notification -> Function to trigger pop-up notification messages
+    function showToast(message, type = 'success') {
+        var toast = document.getElementById('toast');
+        var msgEl = document.getElementById('toast-message');
+        var icon = document.getElementById('toast-icon');
+
+        msgEl.textContent = message;
+        icon.className = type === 'success' ? 'ti ti-check text-green-400 text-xl' : 'ti ti-alert-triangle text-red-400 text-xl';
+
+        toast.classList.remove('translate-y-20', 'opacity-0');
+
+        setTimeout(() => {
+            toast.classList.add('translate-y-20', 'opacity-0');
+        }, 3000);
+    }
 </script>

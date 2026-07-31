@@ -1,9 +1,13 @@
 <?php
 /**
  * Analytics & Reports View
- * Converted to Tailwind CSS for Kesara Enterprises Admin Panel
- * Generates and displays business performance metrics based on dynamic date filtering.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting sales revenue, order volumes, product performance, category shares, and top buyer spending from database.
+ * 2. Self-Healing -> Ensuring order_items entries exist for reporting compatibility.
+ * 3. Processing -> Calculating business metrics (avg order value, total units sold, revenue percentages per category).
  */
+
+// Filtering -> Setting dynamic date range filter (this month, last month, 3 months, 6 months, year)
 $filter_month = $_GET['filter_month'] ?? 'this_month';
 
 $date_where = "MONTH(o.created_at) = MONTH(CURRENT_DATE()) AND YEAR(o.created_at) = YEAR(CURRENT_DATE())";
@@ -51,25 +55,25 @@ if (isset($pdo) && $pdo !== null) {
         }
     } catch (\Exception $e) {}
 
-    // Total Revenue
+    // Fetching Data -> Calculating total sales revenue from completed orders
     try {
         $stmt = $pdo->query("SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.status != 'cancelled' AND $date_where");
         $total_revenue = (float)$stmt->fetchColumn();
     } catch (\Exception $e) {}
 
-    // Total Orders
+    // Fetching Data -> Calculating total number of placed orders
     try {
         $stmt = $pdo->query("SELECT COUNT(*) FROM orders o WHERE o.status != 'cancelled' AND $date_where");
         $total_orders = (int)$stmt->fetchColumn();
     } catch (\Exception $e) {}
 
-    // Avg Order Value
+    // Fetching Data -> Calculating average order value across all orders
     try {
         $stmt = $pdo->query("SELECT COALESCE(AVG(o.total_amount), 0) FROM orders o WHERE o.status != 'cancelled' AND $date_where");
         $avg_order_value = (float)$stmt->fetchColumn();
     } catch (\Exception $e) {}
 
-    // Units Sold
+    // Fetching Data -> Calculating total units of products sold
     try {
         $stmt = $pdo->query("SELECT COALESCE(SUM(oi.quantity), 0) 
                              FROM order_items oi 
@@ -78,7 +82,7 @@ if (isset($pdo) && $pdo !== null) {
         $units_sold = (int)$stmt->fetchColumn();
     } catch (\Exception $e) {}
 
-    // Categories distribution
+    // Fetching Data -> Calculating revenue breakdown and market share per category
     try {
         $stmt = $pdo->query("SELECT c.name, SUM(oi.quantity * oi.unit_price) AS cat_rev 
                              FROM order_items oi 
@@ -96,7 +100,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     } catch (\Exception $e) {}
 
-    // Product performance
+    // Fetching Data -> Getting top 5 performing products by total units sold
     try {
         $stmt = $pdo->query("SELECT p.name, SUM(oi.quantity) AS units, SUM(oi.quantity * oi.unit_price) AS revenue 
                              FROM order_items oi 
@@ -109,7 +113,7 @@ if (isset($pdo) && $pdo !== null) {
         $product_performance = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (\Exception $e) {}
 
-    // Top Customers
+    // Fetching Data -> Getting top 5 customer accounts by total expenditure
     try {
         $stmt = $pdo->query("SELECT u.business_name, SUM(o.total_amount) AS spend 
                              FROM orders o 
@@ -360,6 +364,7 @@ if (empty($top_customers)) {
 <script>
 var reportCharts = {};
 
+// Chart Initialization -> Initializing and rendering Chart.js charts (Monthly Revenue, Category Share, Product Performance, New Buyers)
 function initCharts() {
     if (typeof Chart === 'undefined') {
         setTimeout(initCharts, 100);
@@ -462,6 +467,7 @@ function initCharts() {
 }
 initCharts();
 
+// Selection -> Switching between report tab panels (Sales Report, Top Products, Top Customers)
 function switchTab(el, tab) {
     document.querySelectorAll('.chip').forEach(t => t.classList.remove('on'));
     el.classList.add('on');
@@ -486,6 +492,7 @@ function switchTab(el, tab) {
     }, 50);
 }
 
+// Action -> Exporting the currently active report panel as a downloadable PDF document
 function exportActiveReport() {
     var activeTab = 'sales';
     document.querySelectorAll('.chip').forEach(t => {

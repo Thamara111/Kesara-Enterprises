@@ -1,14 +1,15 @@
 <?php
 /**
  * Admin Index Controller
- * Handles routing and layout assembly for the Kesara Enterprises administrative panel.
- * All admin-related views (e.g. dashboard, products, orders) are routed through this single entry point.
+ * Natural Language Overview:
+ * 1. Session & Auth -> Initializing session, checking logout actions, enforcing login requirements, and evaluating Role-Based Access Control (RBAC).
+ * 2. View Mapping -> Routing requested page parameter to its underlying file in /admin/view/ and loading page metadata.
+ * 3. Layout Rendering -> Assembling admin layout with sidebar, mobile header, and active view component.
  */
 
 session_start();
 
-// Handle Logout
-// Destroys the admin session and redirects to the login screen
+// Auth -> Handling logout action and terminating session
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
     session_destroy();
     header("Location: /admin-login");
@@ -17,8 +18,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 
 require_once __DIR__ . "/../database/connection.php";
 
-// Define the current view based on the GET parameter, defaulting to 'dashboard'
-// This maps to the respective view file in the /admin/view/ directory
+// Routing -> Resolving active view parameter from URL query string
 $view = $_GET['view'] ?? 'dashboard';
 
 // If already logged in and requesting login page, redirect to dashboard
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $view === 'login') {
     exit;
 }
 
-// Check role permissions if logged in (Role-Based Access Control - RBAC)
+// Security -> Verifying user permissions against Role-Based Access Control (RBAC) matrix
 if (isset($_SESSION['admin_id'])) {
     $role = $_SESSION['admin_role'] ?? 'guest';
 
@@ -62,7 +62,7 @@ if (isset($_SESSION['admin_id'])) {
     }
 }
 
-// Configuration mapping for page metadata and view titles
+// Configuration -> Mapping page titles, descriptions, and sidebar visibility settings
 $view_config = [
     'dashboard' => [
         'title' => 'Admin Dashboard | Kesara Enterprises',
@@ -183,7 +183,7 @@ $page_meta = [
 // Path adjustment for head.php since we are in /admin/ instead of the root folder
 require_once __DIR__ . "/../layouts/head.php";
 
-// Mapping dictionary for view names that don't exactly match their underlying filename
+// File Resolution -> Mapping view key to target template file path
 $view_file_mappings = [
     'purchase_orders' => 'suppliers.purchase_orders',
     'goods_received' => 'suppliers.goods_received_note',
@@ -220,6 +220,7 @@ if ($current_config['show_sidebar']): ?>
             </div>
         </header>
 
+        <!-- Rendering -> Loading active view template file into main layout container -->
         <?php if (file_exists($view_file)): ?>
             <?php require_once $view_file; ?>
         <?php else: ?>
@@ -237,7 +238,7 @@ endif;
 ?>
 
 <script>
-    // Global helper for action buttons across the entire admin panel
+    // UI Feedback -> Setting button loading state and spinner animation
     function setButtonLoading(btn, isLoading, customText) {
         if (typeof btn === 'string') btn = document.getElementById(btn);
         if (!btn) return;
@@ -259,7 +260,7 @@ endif;
         }
     }
 
-    // Automatically handle loader for all standard forms
+    // Form Listener -> Attaching automatic submit loader listeners to all standard forms
     document.addEventListener('submit', function(e) {
         var form = e.target;
         var submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');

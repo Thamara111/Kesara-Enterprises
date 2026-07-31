@@ -1,9 +1,10 @@
 <?php
 /**
  * Customer Management View
- * Converted to Tailwind CSS for Kesara Enterprises Admin Panel
- * Handles listing, filtering, and displaying detailed information about registered customers.
- * It also computes customer-specific metrics such as total spent and recent orders.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting customer accounts, business registration (BR) numbers, order histories, and total spent metrics from the database.
+ * 2. Self-Healing -> Ensuring credit_limit column exists in the users table.
+ * 3. Processing -> Calculating customer statistics (Approved, Pending, Suspended) and preparing account badges.
  */
 $admin_customers = [];
 $total_count = 0;
@@ -21,11 +22,12 @@ if (isset($pdo) && $pdo !== null) {
         }
         */
 
-        // Fetch all users to display in the customer list
+        // Fetching -> Fetch all registered users to display in the customer list
         $stmt = $pdo->query("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.phone AS whatsapp_number, u.business_name AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
                              FROM users u");
         $users_db = $stmt->fetchAll();
 
+        // Processing -> Preparing details, metrics, and status badges for each customer
         foreach ($users_db as $usr) {
             $words = explode(" ", $usr['company']);
             $initials = "";
@@ -61,6 +63,7 @@ if (isset($pdo) && $pdo !== null) {
             }
             $total_count++;
 
+            // Fetching -> Fetch total number of orders and total amount spent by this customer
             $spent_stmt = $pdo->prepare("SELECT COUNT(*) as cnt, SUM(total_amount) as total FROM orders WHERE user_id = ? AND status != 'cancelled'");
             $spent_stmt->execute([$usr['id']]);
             $spent_metrics = $spent_stmt->fetch();
@@ -68,6 +71,7 @@ if (isset($pdo) && $pdo !== null) {
             $total_spent = (float) ($spent_metrics['total'] ?? 0);
             $spent = $total_spent > 0 ? 'LKR ' . ($total_spent >= 1000000 ? number_format($total_spent / 1000000, 1) . 'M' : number_format($total_spent / 1000, 0) . 'K') : '—';
 
+            // Fetching -> Fetch 3 most recent orders for this customer to preview in detail panel
             $orders_stmt = $pdo->prepare("SELECT id, status, total_amount FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 3");
             $orders_stmt->execute([$usr['id']]);
             $recent_orders_db = $orders_stmt->fetchAll();
@@ -568,11 +572,13 @@ if (empty($admin_customers)) {
     var currentPage = 1;
     var itemsPerPage = 15;
 
+    // Pagination -> Changing current active page number
     function goToPage(page) {
         currentPage = page;
         applyFilters();
     }
 
+    // Pagination -> Rendering page navigation buttons at the bottom
     function renderPagination(totalItems, totalPages) {
         var info = document.getElementById('pagination-info');
         var buttons = document.getElementById('pagination-buttons');
@@ -616,6 +622,7 @@ if (empty($admin_customers)) {
         buttons.innerHTML = html;
     }
 
+    // Selection -> Clicking a customer row to populate the right-side detail drawer
     function selectCustomer(el, openDrawer = true) {
         if (!el) return;
 
@@ -695,6 +702,7 @@ if (empty($admin_customers)) {
         loadComment(cid);
     }
 
+    // Filtering -> Filtering customer cards by status tab, search term, and sorting options
     function applyFilters() {
         var q = (document.getElementById('customer-search')?.value || '').toLowerCase().trim();
         var sort = document.getElementById('customer-sort')?.value || 'newest';
@@ -784,7 +792,7 @@ if (empty($admin_customers)) {
     }
     closeDetailPane();
 
-
+    // Action -> Filtering by status chip tabs (All, Pending, Approved, Suspended, Rejected)
     function filterChip(el) {
         document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
         el.classList.add('on');
@@ -793,6 +801,7 @@ if (empty($admin_customers)) {
         applyFilters();
     }
 
+    // Notification -> Displaying floating toast pop-up alerts
     function showToast(message, variant = 'success', duration = 3500) {
         var icons = { success: '<i class="ti ti-circle-check"></i>', error: '<i class="ti ti-circle-x"></i>', info: '<i class="ti ti-info-circle"></i>' };
         var titles = { success: 'Success', error: 'Error', info: 'Info' };
@@ -808,6 +817,7 @@ if (empty($admin_customers)) {
         setTimeout(() => { t.classList.remove('toast-show'); t.addEventListener('transitionend', () => t.remove(), { once: true }); }, duration);
     }
 
+    // API Status Update -> Updating customer account status (Approve, Reject, Suspend) via backend API
     function updateStatus(id, newStatus, btnElement) {
         if (btnElement) setButtonLoading(btnElement, true);
         fetch('/api/customers.php', {
@@ -867,6 +877,7 @@ if (empty($admin_customers)) {
             });
     }
 
+    // API Notes -> Fetching private admin note for selected customer
     function loadComment(customerId) {
         _activeCustomerId = customerId;
         var ta = document.getElementById('d-comment');
@@ -882,6 +893,7 @@ if (empty($admin_customers)) {
             .catch(() => { ta.placeholder = 'Add a private note about this customer...'; });
     }
 
+    // API Notes -> Saving private admin note for selected customer via backend API
     function saveComment(btnElement) {
         var ta = document.getElementById('d-comment');
         if (!ta || !_activeCustomerId) return;
@@ -906,6 +918,7 @@ if (empty($admin_customers)) {
             });
     }
 
+    // Controls -> Closing right-side customer detail drawer
     function closeDetailPane() {
         var pane = document.getElementById('detail-pane');
         var backdrop = document.getElementById('customer-detail-backdrop');
@@ -919,7 +932,4 @@ if (empty($admin_customers)) {
             r.classList.add('bg-white', 'border-gray-100');
         });
     }
-
-
-
 </script>

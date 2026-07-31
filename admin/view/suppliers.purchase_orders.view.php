@@ -1,7 +1,10 @@
 <?php
 /**
  * Purchase Orders View - Database Integration & Interaction
- * Manages purchase orders sent to suppliers for restocking inventory.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting purchase orders, suppliers list, inventory stock thresholds, and delivery timelines from database.
+ * 2. Self-Healing -> Ensuring unit_cost column exists on supplier_items table.
+ * 3. Processing -> Handling PO creation (dispatching HTML email to supplier with order table) and PO cancellation/resending.
  */
 
 $success_msg = "";
@@ -19,6 +22,7 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
+// Processing -> Handling POST actions for raising new purchase orders, resending, and cancelling POs
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
     $po_id = (int) ($_POST['po_id'] ?? 0);
@@ -36,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         }
 
         try {
-            // Fetch supplier details (name, email, contact)
+            // Fetching Data -> Getting supplier contact email, payment terms, and recipient details
             $supp_stmt = $pdo->prepare("SELECT name, email, contact_person, payment_terms FROM suppliers WHERE id = ?");
             $supp_stmt->execute([$supplier_id]);
             $supp = $supp_stmt->fetch();
@@ -164,6 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
+// Fetching Data -> Fetching purchase orders, suppliers list, low stock alerts, and order line items
 $admin_pos = [];
 $suppliers_list = [];
 $total_pos = 0;
@@ -982,11 +987,13 @@ if (isset($pdo) && $pdo !== null) {
     var currentPage = 1;
     var itemsPerPage = 15;
 
+    // Pagination -> Changing current active purchase order page number
     function goToPage(page) {
         currentPage = page;
         applyFilters();
     }
 
+    // Pagination -> Rendering page numbers and navigation controls at the bottom
     function renderPagination(totalItems, totalPages) {
         var info = document.getElementById('pagination-info');
         var buttons = document.getElementById('pagination-buttons');
@@ -1027,6 +1034,7 @@ if (isset($pdo) && $pdo !== null) {
         buttons.innerHTML = html;
     }
 
+    // Filtering -> Filtering purchase order table rows by active status tab (Sent, Received, Partial, Overdue)
     function applyFilters() {
         var list = document.getElementById('po-list');
         var rows = Array.from(document.querySelectorAll('.po-row'));
@@ -1084,6 +1092,7 @@ if (isset($pdo) && $pdo !== null) {
         renderPagination(totalItems, totalPages);
     }
 
+    // Action -> Filtering purchase orders by status chip tabs
     function chipFilter(btn) {
         document.querySelectorAll('.chip').forEach(c => {
             c.classList.remove('on', 'bg-brand', 'text-brand-light', 'shadow-md', 'shadow-brand/10', 'border-transparent');
@@ -1103,6 +1112,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
+    // Controls -> Closing right-side purchase order detail drawer
     function closePODetailPane() {
         var pane = document.getElementById('po-detail-pane');
         var backdrop = document.getElementById('po-detail-backdrop');
@@ -1117,17 +1127,19 @@ if (isset($pdo) && $pdo !== null) {
         });
     }
 
-    // Raise PO Modal Actions
+    // Modal -> Opening raise new purchase order dialog
     function openRaisePOModal() {
         document.getElementById('raisePOModal').classList.remove('hidden');
         document.getElementById('raisePOModal').classList.add('flex');
     }
 
+    // Modal -> Closing raise new purchase order dialog
     function closeRaisePOModal() {
         document.getElementById('raisePOModal').classList.add('hidden');
         document.getElementById('raisePOModal').classList.remove('flex');
     }
 
+    // Form Handler -> Adding a new line item row in the purchase order creation form
     function addPOItemRow() {
         var container = document.getElementById('poItemsContainer');
         var row = document.createElement('tr');
@@ -1143,6 +1155,7 @@ if (isset($pdo) && $pdo !== null) {
         container.appendChild(row);
     }
 
+    // Form Handler -> Removing a line item row in the purchase order creation form
     function removePOItemRow(btn) {
         var rows = document.getElementById('poItemsContainer').children;
         if (rows.length > 1) {
@@ -1155,6 +1168,7 @@ if (isset($pdo) && $pdo !== null) {
     var supplierItemsMap = <?= json_encode($supplier_items_map ?? []) ?>;
     var allProductVariants = <?= json_encode($all_product_variants ?? []) ?>;
 
+    // Form Handler -> Updating line item cost input when selecting a product item
     function updateRowCost(selectEl) {
         var opt = selectEl.options[selectEl.selectedIndex];
         var cost = opt.dataset.cost;
@@ -1165,6 +1179,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
+    // Form Handler -> Filtering available product item options dynamically based on selected supplier
     function updatePOItemsForSupplier(supplierId) {
         supplierId = parseInt(supplierId);
         var items = supplierItemsMap[supplierId] || [];
@@ -1200,11 +1215,12 @@ if (isset($pdo) && $pdo !== null) {
         });
     }
 
-    // Actions from Detail Pane
+    // Action -> Exporting, resending, and cancelling purchase orders
     function printPO() {
         downloadPDF('detail-print-area', 'Purchase_Order');
     }
 
+    // Action -> Resending purchase order email to supplier
     function resendPO() {
         if (currentSelectedPOId > 0) {
             uiConfirm("Simulate sending this PO again to the supplier?", () => {
@@ -1215,6 +1231,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
 
+    // Action -> Cancelling and deleting purchase order
     function cancelPO() {
         if (currentSelectedPOId > 0) {
             uiConfirm("Are you sure you want to cancel and delete this Purchase Order?", () => {

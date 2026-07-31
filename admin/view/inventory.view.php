@@ -1,8 +1,10 @@
 <?php
 /**
  * Inventory Management View
- * Converted to Tailwind CSS for Kesara Enterprises Admin Panel
- * Fetches and displays current stock levels, restocking thresholds, and inventory logs.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting inventory stock levels, min thresholds, product SKUs, and adjustment logs from the database.
+ * 2. Self-Healing -> Creating index on inventory(quantity, restock_min) for high performance threshold queries.
+ * 3. Processing -> Computing SKU stats (Critical, Low Stock, Out of Stock) and triggering low stock alert emails.
  */
 
 $rows = [];
@@ -35,12 +37,13 @@ if (isset($pdo) && $pdo !== null) {
                       ORDER BY i.quantity ASC";
         */
         
+        // Fetching Data -> Getting inventory items along with matching product name and SKU from database
         $stmt = $pdo->query("SELECT i.id, i.product_id, i.size, i.colour, i.quantity AS stock, i.restock_min AS thresh, p.name AS product_name, p.sku 
                              FROM inventory i 
                              JOIN products p ON i.product_id = p.id");
         $db_rows = $stmt->fetchAll();
         foreach ($db_rows as $row) {
-            // Fetch logs for this inventory item
+            // Fetching Data -> Fetching adjustment history logs for each inventory item
             $log_stmt = $pdo->prepare("SELECT adj_type, qty_before, qty_after, note, created_at FROM inventory_log WHERE inventory_id = ? ORDER BY created_at DESC");
             $log_stmt->execute([$row['id']]);
             $item_logs = [];
@@ -77,6 +80,7 @@ if (empty($rows)) {
     $rows = [];
 }
 
+// Processing -> Calculating total SKUs, critical low stock counts, and out of stock counts
 $total_skus = count($rows);
 $critical_count = 0;
 $low_stock_count = 0;
@@ -96,9 +100,7 @@ foreach ($rows as $r) {
     }
 }
 
-// ── Auto-send inventory pressure warning email ────────────────────────────────
-// Fires automatically whenever any pressure items exist, with a 1-hour
-// session-based cooldown to prevent duplicate emails on every page refresh.
+// Processing -> Auto-triggering inventory low stock warning alert emails with a 1-hour session cooldown
 $auto_alert_sent = false;
 $auto_alert_time = null;
 $auto_alert_error = null;
@@ -650,6 +652,7 @@ if ($pressure_count > 0) {
         }
     }
 
+    // Detail Rendering -> Updating side panel details, stock bars, and adjustment log history for selected variant
     function renderDetail(el) {
         if (!el) return;
         var stock = parseInt(el.dataset.stock);
@@ -685,6 +688,7 @@ if ($pressure_count > 0) {
         updatePreview();
     }
 
+    // Preview -> Updating stock quantity label when adjustment type dropdown changes
     function updateAdjLabel() {
         var t = document.getElementById('adj-type').value;
         var labels = { add: 'Quantity to add', remove: 'Quantity to remove', set: 'Set exact quantity' };
@@ -692,6 +696,7 @@ if ($pressure_count > 0) {
         updatePreview();
     }
 
+    // Preview -> Calculating predicted stock units after adding or subtracting quantity
     function updatePreview() {
         var t = document.getElementById('adj-type').value;
         var q = parseInt(document.getElementById('adj-qty').value) || 0;
@@ -703,6 +708,7 @@ if ($pressure_count > 0) {
 
     document.getElementById('adj-qty').addEventListener('input', updatePreview);
 
+    // API Stock Adjustment -> Applying manual stock adjustment (add, remove, set) via backend API
     function applyAdj(btnElement) {
         var t = document.getElementById('adj-type').value;
         var q = parseInt(document.getElementById('adj-qty').value) || 0;
@@ -771,6 +777,7 @@ if ($pressure_count > 0) {
         });
     }
 
+    // API Threshold Update -> Updating restocking minimum threshold via backend API
     function saveThresh(btnElement) {
         if (!selEl) return;
         var thresh = parseInt(document.getElementById('thresh-input').value) || 0;
@@ -813,6 +820,7 @@ if ($pressure_count > 0) {
         });
     }
 
+    // Selection -> Clicking an inventory row to populate the adjustment side panel
     function selectRow(el, openDrawer = true) {
         if (!el) return;
         document.querySelectorAll('.inv-row').forEach(r => {
@@ -835,6 +843,7 @@ if ($pressure_count > 0) {
         }
     }
 
+    // Filtering -> Filtering stock list by status chips (Critical, Low Stock, Out of Stock)
     function chipFilter(el) {
         document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
         el.classList.add('on');
@@ -851,6 +860,7 @@ if ($pressure_count > 0) {
         }
     }
 
+    // Controls -> Closing adjustment side panel
     function closeAdjPane() {
         var pane = document.getElementById('adj-pane');
         var backdrop = document.getElementById('inventory-detail-backdrop');
@@ -869,6 +879,7 @@ if ($pressure_count > 0) {
     }
     closeAdjPane();
 
+    // API Alert -> Triggering low stock email warning notification via backend API
     <?php if (!empty($should_trigger_alert)): ?>
         fetch('/api/inventory_warning.php', { method: 'POST' })
             .then(r => r.json())

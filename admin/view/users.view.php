@@ -1,14 +1,16 @@
 <?php
 /**
  * Staff User Management View (Admin Only)
- * Allows System Admins to register new staff managers (Finance, Delivery, Supplier, etc.)
- * and view the directory of active staff.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting active staff managers directory (System Admin, Finance, Delivery, Supplier) from the database.
+ * 2. Self-Healing -> Ensuring deleted_at column and role ENUM values exist in the admins table.
+ * 3. Processing -> Handling staff registration (password hashing with bcrypt) and soft deleting staff users to Recycle Bin.
  */
 
 $success_message = "";
 $error_message = "";
 
-// Handle POST form submission to register a new user/manager
+// Processing -> Handle POST form submission to register a new user/manager
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register_user') {
     // Sanitize and read input fields
     $username = trim($_POST['username'] ?? '');
@@ -24,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     } else {
         if (isset($pdo) && $pdo !== null) {
             try {
-                // Check if the provided email or username already exists to prevent duplicates
+                // Fetching -> Check if the provided email or username already exists to prevent duplicates
                 $check_stmt = $pdo->prepare("SELECT id FROM admins WHERE email = ? OR username = ?");
                 $check_stmt->execute([$email, $username]);
                 if ($check_stmt->fetch()) {
@@ -46,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Handle POST request to soft-delete a staff user
+// Processing -> Handle POST request to soft-delete a staff user to Recycle Bin
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_user') {
     $delete_id = intval($_POST['user_id'] ?? 0);
     if ($delete_id > 0 && isset($pdo) && $pdo !== null) {
@@ -60,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Fetch all staff users from the database for the directory table
+// Fetching -> Fetch all active staff users from the database for the directory table
 $staff_users = [];
 if (isset($pdo) && $pdo !== null) {
     try {
@@ -76,6 +78,7 @@ if (isset($pdo) && $pdo !== null) {
             $pdo->exec("ALTER TABLE admins MODIFY COLUMN role ENUM('admin', 'finance_manager', 'supplier_manager', 'delivery_manager', 'example_manager') DEFAULT 'admin'");
         }
 
+        // Fetching -> Retrieve all staff users who are not deleted
         $stmt = $pdo->query("SELECT id, username, email, role, created_at FROM admins WHERE deleted_at IS NULL ORDER BY created_at DESC");
         $staff_users = $stmt->fetchAll();
     } catch (\Exception $e) {
@@ -88,7 +91,7 @@ if (empty($staff_users)) {
     $staff_users = [];
 }
 
-// Role label & badge class helpers
+// Processing -> Role label & badge class helper function
 function getRoleMeta($role)
 {
     $meta = [
@@ -286,6 +289,7 @@ function getRoleMeta($role)
 </div>
 
 <script>
+    // API Registration -> Submitting new staff user registration form via AJAX
     function handleRegisterUser(e) {
         e.preventDefault();
         var form = e.target;
@@ -338,6 +342,8 @@ function getRoleMeta($role)
             }
         });
     }
+
+    // Modal -> Opening staff user deletion confirmation popup
     function openDeleteUserModal(id, username) {
         document.getElementById('delete-user-id').value = id;
         document.getElementById('delete-user-name').textContent = username;
@@ -351,6 +357,7 @@ function getRoleMeta($role)
         }, 10);
     }
 
+    // Modal -> Closing staff user deletion confirmation popup
     function closeDeleteUserModal() {
         var modal = document.getElementById('delete-user-modal');
         var content = document.getElementById('delete-user-modal-content');
@@ -362,6 +369,7 @@ function getRoleMeta($role)
         }, 200);
     }
 
+    // API Deletion -> Submitting soft-delete request for staff user to Recycle Bin via AJAX
     function submitDeleteUser() {
         var userId = document.getElementById('delete-user-id').value;
         var btn = document.getElementById('delete-confirm-btn');
@@ -400,7 +408,8 @@ function getRoleMeta($role)
             }
         });
     }
-    // Password Visibility Toggle
+
+    // Password Visibility Toggle -> Toggling password text masking with eye icon
     function toggleStaffPassword(btn, targetId) {
         var input = document.getElementById(targetId);
         if (input) {
@@ -416,7 +425,7 @@ function getRoleMeta($role)
         }
     }
 
-    // Password Strength Checker
+    // Password Strength Checker -> Dynamically evaluating password security score (Low, Medium, Strong)
     window.checkStaffPasswordStrength = function (password) {
         var bar = document.getElementById('staff-strengthBar');
         var label = document.getElementById('staff-strengthLabel');

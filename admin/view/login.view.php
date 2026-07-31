@@ -1,8 +1,9 @@
 <?php
 /**
  * Admin Login View
- * Handles admin authentication and session initialization.
- * Verifies credentials via AJAX POST requests.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Looking up admin account details by email from database for authentication.
+ * 2. Processing -> Verifying password hash via AJAX, creating admin session, or using offline demo fallback.
  */
 // Handle AJAX POST requests to verify credentials
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -19,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
     
+    // Fetching Data -> Looking up admin account details by email from database
     $admin = null;
     if (isset($pdo) && $pdo !== null) {
         try {
@@ -30,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     
-    // Auth logic
+    // Processing -> Verifying admin password hash or falling back to offline demo credentials
     if ($admin) {
         if (password_verify($password, $admin['password'])) {
             $_SESSION['admin_id'] = $admin['id'];
@@ -172,6 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   var locked = false;
   var countdownTimer = null;
 
+  // UI Feedback -> Setting button loading spinner state during authentication
   function setBtnLoader(btn, isLoading, text) {
     if (typeof setButtonLoading === 'function') {
       setButtonLoading(btn, isLoading, text);
@@ -190,6 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
   }
 
+  // Processing -> Validating input credentials and sending login verification request via AJAX
   function tryLogin(btnElement) {
     if (locked) return;
     var email = document.getElementById('email-input').value.trim();
@@ -267,6 +271,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     });
   }
 
+  // Timer -> Starting lockout countdown timer after failed attempts
   function startCountdown(seconds) {
     var el = document.getElementById('countdown');
     countdownTimer = setInterval(() => {
@@ -281,6 +286,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }, 1000);
   }
 
+  // Controls -> Resetting login form and unlocking state for demo mode
   function resetDemo() {
     if (countdownTimer) clearInterval(countdownTimer);
     attempts = 0;
@@ -292,6 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     document.getElementById('pw-input').value = '';
   }
 
+  // Controls -> Toggling password input visibility between masked and plain text
   function togglePw() {
     var inp = document.getElementById('pw-input');
     var icon = document.getElementById('eye-icon');

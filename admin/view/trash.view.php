@@ -1,8 +1,9 @@
 <?php
 /**
  * Trash / Deleted Items View
- * Displays soft-deleted records across products, categories, orders, and admins.
- * Allows restoring or permanently deleting these records.
+ * Natural Language Overview:
+ * 1. Fetching Data -> Getting soft-deleted products, categories, orders, suppliers, staff admins, and suspended customers.
+ * 2. Processing -> Displaying recycle bin items and managing restore / permanent deletion actions.
  */
 
 $deleted_products = [];
@@ -12,6 +13,7 @@ $deleted_suppliers = [];
 $deleted_admins = [];
 $suspended_customers = [];
 
+// Fetching Data -> Fetching soft-deleted products, categories, orders, suppliers, staff admins, and suspended customers from database
 if (isset($pdo) && $pdo !== null) {
     try {
         $stmt = $pdo->query("SELECT * FROM products WHERE deleted_at IS NOT NULL");
@@ -202,6 +204,7 @@ if (isset($pdo) && $pdo !== null) {
 </div>
 
 <script>
+// Selection -> Switching active recycle bin tab (Products, Categories, Orders, Suppliers, Staff, Customers)
 function switchTrashTab(tabName, btn) {
     document.querySelectorAll('.trash-section').forEach(el => el.classList.add('hidden'));
     document.getElementById('tab-' + tabName).classList.remove('hidden');
@@ -214,6 +217,7 @@ function switchTrashTab(tabName, btn) {
     btn.classList.add('border-brand', 'text-brand');
 }
 
+// API Restore -> Restoring soft-deleted record back to active state via backend API
 function restoreItem(table, id, btnElement) {
     if (btnElement) setButtonLoading(btnElement, true, 'Restoring...');
     fetch('/api/trash.php', {
@@ -238,6 +242,7 @@ function restoreItem(table, id, btnElement) {
     });
 }
 
+// Modal -> Opening permanent deletion confirmation popup
 function confirmHardDelete(table, id) {
     document.getElementById('hd-table').value = table;
     document.getElementById('hd-id').value = id;
@@ -250,6 +255,7 @@ function confirmHardDelete(table, id) {
     }, 10);
 }
 
+// Modal -> Closing permanent deletion confirmation popup
 function closeHardDeleteModal() {
     var modal = document.getElementById('hard-delete-modal');
     var content = document.getElementById('hard-delete-content');
@@ -260,6 +266,7 @@ function closeHardDeleteModal() {
     }, 200);
 }
 
+// API Permanent Delete -> Permanently removing record from database via backend API
 function executeHardDelete() {
     var table = document.getElementById('hd-table').value;
     var id = document.getElementById('hd-id').value;

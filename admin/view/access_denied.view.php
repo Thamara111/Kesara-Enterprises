@@ -19,6 +19,7 @@
 
         <hr class="border-gray-50">
 
+        <!-- User Info -> Reading current user's session role to display permission error message -->
         <p class="text-sm text-gray-500 leading-relaxed font-medium">
             Your staff account role (<span class="font-bold text-gray-900"><?= htmlspecialchars(ucwords(str_replace('_', ' ', $_SESSION['admin_role'] ?? 'guest'))) ?></span>) is not authorised to view this page. If you believe this is an error, please contact your logistics administrator.
         </p>
