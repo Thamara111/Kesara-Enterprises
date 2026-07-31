@@ -681,7 +681,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
     </div>
 </div>
 
-<!-- Global Toasts -->
+<!-- Global application toast notifications -->
 <div id="toast-wrapper" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[2000] w-11/12 max-w-[400px] pointer-events-none transform translate-y-12 opacity-0 transition-all duration-300">
     <div class="bg-gray-900 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-semibold justify-center">
         <i id="toast-icon" class="ti ti-bell"></i>
@@ -690,7 +690,7 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
 </div>
 
 <script>
-// Available drivers matching assignments page
+// Available drivers matching the assignments list
 <?php
 $php_drivers = [];
 if (isset($pdo) && $pdo !== null) {
@@ -727,7 +727,7 @@ if (isset($pdo) && $pdo !== null) {
             ];
         }
     } catch (\Exception $e) {
-        // Fallback
+        // Fallback implementation
     }
 }
 ?>
@@ -738,7 +738,7 @@ const DRIVERS = <?php echo !empty($php_drivers) ? json_encode($php_drivers) : '[
   { id: "SR", name: "Saman Rajapaksa", vehicle: "Van · WP CBB-1122", avColor: "bg-indigo-100 text-indigo-700 border-indigo-200" }
 ]'; ?>;
 
-// Warehouse coords
+// Warehouse location coordinates
 const WAREHOUSES = {
   'Colombo': [6.9535, 79.8886],
   'Gampaha': [7.0873, 80.0144],
@@ -790,12 +790,12 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
-// Load assignments from default assignments
+// Loads initial assignments into the app state
 function loadState() {
     assignments = [...defaultAssignments];
 }
 
-// Log out driver
+// Logs the driver out of the portal
 function logoutDriver() {
     if (gpsTimer) {
         clearInterval(gpsTimer);
@@ -818,7 +818,7 @@ function renderApp() {
         loginScreen.style.display = 'none';
         portalScreen.style.display = 'flex';
         
-        // Find driver details
+        // Sets driver profile details
         const getInitials = (name) => {
             if (!name) return '--';
             return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
@@ -827,12 +827,11 @@ function renderApp() {
         document.getElementById('driver-name-title').textContent = activeDriverName || 'Driver';
         document.getElementById('driver-vehicle-title').textContent = activeDriverVehicle || 'Vehicle Info';
         
-        // Find active run for this driver
-        // Note: Active runs are status "Active" or "Pending"
+        // Determines active or pending run
         activeRun = assignments.find(a => a.badgeText === 'Active' || a.badgeText === 'Pending');
         
         if (!activeRun) {
-            // Check if there is a completed run
+            // Checks for completed runs if no active ones exist
             activeRun = assignments.find(a => a.badgeText === 'Completed');
         }
         
@@ -883,7 +882,7 @@ function renderDashboard() {
     const pct = (completedStops / totalStops) * 100;
     document.getElementById('active-run-progress-bar').style.width = pct + '%';
     
-    // Render Stops
+    // Renders list of stops
     stopsContainer.innerHTML = activeRun.stops.map((s, idx) => {
         let cardBorder = 'border-gray-200';
         let badgeStyle = 'bg-gray-50 text-gray-500 border-gray-100';
@@ -899,7 +898,7 @@ function renderDashboard() {
             badgeStyle = 'bg-blue-50 text-blue-700 border-blue-100 animate-pulse';
             cardBorder = 'border-blue-200 ring-1 ring-blue-100';
             
-            // Actions when en route
+            // Actions available when stop is in progress
             const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.addr + ', Sri Lanka')}`;
             actionsHtml = `
                 <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-gray-100">
@@ -918,8 +917,7 @@ function renderDashboard() {
                 </div>
             `;
         } else {
-            // Not started / Pending
-            // Only enable "Depart" button on the first incomplete stop
+            // Logic for pending/not started stops
             const firstIncomplete = activeRun.stops.find(stop => stop.status === 'Not started' || stop.status === 'In progress');
             const isNextStop = firstIncomplete && firstIncomplete.num === s.num;
             
@@ -980,7 +978,7 @@ function renderDashboard() {
         `;
     }).join('');
     
-    // Sync HUD coordinates & Trip Map
+    // Updates HUD coordinates and trip map
     if (activeRun.sim_coords) {
         document.getElementById('sim-coords-text').textContent = `${activeRun.sim_coords[0].toFixed(5)}, ${activeRun.sim_coords[1].toFixed(5)}`;
     }
@@ -988,7 +986,7 @@ function renderDashboard() {
     updateDriverTripMap();
 }
 
-// ── Driver Trip Map Leaflet Renderer ──────────────────────────────────────
+// Logic for rendering the Leaflet map
 var driverMap = null;
 var driverWhMarker = null;
 var driverStopMarkers = [];
@@ -1029,14 +1027,14 @@ function updateDriverTripMap() {
         window.driverTruckIcon = createDivIcon('ti-truck', 'bg-brand');
     }
 
-    // Clear previous markers
+    // Resets markers
     if (driverWhMarker) driverMap.removeLayer(driverWhMarker);
     driverStopMarkers.forEach(m => driverMap.removeLayer(m));
     driverStopMarkers = [];
     if (driverVehicleMarker) driverMap.removeLayer(driverVehicleMarker);
     if (driverPolyline) driverMap.removeLayer(driverPolyline);
 
-    // Add Warehouse Origin Marker
+    // Adds warehouse marker
     driverWhMarker = L.marker(whCoords, { icon: window.driverWhIcon })
         .addTo(driverMap)
         .bindPopup('<b>Central Warehouse</b><br>Dispatch Depot');
@@ -1061,7 +1059,7 @@ function updateDriverTripMap() {
         driverStopMarkers.push(m);
     });
 
-    // Add Current Vehicle Position Marker
+    // Adds vehicle marker
     var currentPos = activeRun.sim_coords || whCoords;
     driverVehicleMarker = L.marker(currentPos, { icon: window.driverTruckIcon })
         .addTo(driverMap)
@@ -1082,29 +1080,29 @@ function updateDriverTripMap() {
     }, 200);
 }
 
-// Extract numeric order ID from stop name "KE-2025-00123 · Company"
+// Parses order ID from delivery stop string
 function extractOrderId(stopName) {
     const match = stopName.match(/KE-\d{4}-(\d+)/);
     return match ? parseInt(match[1], 10) : null;
 }
 
-// POST order status update to DB via API
+// Submits delivery status updates to the database
 function updateOrderStatus(orderId, status) {
     if (!orderId) return;
     fetch('/api/orders.php?action=update_status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: orderId, status: status })
-    }).catch(() => { /* silently fail — localStorage state stays intact */ });
+    }).catch(() => { /* silent fail */ });
 }
 
-// Pickup Confirmation Modal
+// Pickup modal logic
 let pendingDepartStopNum = null;
 
 function openPickupModal(stopNum) {
     pendingDepartStopNum = stopNum;
     
-    // Populate order list
+    // Populates the order list in the modal
     const listEl = document.getElementById('pickup-order-list');
     if (activeRun && activeRun.stops) {
         listEl.innerHTML = activeRun.stops.map(s => `
@@ -1118,7 +1116,7 @@ function openPickupModal(stopNum) {
         `).join('');
     }
     
-    // Reset checkbox
+    // Reset check box state
     document.getElementById('pickup-confirmed-check').checked = false;
     
     const modal = document.getElementById('pickup-modal');
@@ -1139,6 +1137,7 @@ function closePickupModal() {
     pendingDepartStopNum = null;
 }
 
+// Adjusts minimum date for leave requests
 function updateLeaveEndDateMin() {
     const today = new Date().toISOString().split('T')[0];
     const startDateInput = document.getElementById('leave_start_date');
@@ -1187,7 +1186,7 @@ function closeDayOffModal() {
     panel.classList.remove('translate-y-0');
 }
 
-// Customer Delivery Note Modal Helpers
+// Opens the note modal for a delivery stop
 function openNoteModal(stopNum) {
     if (!activeRun || !activeRun.stops) return;
     const stop = activeRun.stops.find(s => s.num === stopNum);
@@ -1233,14 +1232,14 @@ function confirmPickup() {
     departStop(pendingDepartStopNum);
 }
 
-// Start moving towards stop
+// Logic for initiating a delivery route
 function departStop(stopNum) {
     if (activeRun.badgeText === 'Pending') {
         activeRun.badgeText = 'Active';
         activeRun.badge = 'bg-blue-50 text-blue-770 border-blue-100';
         logDriverTelemetry(activeRun, `Run dispatched from depot.`, 'SYSTEM');
         
-        // Mark ALL stops in this run as shipped in DB
+        // Updates all orders to Shipped
         activeRun.stops.forEach(s => {
             const orderId = extractOrderId(s.name);
             updateOrderStatus(orderId, 'shipped');
@@ -1254,14 +1253,14 @@ function departStop(stopNum) {
     stop.status = 'In progress';
     logDriverTelemetry(activeRun, `En route to Stop ${stop.num}: ${stop.name.split(' · ')[1]}`, 'GPS');
     
-    // Save to localStorage
+    // Updates local state
     localStorage.setItem('ke_assignments', JSON.stringify(assignments));
     
     renderApp();
     showToast(`Departed towards Stop ${stopNum}!`, 'success');
 }
 
-// Logger helper for telemetry
+// Telemetry logging helper
 function logDriverTelemetry(run, message, type = 'INFO') {
     if (!run.telemetry_history) {
         run.telemetry_history = [];
@@ -1270,13 +1269,11 @@ function logDriverTelemetry(run, message, type = 'INFO') {
     run.telemetry_history.push(`[${timestamp}] [${type}] ${message}`);
 }
 
-// Confirm Delivery Modal Slider Actions
+// Confirmation modal management
 function openConfirmationModal(stopNum) {
     currentModalStopNum = stopNum;
     const stop = activeRun.stops.find(s => s.num === stopNum);
     document.getElementById('confirm-stop-name').textContent = stop ? stop.name : '';
-    
-    // Signature pad not implemented yet
     
     const modal = document.getElementById('confirm-modal');
     modal.classList.remove('opacity-0', 'pointer-events-none');
@@ -1314,11 +1311,11 @@ function submitDelivery() {
         stop.status = `Delivered ${timeStr}`;
         logDriverTelemetry(activeRun, `Stop ${stop.num} Delivered: Proof of delivery verified.`, 'DELIVERED');
         
-        // Update this stop's order to 'delivered' in DB
+        // Updates DB
         const orderId = extractOrderId(stop.name);
         updateOrderStatus(orderId, 'delivered');
         
-        // If it was the last stop, mark run as completed!
+        // Checks run completion
         const nextIncomplete = activeRun.stops.find(s => s.status === 'Not started' || s.status === 'In progress');
         if (!nextIncomplete) {
             activeRun.badgeText = 'Completed';
@@ -1326,7 +1323,7 @@ function submitDelivery() {
             logDriverTelemetry(activeRun, `All deliveries completed. Returning to warehouse.`, 'SYSTEM');
             showToast('Excellent! All stops completed.', 'success');
             
-            // Turn off GPS simulator
+            // Turns off GPS tracking on run finish
             if (gpsTimer) {
                 clearInterval(gpsTimer);
                 gpsTimer = null;
@@ -1334,7 +1331,6 @@ function submitDelivery() {
                 document.getElementById('gps-telemetry-hud').style.display = 'none';
             }
             
-            // Stop simulation ticker if running
             stopDriverSimulation();
         }
         
@@ -1345,26 +1341,23 @@ function submitDelivery() {
     }
 }
 
-// Reason chip selection for Did Not Deliver modal
+// Logic for selection chips
 function selectFailReason(btn, reason) {
-    // Clear all chips
     document.querySelectorAll('.fail-chip').forEach(c => {
         c.classList.remove('border-red-400', 'bg-red-50', 'text-red-700');
         c.classList.add('border-gray-200', 'text-gray-600');
     });
-    // Highlight selected
     btn.classList.add('border-red-400', 'bg-red-50', 'text-red-700');
     btn.classList.remove('border-gray-200', 'text-gray-600');
     document.getElementById('fail-reason').value = reason;
 }
 
-// Failure Modal Actions
+// Failure modal management
 function openFailureModal(stopNum) {
     currentModalStopNum = stopNum;
     const stop = activeRun.stops.find(s => s.num === stopNum);
     document.getElementById('fail-stop-name').textContent = stop ? stop.name : '';
     
-    // Reset reason state
     document.getElementById('fail-reason').value = '';
     document.getElementById('fail-notes').value = '';
     document.querySelectorAll('.fail-chip').forEach(c => {
@@ -1406,11 +1399,9 @@ function submitFailure() {
         stop.status = `Failed: ${fullReason}`;
         logDriverTelemetry(activeRun, `Stop ${stop.num} Not Delivered: ${fullReason}`, 'WARN');
         
-        // Update order status to failed in DB
         const orderId = extractOrderId(stop.name);
         updateOrderStatus(orderId, 'failed');
         
-        // Check if run completed (even with failures)
         const nextIncomplete = activeRun.stops.find(s => s.status === 'Not started' || s.status === 'In progress');
         if (!nextIncomplete) {
             activeRun.badgeText = 'Completed';
@@ -1426,11 +1417,9 @@ function submitFailure() {
     }
 }
 
-// ============================================================
-// DRIVER SIMULATION CONTROLS
-// ============================================================
+// Simulation controls
 let driverSimInterval = null;
-let driverSimSpeed = 1; // 1x, 2x, 5x
+let driverSimSpeed = 1;
 let driverIsSimulating = false;
 
 function driverToggleSimulation() {
@@ -1441,13 +1430,11 @@ function driverToggleSimulation() {
     }
 
     if (activeRun.badgeText === 'Pending') {
-        // Kick off the run: mark Active, set first stop In Progress
         activeRun.badgeText = 'Active';
         activeRun.badge = 'bg-blue-50 text-blue-770 border-blue-100';
         activeRun.stops[0].status = 'In progress';
         logDriverTelemetry(activeRun, `Run ${activeRun.id} started by driver. En route to Stop 1.`, 'SYSTEM');
 
-        // Mark ALL orders in this run as shipped
         activeRun.stops.forEach(s => {
             const orderId = extractOrderId(s.name);
             updateOrderStatus(orderId, 'shipped');
@@ -1496,7 +1483,6 @@ function driverSimulateTick() {
     if (!activeRun) return;
     const inProgressStop = activeRun.stops.find(s => s.status === 'In progress');
     if (!inProgressStop) {
-        // All stops done — complete the run
         stopDriverSimulation();
         activeRun.badgeText = 'Completed';
         activeRun.badge = 'bg-emerald-50 text-emerald-700 border-emerald-100';
@@ -1507,7 +1493,6 @@ function driverSimulateTick() {
         return;
     }
 
-    // Arrived at current stop — wait for driver action
     stopDriverSimulation();
     showToast(`Arrived at Stop ${inProgressStop.num}. Awaiting delivery confirmation.`, 'info');
     logDriverTelemetry(activeRun, `Arrived at Stop ${inProgressStop.num}. Awaiting signature.`, 'SYSTEM');
@@ -1541,7 +1526,7 @@ function driverStepNextStop() {
     driverSimulateTick();
 }
 
-// GPS Simulation Ticker
+// GPS Simulator Ticker
 function toggleGPS() {
     const checked = document.getElementById('gps-toggle').checked;
     const hud = document.getElementById('gps-telemetry-hud');
@@ -1573,7 +1558,6 @@ function startGPSSimulation() {
             return;
         }
         
-        // Fallback coordinates if missing
         if (!activeStop.lat || !activeStop.lng) {
             const wh = getWarehouseCoords(activeRun.zone);
             activeStop.lat = wh[0] + (Math.random() - 0.5) * 0.04;
@@ -1582,7 +1566,6 @@ function startGPSSimulation() {
         
         let currentPos = activeRun.sim_coords;
         if (!currentPos) {
-            // Locate starting point of current leg
             const stopIdx = activeRun.stops.findIndex(s => s.num === activeStop.num);
             if (stopIdx > 0) {
                 const prev = activeRun.stops[stopIdx - 1];
@@ -1599,26 +1582,22 @@ function startGPSSimulation() {
         let distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
         
         if (distance < 0.0008) {
-            // Reached stop!
             activeRun.sim_coords = targetPos;
             document.getElementById('sim-coords-text').textContent = `${targetPos[0].toFixed(5)}, ${targetPos[1].toFixed(5)} (Arrived)`;
             showToast(`Arrived at Stop ${activeStop.num}!`, 'info');
             
-            // Save to localStorage
             localStorage.setItem('ke_assignments', JSON.stringify(assignments));
             renderDashboard();
             return;
         }
         
-        // Take a small step towards target
-        const speed = 0.0015; // movement speed
+        const speed = 0.0015;
         const nextLat = currentPos[0] + (latDiff / distance) * speed;
         const nextLng = currentPos[1] + (lngDiff / distance) * speed;
         
         activeRun.sim_coords = [nextLat, nextLng];
         document.getElementById('sim-coords-text').textContent = `${nextLat.toFixed(5)}, ${nextLng.toFixed(5)}`;
         
-        // Save to localStorage
         localStorage.setItem('ke_assignments', JSON.stringify(assignments));
     }, 1000);
 }
@@ -1630,7 +1609,7 @@ function stopGPSSimulation() {
     }
 }
 
-// Window local storage change synchronization
+// Event listener for tab syncing
 window.addEventListener('storage', (e) => {
     if (e.key === 'ke_assignments') {
         loadState();
@@ -1644,7 +1623,7 @@ window.addEventListener('storage', (e) => {
     }
 });
 
-// Password Visibility Toggle for Registration
+// Password visibility toggle logic
 document.addEventListener('click', (e) => {
     if (e.target.classList.contains('toggle-password-btn')) {
         const targetId = e.target.getAttribute('data-target');
@@ -1663,7 +1642,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Password Strength Checker for Driver Registration
+// Password strength assessment logic
 window.checkDriverPasswordStrength = function(password) {
     const bar = document.getElementById('driver-strengthBar');
     const label = document.getElementById('driver-strengthLabel');
@@ -1722,7 +1701,7 @@ window.checkDriverPasswordStrength = function(password) {
     }
 };
 
-// Button Loading Indicator Helper
+// Loading indicator controller
 function setButtonLoading(btn, isLoading, customText = '') {
     if (!btn) return;
     if (isLoading) {
@@ -1743,7 +1722,7 @@ function setButtonLoading(btn, isLoading, customText = '') {
     }
 }
 
-// Init on Load
+// App initial setup and event listener attachments
 document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('auth-login-form');
     if (loginForm) {
