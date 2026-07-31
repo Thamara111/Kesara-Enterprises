@@ -8,6 +8,7 @@
 $deleted_products = [];
 $deleted_categories = [];
 $deleted_orders = [];
+$deleted_suppliers = [];
 $deleted_admins = [];
 $suspended_customers = [];
 
@@ -21,6 +22,12 @@ if (isset($pdo) && $pdo !== null) {
 
         $stmt = $pdo->query("SELECT * FROM orders WHERE deleted_at IS NOT NULL");
         $deleted_orders = $stmt->fetchAll();
+
+        $checkSupp = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'deleted_at'");
+        if ($checkSupp->fetch()) {
+            $stmt = $pdo->query("SELECT * FROM suppliers WHERE deleted_at IS NOT NULL");
+            $deleted_suppliers = $stmt->fetchAll();
+        }
 
         $stmt = $pdo->query("SELECT * FROM admins WHERE deleted_at IS NOT NULL");
         $deleted_admins = $stmt->fetchAll();
@@ -52,6 +59,7 @@ if (isset($pdo) && $pdo !== null) {
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-brand text-brand" onclick="switchTrashTab('products', this)">Products (<?= count($deleted_products) ?>)</button>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('categories', this)">Categories (<?= count($deleted_categories) ?>)</button>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('orders', this)">Orders (<?= count($deleted_orders) ?>)</button>
+        <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('suppliers', this)">Suppliers (<?= count($deleted_suppliers) ?>)</button>
         <?php if ($role === 'admin'): ?>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('users', this)">Staff (<?= count($deleted_admins) ?>)</button>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('customers', this)">Customers (<?= count($suspended_customers) ?>)</button>
@@ -110,6 +118,25 @@ if (isset($pdo) && $pdo !== null) {
                 <div class="flex gap-2">
                     <button onclick="restoreItem('orders', <?= $item['id'] ?>)" class="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-200">Restore</button>
                     <button onclick="confirmHardDelete('orders', <?= $item['id'] ?>)" class="bg-red-50 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100">Delete Permanently</button>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div>
+
+    <div id="tab-suppliers" class="trash-section hidden space-y-4">
+        <?php if (empty($deleted_suppliers)): ?>
+            <p class="text-gray-400 text-sm font-bold">No deleted suppliers found.</p>
+        <?php else: ?>
+            <?php foreach($deleted_suppliers as $item): ?>
+            <div class="bg-white p-4 rounded-xl border border-gray-100 flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold text-gray-900"><?= htmlspecialchars($item['name']) ?></h3>
+                    <p class="text-xs text-gray-400">Email: <?= htmlspecialchars($item['email']) ?> · Deleted: <?= $item['deleted_at'] ?></p>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="restoreItem('suppliers', <?= $item['id'] ?>)" class="bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-gray-200">Restore</button>
+                    <button onclick="confirmHardDelete('suppliers', <?= $item['id'] ?>)" class="bg-red-50 text-red-500 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-red-100">Delete Permanently</button>
                 </div>
             </div>
             <?php endforeach; ?>

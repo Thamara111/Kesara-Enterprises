@@ -5,6 +5,28 @@
  * Includes status tracking (Active, On Hold) and contact details.
  */
 
+// Self-Healing DB: Ensure supplier_items has unit_cost column & suppliers has deleted_at and lead_time columns
+if (isset($pdo) && $pdo !== null) {
+    try {
+        $checkUnitCost = $pdo->query("SHOW COLUMNS FROM supplier_items LIKE 'unit_cost'");
+        if (!$checkUnitCost->fetch()) {
+            $pdo->exec("ALTER TABLE supplier_items ADD COLUMN unit_cost DECIMAL(10,2) DEFAULT NULL");
+        }
+
+        $checkDeleted = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'deleted_at'");
+        if (!$checkDeleted->fetch()) {
+            $pdo->exec("ALTER TABLE suppliers ADD COLUMN deleted_at DATETIME DEFAULT NULL");
+        }
+
+        $checkLeadTime = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'lead_time'");
+        if (!$checkLeadTime->fetch()) {
+            $pdo->exec("ALTER TABLE suppliers ADD COLUMN lead_time INT DEFAULT 7");
+        }
+    } catch (\Exception $e) {
+        // Ignored
+    }
+}
+
 // Handle Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'save') {
@@ -15,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $phone = trim($_POST['phone'] ?? '');
         $address = trim($_POST['address'] ?? '');
         $payment_terms = trim($_POST['payment_terms'] ?? 'Net 30');
+        $lead_time = (isset($_POST['lead_time']) && is_numeric($_POST['lead_time'])) ? max(1, (int)$_POST['lead_time']) : 7;
         $category = trim($_POST['category'] ?? 'Fabric');
         $status = trim($_POST['status'] ?? 'active');
         $hold_reason = trim($_POST['hold_reason'] ?? '');
@@ -39,11 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             try {
                 if ($supplier_id > 0) {
-                    $stmt = $pdo->prepare("UPDATE suppliers SET name = ?, email = ?, contact_person = ?, phone = ?, address = ?, payment_terms = ?, category = ?, status = ?, hold_reason = ?, hold_since = ? WHERE id = ?");
-                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $category, $status, $hold_reason, $hold_since, $supplier_id]);
+                    $stmt = $pdo->prepare("UPDATE suppliers SET name = ?, email = ?, contact_person = ?, phone = ?, address = ?, payment_terms = ?, lead_time = ?, category = ?, status = ?, hold_reason = ?, hold_since = ? WHERE id = ?");
+                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $lead_time, $category, $status, $hold_reason, $hold_since, $supplier_id]);
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO suppliers (name, email, contact_person, phone, address, payment_terms, category, status, hold_reason, hold_since) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $category, $status, $hold_reason, $hold_since]);
+                    $stmt = $pdo->prepare("INSERT INTO suppliers (name, email, contact_person, phone, address, payment_terms, lead_time, category, status, hold_reason, hold_since) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $lead_time, $category, $status, $hold_reason, $hold_since]);
                     $supplier_id = $pdo->lastInsertId();
 
                     if (file_exists(__DIR__ . "/../../src/Mailer.php")) {
@@ -59,11 +82,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $del_stmt = $pdo->prepare("DELETE FROM supplier_items WHERE supplier_id = ?");
                 $del_stmt->execute([$supplier_id]);
 
+                $del_sp_stmt = $pdo->prepare("DELETE FROM supplier_products WHERE supplier_id = ?");
+                $del_sp_stmt->execute([$supplier_id]);
+
                 if (!empty($items_arr)) {
                     $ins_stmt = $pdo->prepare("INSERT INTO supplier_items (supplier_id, item_name, unit_cost) VALUES (?, ?, ?)");
+                    $ins_sp_stmt = $pdo->prepare("INSERT INTO supplier_products (supplier_id, product_id, unit_cost) VALUES (?, ?, ?)");
+
+                    // Fetch active products map for cross-referencing supplier_products table
+                    $prod_map = [];
+                    $pm_rows = $pdo->query("SELECT id, name FROM products WHERE deleted_at IS NULL")->fetchAll();
+                    foreach ($pm_rows as $pm) {
+                        $prod_map[mb_strtolower(trim($pm['name']))] = (int)$pm['id'];
+                    }
+
                     foreach ($items_arr as $itm) {
-                        $cost = isset($itm['cost']) && is_numeric($itm['cost']) ? $itm['cost'] : null;
-                        $ins_stmt->execute([$supplier_id, $itm['name'], $cost]);
+                        $itm_name = trim($itm['name'] ?? '');
+                        if ($itm_name === '') continue;
+                        $cost = (isset($itm['cost']) && is_numeric($itm['cost'])) ? (float)$itm['cost'] : null;
+                        $ins_stmt->execute([$supplier_id, $itm_name, $cost]);
+
+                        $lowercase_name = mb_strtolower($itm_name);
+                        if (isset($prod_map[$lowercase_name])) {
+                            $pid = $prod_map[$lowercase_name];
+                            $ins_sp_stmt->execute([$supplier_id, $pid, $cost]);
+                        }
                     }
                 }
                 echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Supplier saved successfully.', 'success'); });</script>";
@@ -75,9 +118,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $supplier_id = isset($_POST['supplier_id']) ? (int) $_POST['supplier_id'] : 0;
         if ($supplier_id > 0) {
             try {
-                $stmt = $pdo->prepare("DELETE FROM suppliers WHERE id = ?");
+                $stmt = $pdo->prepare("UPDATE suppliers SET deleted_at = NOW() WHERE id = ?");
                 $stmt->execute([$supplier_id]);
-                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Supplier deleted successfully.', 'success'); });</script>";
+                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Supplier moved to Recycle Bin.', 'success'); });</script>";
             } catch (Exception $e) {
                 echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Error deleting supplier.', 'error'); });</script>";
             }
@@ -99,8 +142,9 @@ if (isset($pdo) && $pdo !== null) {
         $rating = isset($_POST['rating']) ? (float)$_POST['rating'] : 5.00;
         */
 
-        $stmt = $pdo->query("SELECT s.id, s.name, s.email, s.contact_person AS contact, s.phone, s.address AS addr, s.payment_terms AS terms, s.category AS cat, s.status, s.hold_reason, s.hold_since 
-                             FROM suppliers s");
+        $stmt = $pdo->query("SELECT s.id, s.name, s.email, s.contact_person AS contact, s.phone, s.address AS addr, s.payment_terms AS terms, s.category AS cat, s.status, s.hold_reason, s.hold_since, s.lead_time 
+                             FROM suppliers s 
+                             WHERE s.deleted_at IS NULL");
         $supps = $stmt->fetchAll();
 
         foreach ($supps as $s) {
@@ -135,7 +179,8 @@ if (isset($pdo) && $pdo !== null) {
             $sp_stmt = $pdo->prepare("SELECT AVG(lead_days) FROM supplier_products WHERE supplier_id = ?");
             $sp_stmt->execute([$s['id']]);
             $avg_lead = $sp_stmt->fetchColumn();
-            $lead = $avg_lead ? round($avg_lead) . ' days' : '7 days';
+            $lead_days_val = (isset($s['lead_time']) && is_numeric($s['lead_time'])) ? (int)$s['lead_time'] : ($avg_lead ? (int)round($avg_lead) : 7);
+            $lead = $lead_days_val . ' days';
 
             $po_stmt = $pdo->prepare("SELECT COUNT(*) AS pos, SUM(total) AS spend FROM purchase_orders WHERE supplier_id = ?");
             $po_stmt->execute([$s['id']]);
@@ -174,6 +219,7 @@ if (isset($pdo) && $pdo !== null) {
                 'phone' => $s['phone'] ?? '',
                 'addr' => $s['addr'] ?? '',
                 'terms' => $s['terms'] ?? 'Net 30',
+                'lead_days' => $lead_days_val,
                 'products' => $products_html,
                 'items_raw' => $items_raw,
                 'hold_reason' => $s['hold_reason'] ?? '',
@@ -199,10 +245,10 @@ if (empty($admin_suppliers)) {
     $admin_suppliers = [];
 }
 
-$inv_options = '<option value="">Select an item to add...</option>';
+$inv_options = '';
 if (isset($pdo) && $pdo !== null) {
     try {
-        $prod_list = $pdo->query("SELECT p.id AS p_id, p.name AS p_name FROM products p ORDER BY p.name ASC")->fetchAll();
+        $prod_list = $pdo->query("SELECT p.id AS p_id, p.name AS p_name FROM products p WHERE p.deleted_at IS NULL ORDER BY p.name ASC")->fetchAll();
         foreach ($prod_list as $prod) {
             $pName = htmlspecialchars($prod['p_name']);
             $inv_options .= '<option value="' . $pName . '">' . $pName . '</option>';
@@ -281,13 +327,6 @@ foreach ($admin_suppliers as $s) {
                 <input id="supp-search" type="text" placeholder="Search supplier name, email or contact..."
                     class="w-full pl-11 pr-4 py-2.5 bg-white border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand rounded-xl text-sm transition-all outline-none">
             </div>
-            <select id="supp-cat"
-                class="px-4 py-2.5 bg-white border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand rounded-xl text-sm font-medium transition-all outline-none cursor-pointer">
-                <option value="all">All Categories</option>
-                <option value="fabric">Fabric</option>
-                <option value="elastic / trims">Elastic / Trims</option>
-                <option value="packaging">Packaging</option>
-            </select>
             <select id="supp-status"
                 class="px-4 py-2.5 bg-white border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand rounded-xl text-sm font-medium transition-all outline-none cursor-pointer">
                 <option value="all">All Statuses</option>
@@ -305,7 +344,6 @@ foreach ($admin_suppliers as $s) {
                     <thead>
                         <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
                             <th class="px-4 py-3 rounded-l-xl w-64">Supplier Name</th>
-                            <th class="px-4 py-3 w-40">Category</th>
                             <th class="px-4 py-3 w-40">Contact Person</th>
 
                             <!-- TASK 09: Supplier Rating - STEP 4: Admin UI Table Rating Column (Commented out for later use)
@@ -319,7 +357,7 @@ foreach ($admin_suppliers as $s) {
                     <tbody id="supplier-list">
                         <?php if (empty($admin_suppliers)): ?>
                             <tr id="empty-state">
-                                <td colspan="5" class="p-12 text-center text-gray-400 text-sm">No suppliers found.</td>
+                                <td colspan="4" class="p-12 text-center text-gray-400 text-sm">No suppliers found.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($admin_suppliers as $idx => $s): ?>
@@ -332,6 +370,7 @@ foreach ($admin_suppliers as $s) {
                                     data-cat="<?= htmlspecialchars($s['cat']) ?>"
                                     data-contact="<?= htmlspecialchars($s['contact']) ?>"
                                     data-lead="<?= htmlspecialchars($s['lead']) ?>"
+                                    data-lead-days="<?= htmlspecialchars($s['lead_days']) ?>"
                                     data-badge="<?= htmlspecialchars($s['badge']) ?>"
                                     data-badgetext="<?= htmlspecialchars($s['badgeText']) ?>"
                                     data-status="<?= htmlspecialchars(strtolower($s['status'])) ?>"
@@ -363,10 +402,6 @@ foreach ($admin_suppliers as $s) {
                                                 </p>
                                             </div>
                                         </div>
-                                    </td>
-                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
-                                        <span
-                                            class="text-xs font-semibold text-gray-500 bg-gray-50 px-2 py-1 rounded-lg border"><?= htmlspecialchars($s['cat']) ?></span>
                                     </td>
                                     <td
                                         class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-medium text-gray-650">
@@ -584,6 +619,12 @@ foreach ($admin_suppliers as $s) {
                                 class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none"
                                 placeholder="e.g. Net 30">
                         </div>
+                        <div class="space-y-2">
+                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Lead Time (Days) *</label>
+                            <input type="number" name="lead_time" id="modalLeadTimeInput" min="1" max="365" value="7" required
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none"
+                                placeholder="e.g. 7">
+                        </div>
                         <div class="space-y-2 hidden" id="holdReasonContainer">
                             <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Hold Reason</label>
                             <input type="text" name="hold_reason" id="modalHoldReason"
@@ -598,10 +639,11 @@ foreach ($admin_suppliers as $s) {
                             Items</label>
                         <div class="flex flex-wrap gap-2 mb-4" id="modalSuppliedItemsContainer"></div>
                         <div class="flex gap-2">
-                            <select id="modalAddItemInput"
+                            <input id="modalAddItemInput" list="productListDatalist" placeholder="Select or type product name..."
                                 class="flex-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
+                            <datalist id="productListDatalist">
                                 <?= $inv_options ?>
-                            </select>
+                            </datalist>
                             <input type="number" id="modalAddItemCost" step="0.01" min="0"
                                 class="w-32 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none"
                                 placeholder="Unit Cost">
@@ -694,14 +736,25 @@ foreach ($admin_suppliers as $s) {
         var currentSupplierId = null;
         var modalSuppliedItems = [];
 
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         function renderModalTags() {
             var container = document.getElementById('modalSuppliedItemsContainer');
+            if (!container) return;
             container.innerHTML = '';
             modalSuppliedItems.forEach((item, idx) => {
                 var tag = document.createElement('span');
                 tag.className = 'group flex items-center gap-2 px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-lg text-xs font-bold text-brand';
-                let costStr = item.cost ? ' - LKR ' + parseFloat(item.cost).toFixed(2) : '';
-                tag.innerHTML = `${item.name}${costStr} <button type="button" onclick="modalRemoveTag(${idx})" class="ti ti-x hover:text-red-500"></button>`;
+                let costStr = (item.cost !== null && item.cost !== undefined && item.cost !== '') ? ' - LKR ' + parseFloat(item.cost).toFixed(2) : '';
+                tag.innerHTML = `${escapeHtml(item.name)}${costStr} <button type="button" onclick="modalRemoveTag(${idx})" class="ti ti-x hover:text-red-500 ml-1"></button>`;
                 container.appendChild(tag);
             });
             document.getElementById('suppliedItemsInput').value = JSON.stringify(modalSuppliedItems);
@@ -712,12 +765,14 @@ foreach ($admin_suppliers as $s) {
             var costInput = document.getElementById('modalAddItemCost');
             var val = input.value.trim();
             var cost = costInput ? costInput.value.trim() : null;
-            var exists = modalSuppliedItems.some(i => i.name === val);
+            var exists = modalSuppliedItems.some(i => i.name.toLowerCase() === val.toLowerCase());
             if (val && !exists) {
                 modalSuppliedItems.push({ name: val, cost: cost || null });
                 renderModalTags();
                 input.value = '';
                 if (costInput) costInput.value = '';
+            } else if (exists) {
+                if (typeof showToast === 'function') showToast('Item already added to this supplier.', 'warning');
             }
         }
 
@@ -734,6 +789,9 @@ foreach ($admin_suppliers as $s) {
             modalSuppliedItems = [];
             renderModalTags();
             toggleHoldReason();
+            if (form.querySelector('[name="lead_time"]')) {
+                form.querySelector('[name="lead_time"]').value = 7;
+            }
 
             if (mode === 'edit' && id) {
                 document.getElementById('modalTitle').textContent = 'Edit Supplier';
@@ -755,6 +813,9 @@ foreach ($admin_suppliers as $s) {
                     });
 
                     form.querySelector('[name="payment_terms"]').value = row.dataset.terms;
+                    if (form.querySelector('[name="lead_time"]')) {
+                        form.querySelector('[name="lead_time"]').value = row.dataset.leadDays || 7;
+                    }
                     form.querySelector('[name="hold_reason"]').value = row.dataset.holdReason || '';
                     toggleHoldReason();
 
@@ -795,10 +856,10 @@ foreach ($admin_suppliers as $s) {
         }
 
         function modalDeleteSupplier() {
-            if (confirm("Are you sure you want to delete this supplier?")) {
+            uiConfirm("Are you sure you want to delete this supplier?", () => {
                 document.getElementById('formAction').value = 'delete';
                 document.getElementById('supplierForm').submit();
-            }
+            });
         }
 
         var currentPage = 1;
@@ -851,8 +912,8 @@ foreach ($admin_suppliers as $s) {
 
         function applyFilters() {
             var q = (document.getElementById('supp-search')?.value || '').toLowerCase().trim();
-            var cat = (document.getElementById('supp-cat')?.value || '').toLowerCase();
-            var status = (document.getElementById('supp-status')?.value || '').toLowerCase();
+            var cat = (document.getElementById('supp-cat')?.value || 'all').toLowerCase();
+            var status = (document.getElementById('supp-status')?.value || 'all').toLowerCase();
 
             var list = document.getElementById('supplier-list');
             var rows = Array.from(document.querySelectorAll('.supplier-row'));
@@ -863,8 +924,8 @@ foreach ($admin_suppliers as $s) {
                 var name = r.dataset.name.toLowerCase();
                 var email = r.dataset.email.toLowerCase();
                 var contact = r.dataset.contact.toLowerCase();
-                var rowCat = r.dataset.cat.toLowerCase();
-                var rowStatus = r.dataset.status.toLowerCase();
+                var rowCat = (r.dataset.cat || '').toLowerCase();
+                var rowStatus = (r.dataset.status || '').toLowerCase();
 
                 if (q && !name.includes(q) && !email.includes(q) && !contact.includes(q)) match = false;
                 if (cat !== 'all' && rowCat !== cat) match = false;
@@ -885,7 +946,7 @@ foreach ($admin_suppliers as $s) {
             if (visibleRows.length === 0) {
                 var tr = document.createElement('tr');
                 tr.id = 'empty-state';
-                tr.innerHTML = '<td colspan="5" class="p-12 text-center text-gray-400 text-sm">No suppliers match these filters.</td>';
+                tr.innerHTML = '<td colspan="4" class="p-12 text-center text-gray-400 text-sm">No suppliers match these filters.</td>';
                 list.appendChild(tr);
                 renderPagination(0, 0);
                 return;

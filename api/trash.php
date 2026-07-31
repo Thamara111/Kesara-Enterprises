@@ -23,7 +23,7 @@ $table = $input['table'] ?? '';
 $id = (int)($input['id'] ?? 0);
 
 // Restrict operations to a specific whitelist of tables to prevent SQL injection or unintended table modifications
-$allowed_tables = ['products', 'categories', 'orders', 'admins', 'users'];
+$allowed_tables = ['products', 'categories', 'orders', 'admins', 'users', 'suppliers'];
 
 if (!in_array($table, $allowed_tables) || $id <= 0) {
     http_response_code(400);
@@ -49,6 +49,10 @@ try {
         if ($table === 'products') {
             // Clean up related pricing tiers before deleting a product to maintain referential integrity
             $pdo->prepare("DELETE FROM pricing_tiers WHERE product_id = ?")->execute([$id]);
+        } elseif ($table === 'suppliers') {
+            // Clean up related supplier_items and supplier_products before deleting a supplier
+            $pdo->prepare("DELETE FROM supplier_items WHERE supplier_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM supplier_products WHERE supplier_id = ?")->execute([$id]);
         }
         $stmt = $pdo->prepare("DELETE FROM `$table` WHERE id = ?");
         $stmt->execute([$id]);

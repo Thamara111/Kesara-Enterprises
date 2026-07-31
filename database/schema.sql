@@ -165,6 +165,7 @@ CREATE TABLE supplier_items (
   id          INT AUTO_INCREMENT PRIMARY KEY,
   supplier_id INT NOT NULL,
   item_name   VARCHAR(100) NOT NULL,
+  unit_cost   DECIMAL(10,2) DEFAULT NULL,
   FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
