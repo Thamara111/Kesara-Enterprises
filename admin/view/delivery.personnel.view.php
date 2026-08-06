@@ -615,7 +615,7 @@ foreach ($admin_drivers as $d) {
 
 <!-- Add/Edit Personnel Modal -->
 <div id="driverModal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 items-center justify-center p-4 hidden">
-    <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-lg w-full">
+    <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-4xl w-full">
         <h2 id="modalTitle" class="text-xl font-bold text-gray-900 mb-6">Add New Personnel</h2>
 
         <form method="POST" id="driverForm" data-turbo="false">

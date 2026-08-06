@@ -1631,20 +1631,8 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
     applyFilters();
-</script>�────────────────
-    var urlParams = new URLSearchParams(window.location.search);
-    var tabParam = urlParams.get('tab');
-    if (tabParam) {
-        var targetTab = document.querySelector(`.status-tab[data-status="${tabParam}"]`);
-        if (targetTab) {
-            document.querySelectorAll('.status-tab').forEach(b => b.classList.remove('on'));
-            targetTab.classList.add('on');
-            activeStatus = tabParam;
-        }
-    }
-    applyFilters();
-    // Pane starts hidden on all screen sizes — opens only when a row is clicked
 </script>
+
 
 <?php
 /*

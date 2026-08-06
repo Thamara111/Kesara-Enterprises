@@ -54,6 +54,26 @@ if (isset($pdo) && $pdo !== null) {
         if (!$checkDeleted->fetch()) {
             $pdo->exec("ALTER TABLE products ADD COLUMN deleted_at DATETIME DEFAULT NULL");
         }
+        $checkRetailPrice = $pdo->query("SHOW COLUMNS FROM products LIKE 'retail_price'");
+        if (!$checkRetailPrice->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN retail_price DECIMAL(10,2) DEFAULT NULL");
+        }
+        $checkRetailMoq = $pdo->query("SHOW COLUMNS FROM products LIKE 'retail_moq'");
+        if (!$checkRetailMoq->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN retail_moq INT DEFAULT 1");
+        }
+        $checkRetailDiscount = $pdo->query("SHOW COLUMNS FROM products LIKE 'retail_discount'");
+        if (!$checkRetailDiscount->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN retail_discount DECIMAL(10,2) DEFAULT 0.00");
+        }
+        $checkTierType = $pdo->query("SHOW COLUMNS FROM pricing_tiers LIKE 'tier_type'");
+        if (!$checkTierType->fetch()) {
+            $pdo->exec("ALTER TABLE pricing_tiers ADD COLUMN tier_type ENUM('wholesale', 'retail') DEFAULT 'wholesale'");
+        }
+        $checkUserType = $pdo->query("SHOW COLUMNS FROM users LIKE 'user_type'");
+        if (!$checkUserType->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN user_type ENUM('wholesale', 'individual') DEFAULT 'individual'");
+        }
     } catch (\Exception $e) {
         // Ignore database structure check errors if columns already exist
     }
@@ -73,7 +93,7 @@ if ($method === 'GET') {
     if (isset($pdo) && $pdo !== null) {
         try {
             // Getting data -> Fetching products joined with category names
-            $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband 
+            $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.retail_price, p.retail_moq, p.retail_discount, p.retail_discount_start, p.retail_discount_end, p.status, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband 
                                  FROM products p 
                                  LEFT JOIN categories c ON p.category_id = c.id
                                  ORDER BY p.name ASC");
@@ -81,23 +101,8 @@ if ($method === 'GET') {
 
             // Processing data -> Fetching pricing tiers and calculating discounts for each product
             foreach ($prods as $pr) {
-                /*
-                // [VIVA TASK 03 - API: Tiered Pricing Max Limit Query]
-                $t_stmt = $pdo->prepare("SELECT min_qty AS q, max_qty AS max_q, price AS p FROM pricing_tiers WHERE product_id = ? ORDER BY min_qty ASC");
-                $t_stmt->execute([$pr['id']]);
-                $tiers = $t_stmt->fetchAll();
-
-                $formatted_tiers = [];
-                foreach ($tiers as $t) {
-                    $formatted_tiers[] = [
-                        'q' => (int)$t['q'],
-                        'max_q' => !empty($t['max_q']) ? (int)$t['max_q'] : null,
-                        'p' => (float)$t['p']
-                    ];
-                }
-                */
-                // Getting data -> Fetching pricing tiers for current product
-                $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ?");
+                // Getting data -> Fetching wholesale pricing tiers for current product
+                $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ? AND (tier_type = 'wholesale' OR tier_type IS NULL) ORDER BY min_qty ASC");
                 $t_stmt->execute([$pr['id']]);
                 $tiers = $t_stmt->fetchAll();
 
@@ -110,9 +115,36 @@ if ($method === 'GET') {
                     ];
                 }
 
+                // Getting data -> Fetching retail pricing tiers for current product
+                $rt_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ? AND tier_type = 'retail' ORDER BY min_qty ASC");
+                $rt_stmt->execute([$pr['id']]);
+                $retail_tiers = $rt_stmt->fetchAll();
+                $formatted_retail_tiers = [];
+                foreach ($retail_tiers as $rt) {
+                    $formatted_retail_tiers[] = [
+                        'q' => (int)$rt['q'],
+                        'p' => (float)$rt['p']
+                    ];
+                }
+
                 // Processing data -> Calculating active discount status and effective price
                 $today_str = date('Y-m-d');
                 $base_price = (float)$pr['price'];
+                $retail_price = $pr['retail_price'] !== null ? (float)$pr['retail_price'] : $base_price;
+                $retail_moq = isset($pr['retail_moq']) ? (int)$pr['retail_moq'] : 1;
+                $retail_discount = isset($pr['retail_discount']) ? (float)$pr['retail_discount'] : 0.00;
+                $rd_start = !empty($pr['retail_discount_start']) ? $pr['retail_discount_start'] : null;
+                $rd_end   = !empty($pr['retail_discount_end'])   ? $pr['retail_discount_end']   : null;
+                $is_retail_discount_active = false;
+                if ($retail_discount > 0) {
+                    $r_valid_s = empty($rd_start) || ($today_str >= $rd_start);
+                    $r_valid_e = empty($rd_end)   || ($today_str <= $rd_end);
+                    if ($r_valid_s && $r_valid_e) {
+                        $is_retail_discount_active = true;
+                    }
+                }
+                $effective_retail_price = $is_retail_discount_active ? round($retail_price * (1 - ($retail_discount / 100)), 2) : $retail_price;
+
                 $discount_val = (float)($pr['discount'] ?? 0);
                 $d_start = !empty($pr['discount_start']) ? $pr['discount_start'] : null;
                 $d_end   = !empty($pr['discount_end'])   ? $pr['discount_end']   : null;
@@ -135,6 +167,13 @@ if ($method === 'GET') {
                     'cat' => $pr['cat'] ?? 'Uncategorized',
                     'moq' => $effective_product_moq,
                     'price' => $base_price,
+                    'retail_price' => $retail_price,
+                    'retail_moq' => $retail_moq,
+                    'retail_discount' => $retail_discount,
+                    'retail_discount_start' => $pr['retail_discount_start'] ?? '',
+                    'retail_discount_end' => $pr['retail_discount_end'] ?? '',
+                    'is_retail_discount_active' => $is_retail_discount_active,
+                    'effective_retail_price' => $effective_retail_price,
                     'status' => $pr['status'],
                     'desc' => $pr['desc'] ?? '',
                     'images' => json_decode($pr['images'] ?? '[]', true) ?: [],
@@ -147,7 +186,8 @@ if ($method === 'GET') {
                     'discount_end' => $pr['discount_end'] ?? '',
                     'gsm' => $pr['gsm'] ?? '',
                     'waistband' => $pr['waistband'] ?? '',
-                    'tiers' => $formatted_tiers
+                    'tiers' => $formatted_tiers,
+                    'retail_tiers' => $formatted_retail_tiers
                 ];
             }
         } catch (\Exception $e) {
@@ -156,9 +196,7 @@ if ($method === 'GET') {
             exit;
         }
     } else {
-        $products = [
-            [ 'id' => 0, 'name' => 'Classic Cotton Brief', 'sku' => 'KB-001', 'cat' => "Men's Briefs", 'moq' => 50, 'price' => 95, 'status' => 'In Stock', 'desc' => "Classic cut men's brief. Suitable for all-day wear.", 'images' => [], 'colors' => '', 'sizes' => 'S,M,L,XL', 'discount' => 0, 'gsm' => '180 GSM', 'waistband' => 'Elastic', 'tiers' => [['q' => 50, 'p' => 120], ['q' => 100, 'p' => 108], ['q' => 500, 'p' => 95]] ]
-        ];
+        $products = [];
     }
     echo json_encode(["status" => "success", "data" => $products]);
     exit;
@@ -229,6 +267,13 @@ if ($method === 'POST') {
     $description = trim($input['description'] ?? '');
     $moq = isset($input['moq']) ? (int)$input['moq'] : 50;
     $base_price = isset($input['base_price']) ? (float)$input['base_price'] : 0;
+    $retail_price = isset($input['retail_price']) && $input['retail_price'] !== '' ? (float)$input['retail_price'] : null;
+    $retail_moq = isset($input['retail_moq']) ? (int)$input['retail_moq'] : 1;
+    $retail_discount = isset($input['retail_discount']) ? (float)$input['retail_discount'] : 0;
+    $retail_discount_start = trim($input['retail_discount_start'] ?? '');
+    if ($retail_discount_start === '') $retail_discount_start = null;
+    $retail_discount_end = trim($input['retail_discount_end'] ?? '');
+    if ($retail_discount_end === '') $retail_discount_end = null;
     $status = trim($input['status'] ?? 'In Stock');
     $colors = trim($input['colors'] ?? '');
     $sizes = trim($input['sizes'] ?? '');
@@ -244,6 +289,11 @@ if ($method === 'POST') {
     $tiers = $input['tiers'] ?? []; 
     if (is_string($tiers)) {
         $tiers = json_decode($tiers, true) ?: [];
+    }
+
+    $retail_tiers = $input['retail_tiers'] ?? [];
+    if (is_string($retail_tiers)) {
+        $retail_tiers = json_decode($retail_tiers, true) ?: [];
     }
 
     // Checking data -> Validating that product name and SKU are provided
@@ -333,13 +383,13 @@ if ($method === 'POST') {
 
             if ($id > 0) {
                 // Updating data -> Saving updated product details to database
-                $stmt = $pdo->prepare("UPDATE products SET name = ?, sku = ?, category_id = ?, description = ?, moq = ?, base_price = ?, status = ?, images = ?, colors = ?, sizes = ?, discount = ?, discount_start = ?, discount_end = ?, gsm = ?, waistband = ? WHERE id = ?");
-                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $discount_start, $discount_end, $gsm, $waistband, $id]);
+                $stmt = $pdo->prepare("UPDATE products SET name = ?, sku = ?, category_id = ?, description = ?, moq = ?, base_price = ?, retail_price = ?, retail_moq = ?, retail_discount = ?, retail_discount_start = ?, retail_discount_end = ?, status = ?, images = ?, colors = ?, sizes = ?, discount = ?, discount_start = ?, discount_end = ?, gsm = ?, waistband = ? WHERE id = ?");
+                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $retail_price, $retail_moq, $retail_discount, $retail_discount_start, $retail_discount_end, $status, $images_json, $colors, $sizes, $discount, $discount_start, $discount_end, $gsm, $waistband, $id]);
                 $product_id = $id;
             } else {
                 // Saving data -> Inserting new product record into database
-                $stmt = $pdo->prepare("INSERT INTO products (name, sku, category_id, description, moq, base_price, status, images, colors, sizes, discount, discount_start, discount_end, gsm, waistband) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $status, $images_json, $colors, $sizes, $discount, $discount_start, $discount_end, $gsm, $waistband]);
+                $stmt = $pdo->prepare("INSERT INTO products (name, sku, category_id, description, moq, base_price, retail_price, retail_moq, retail_discount, retail_discount_start, retail_discount_end, status, images, colors, sizes, discount, discount_start, discount_end, gsm, waistband) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$name, $sku, $cat_id, $description, $moq, $base_price, $retail_price, $retail_moq, $retail_discount, $retail_discount_start, $retail_discount_end, $status, $images_json, $colors, $sizes, $discount, $discount_start, $discount_end, $gsm, $waistband]);
                 $product_id = $pdo->lastInsertId();
             }
 
@@ -347,7 +397,7 @@ if ($method === 'POST') {
             $del_tiers = $pdo->prepare("DELETE FROM pricing_tiers WHERE product_id = ?");
             $del_tiers->execute([$product_id]);
 
-            $ins_tier = $pdo->prepare("INSERT INTO pricing_tiers (product_id, min_qty, max_qty, price) VALUES (?, ?, ?, ?)");
+            $ins_tier = $pdo->prepare("INSERT INTO pricing_tiers (product_id, tier_type, min_qty, max_qty, price) VALUES (?, 'wholesale', ?, ?, ?)");
             foreach ($tiers as $index => $tier) {
                 $min_qty = (int)$tier['q'];
                 $price = (float)$tier['p'];
@@ -355,6 +405,16 @@ if ($method === 'POST') {
                 $max_qty = $next_min ? ($next_min - 1) : 999999;
                 
                 $ins_tier->execute([$product_id, $min_qty, $max_qty, $price]);
+            }
+
+            $ins_retail_tier = $pdo->prepare("INSERT INTO pricing_tiers (product_id, tier_type, min_qty, max_qty, price) VALUES (?, 'retail', ?, ?, ?)");
+            foreach ($retail_tiers as $index => $rtier) {
+                $rmin_qty = (int)$rtier['q'];
+                $rprice = (float)$rtier['p'];
+                $rnext_min = isset($retail_tiers[$index + 1]) ? (int)$retail_tiers[$index + 1]['q'] : null;
+                $rmax_qty = $rnext_min ? ($rnext_min - 1) : 999999;
+                
+                $ins_retail_tier->execute([$product_id, $rmin_qty, $rmax_qty, $rprice]);
             }
 
             // Updating data -> Creating or updating inventory variants for colors and sizes

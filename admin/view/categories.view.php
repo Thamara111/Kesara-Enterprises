@@ -133,89 +133,172 @@ if (empty($categories_data)) {
     <!-- RIGHT: EDIT/ADD FORM -->
     <!-- Backdrop -->
     <div id="cat-form-backdrop" class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300" onclick="closeCatFormPane()"></div>
-    <div id="cat-form-pane" class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-gray-50 border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
-        <!-- Form Header -->
-        <div class="p-8 border-b border-gray-100 bg-white flex items-center justify-between">
-            <h2 id="form-mode-label" class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Edit Category</h2>
-            <button onclick="closeCatFormPane()" class="p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none" aria-label="Close form">
-                <i class="ti ti-x text-xl"></i>
+
+    <div id="cat-form-pane" class="fixed inset-y-0 right-0 z-50 w-[520px] max-w-full bg-[#f5f6fa] border-l border-gray-200 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300">
+
+        <!-- ── Form Header ── -->
+        <div class="shrink-0 px-8 py-5 bg-white border-b border-gray-100 flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-brand/10 flex items-center justify-center">
+                    <i class="ti ti-folder text-brand text-base"></i>
+                </div>
+                <div>
+                    <p id="form-mode-label" class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] leading-none">Edit Category</p>
+                    <p class="text-xs font-bold text-gray-900 mt-0.5" id="form-cat-name-preview">—</p>
+                </div>
+            </div>
+            <button onclick="closeCatFormPane()" class="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all" aria-label="Close form">
+                <i class="ti ti-x text-base"></i>
             </button>
         </div>
 
-        <!-- Form Content -->
-        <form method="POST" id="cat-form" enctype="multipart/form-data" class="flex-1 flex flex-col justify-between p-10 space-y-10">
+        <!-- ── Scrollable Form Body ── -->
+        <form method="POST" id="cat-form" enctype="multipart/form-data" class="flex-1 flex flex-col overflow-hidden">
             <input type="hidden" name="action" id="f-action" value="save">
             <input type="hidden" name="id" id="f-id" value="">
 
-            <div class="space-y-6">
-                <!-- Name -->
-                <div class="space-y-2">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Category Name</label>
-                    <input type="text" name="name" id="f-name" required class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
-                </div>
+            <div class="flex-1 overflow-y-auto">
+                <div class="p-6 space-y-4 bg-white">
 
-                <!-- Slug -->
-                <div class="space-y-2">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Slug (URL identifier)</label>
-                    <input type="text" name="slug" id="f-slug" placeholder="e.g. mens-briefs (Auto-generated if empty)" class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
-                </div>
-
-                <!-- Image Upload (Styled Media Assets Card) -->
-                <div class="space-y-4">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Category Image</label>
-                    <input type="file" name="category_image_file" id="f-image-file" accept="image/*" class="hidden" onchange="previewSelectedImage(this)">
-                    <div onclick="document.getElementById('f-image-file').click();" class="border-2 border-dashed border-gray-200 rounded-[2rem] p-8 flex flex-col items-center justify-center text-center group hover:border-brand/40 hover:bg-white transition-all cursor-pointer bg-white shadow-sm relative overflow-hidden min-h-[160px]">
-                        <div id="upload-placeholder" class="flex flex-col items-center justify-center">
-                            <div class="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center text-gray-300 group-hover:bg-brand-light group-hover:text-brand transition-all mb-3">
-                                <i class="ti ti-cloud-upload text-2xl"></i>
+                    <!-- ┌─ SECTION 1: Identity & URL ───────────────────────────┐ -->
+                    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-brand/5 to-transparent">
+                            <i class="ti ti-id-badge text-brand text-lg"></i>
+                            <h3 class="text-[10px] font-black text-brand uppercase tracking-[0.2em]">Identity &amp; URL</h3>
+                        </div>
+                        <div class="p-6 space-y-4">
+                            <!-- Category Name -->
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Category Name <span class="text-red-400">*</span></label>
+                                <input type="text" name="name" id="f-name" required
+                                    oninput="document.getElementById('form-cat-name-preview').textContent = this.value || '—'; autoSlug(this.value);"
+                                    placeholder="e.g. Men's Briefs"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-gray-900 outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all">
                             </div>
-                            <p class="text-xs font-bold text-gray-900">Upload Category Image</p>
-                            <p class="text-[9px] font-medium text-gray-400 mt-0.5 uppercase tracking-tighter">PNG, JPG, WEBP up to 5MB</p>
-                        </div>
-                        <img id="form-image-preview" src="" alt="Preview" class="hidden absolute inset-0 w-full h-full object-cover">
-                        <!-- Change image label on hover -->
-                        <div id="preview-hover-overlay" class="hidden absolute inset-0 bg-black/40 flex items-center justify-center text-white text-xs font-bold opacity-0 hover:opacity-100 transition-opacity">
-                            Change Image
+                            <!-- Slug -->
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">
+                                    URL Slug <span class="normal-case font-normal text-gray-400">(auto-generated if empty)</span>
+                                </label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-300">/</span>
+                                    <input type="text" name="slug" id="f-slug"
+                                        placeholder="e.g. mens-briefs"
+                                        class="w-full pl-7 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all">
+                                </div>
+                                <p class="text-[9px] text-gray-400 ml-1">Lowercase letters, numbers, and hyphens only.</p>
+                            </div>
                         </div>
                     </div>
-                    <!-- Manual image URL input underneath -->
-                    <div class="space-y-1">
-                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Or Image URL</label>
-                        <input type="text" name="image" id="f-image" oninput="updatePreviewFromUrl(this.value)" placeholder="e.g. /assets/images/category-briefs.jpg" class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
+                    <!-- └──────────────────────────────────────────────────────┘ -->
+
+                    <!-- ┌─ SECTION 2: Visual Identity ──────────────────────────┐ -->
+                    <div class="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
+                        <div class="flex items-center gap-3 px-6 py-4 border-b border-purple-100 bg-gradient-to-r from-purple-50 to-transparent">
+                            <i class="ti ti-photo text-purple-600 text-lg"></i>
+                            <div>
+                                <h3 class="text-[10px] font-black text-purple-700 uppercase tracking-[0.2em]">Visual Identity</h3>
+                                <p class="text-[9px] text-purple-500 font-semibold mt-0.5">Image shown in catalog — icon used as fallback</p>
+                            </div>
+                        </div>
+                        <div class="p-6 space-y-5">
+
+                            <!-- Image Upload -->
+                            <div class="space-y-3">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Category Image</label>
+                                <input type="file" name="category_image_file" id="f-image-file" accept="image/*" class="hidden" onchange="previewSelectedImage(this)">
+                                <div onclick="document.getElementById('f-image-file').click();"
+                                    class="border-2 border-dashed border-gray-200 rounded-2xl p-8 flex flex-col items-center justify-center text-center group hover:border-purple-300 hover:bg-purple-50/30 transition-all cursor-pointer bg-gray-50 relative overflow-hidden min-h-[140px]">
+                                    <div id="upload-placeholder" class="flex flex-col items-center justify-center">
+                                        <div class="w-12 h-12 rounded-xl bg-white border border-gray-100 flex items-center justify-center text-gray-300 group-hover:border-purple-200 group-hover:text-purple-400 transition-all mb-3 shadow-sm">
+                                            <i class="ti ti-cloud-upload text-2xl"></i>
+                                        </div>
+                                        <p class="text-xs font-bold text-gray-700">Click to upload image</p>
+                                        <p class="text-[9px] font-medium text-gray-400 mt-0.5 uppercase tracking-tighter">PNG · JPG · WEBP — max 5 MB</p>
+                                    </div>
+                                    <img id="form-image-preview" src="" alt="Preview" class="hidden absolute inset-0 w-full h-full object-cover">
+                                    <div id="preview-hover-overlay" class="hidden absolute inset-0 bg-black/40 flex items-center justify-center text-white text-xs font-bold opacity-0 hover:opacity-100 transition-opacity">
+                                        Change Image
+                                    </div>
+                                </div>
+                                <!-- URL input -->
+                                <div class="space-y-1.5">
+                                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Or paste image URL</label>
+                                    <input type="text" name="image" id="f-image"
+                                        oninput="updatePreviewFromUrl(this.value)"
+                                        placeholder="e.g. /assets/images/category.jpg"
+                                        class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 focus:bg-white transition-all">
+                                </div>
+                            </div>
+
+                            <!-- Icon Fallback -->
+                            <div class="rounded-xl border border-purple-100 bg-purple-50/40 p-4 space-y-3">
+                                <p class="text-[9px] font-bold text-purple-600 uppercase tracking-widest flex items-center gap-1.5">
+                                    <i class="ti ti-wand text-xs"></i> Icon Fallback (shown when no image is set)
+                                </p>
+                                <div class="space-y-1.5">
+                                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Icon Class</label>
+                                    <div class="flex items-center gap-3">
+                                        <div id="icon-preview" class="w-10 h-10 rounded-xl bg-white border border-purple-100 flex items-center justify-center text-gray-500 shrink-0 shadow-sm">
+                                            <i id="icon-preview-i" class="ti ti-shirt text-xl"></i>
+                                        </div>
+                                        <select name="icon" id="f-icon"
+                                            onchange="document.getElementById('icon-preview-i').className = 'ti ' + this.value + ' text-xl';"
+                                            class="flex-1 px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 transition-all appearance-none">
+                                            <option value="ti-shirt">👕  Shirt (ti-shirt)</option>
+                                            <option value="ti-tag">🏷  Tag (ti-tag)</option>
+                                            <option value="ti-package">📦  Package (ti-package)</option>
+                                            <option value="ti-folder">📁  Folder (ti-folder)</option>
+                                            <option value="ti-list">📋  List (ti-list)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
                     </div>
-                </div>
+                    <!-- └──────────────────────────────────────────────────────┘ -->
 
-                <!-- Icon -->
-                <div class="space-y-2">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Icon Class (Fallback if no image)</label>
-                    <select name="icon" id="f-icon" class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
-                        <option value="ti-shirt">Shirt (ti-shirt)</option>
-                        <option value="ti-tag">Tag (ti-tag)</option>
-                        <option value="ti-package">Package (ti-package)</option>
-                        <option value="ti-folder">Folder (ti-folder)</option>
-                        <option value="ti-list">List (ti-list)</option>
-                    </select>
-                </div>
+                    <!-- ┌─ SECTION 3: Details ──────────────────────────────────┐ -->
+                    <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-500/5 to-transparent">
+                            <i class="ti ti-align-left text-gray-500 text-lg"></i>
+                            <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Details</h3>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Description <span class="normal-case font-normal">(optional)</span></label>
+                                <textarea name="description" id="f-desc" rows="4"
+                                    placeholder="Briefly describe what products belong to this category..."
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all resize-none"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- └──────────────────────────────────────────────────────┘ -->
 
-                <!-- Description -->
-                <div class="space-y-2">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Description</label>
-                    <textarea name="description" id="f-desc" rows="4" class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-medium outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm resize-none"></textarea>
+                </div><!-- /p-6 space-y-4 -->
+            </div><!-- /scrollable body -->
+
+            <!-- ── Sticky Footer Actions ── -->
+            <div class="shrink-0 px-6 py-4 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+                <div class="flex gap-3">
+                    <button type="submit"
+                        class="flex-[2] bg-brand text-white font-bold py-4 rounded-2xl text-xs uppercase tracking-widest shadow-lg shadow-brand/20 hover:bg-brand-dark transition-all hover:-translate-y-px flex items-center justify-center gap-2">
+                        <i class="ti ti-device-floppy text-base"></i>
+                        <span>Save Category</span>
+                    </button>
+                    <button type="button" id="btn-delete" onclick="submitDelete()"
+                        class="hidden flex-1 bg-white border border-red-200 text-red-500 font-bold py-4 rounded-2xl text-xs uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2">
+                        <i class="ti ti-trash text-base"></i>
+                        <span>Delete</span>
+                    </button>
                 </div>
             </div>
 
-            <!-- Controls -->
-            <div class="flex gap-4 pt-10">
-                <button type="submit" class="flex-[2] bg-brand text-brand-light font-bold py-5 rounded-[1.5rem] text-xs uppercase tracking-widest shadow-xl shadow-brand/20 hover:bg-brand-dark transition-all transform hover:-translate-y-px">
-                    Save Changes
-                </button>
-                <button type="button" id="btn-delete" onclick="submitDelete()" class="hidden flex-1 bg-white border border-red-100 text-red-500 font-bold py-5 rounded-[1.5rem] text-xs uppercase tracking-widest hover:bg-red-50 transition-all">
-                    Delete
-                </button>
-            </div>
         </form>
     </div>
 </main>
+
 
 <style>
 .cat-row.selected {
@@ -321,13 +404,17 @@ function selectCat(el, openDrawer = true) {
     el.classList.remove('bg-white', 'border-gray-100');
     
     document.getElementById('form-mode-label').textContent = 'Edit Category';
+    document.getElementById('form-cat-name-preview').textContent = el.dataset.name || '—';
     document.getElementById('f-id').value = el.dataset.id;
     document.getElementById('f-name').value = el.dataset.name;
     document.getElementById('f-slug').value = el.dataset.slug;
     document.getElementById('f-image').value = el.dataset.image || '';
     document.getElementById('f-image-file').value = ''; // Reset file input
     updatePreviewFromUrl(el.dataset.image || '');
-    document.getElementById('f-icon').value = el.dataset.icon || 'ti-tag';
+    var iconVal = el.dataset.icon || 'ti-tag';
+    document.getElementById('f-icon').value = iconVal;
+    var iconPrev = document.getElementById('icon-preview-i');
+    if (iconPrev) iconPrev.className = 'ti ' + iconVal + ' text-xl';
     document.getElementById('f-desc').value = el.dataset.description || '';
     
     // Show delete button for existing categories
@@ -351,6 +438,7 @@ function showNew() {
         r.classList.add('bg-white', 'border-gray-100');
     });
     document.getElementById('form-mode-label').textContent = 'Add New Category';
+    document.getElementById('form-cat-name-preview').textContent = 'New Category';
     document.getElementById('f-id').value = '';
     document.getElementById('f-name').value = '';
     document.getElementById('f-slug').value = '';
@@ -358,6 +446,8 @@ function showNew() {
     document.getElementById('f-image-file').value = '';
     updatePreviewFromUrl('');
     document.getElementById('f-icon').value = 'ti-tag';
+    var iconPrev = document.getElementById('icon-preview-i');
+    if (iconPrev) iconPrev.className = 'ti ti-tag text-xl';
     document.getElementById('f-desc').value = '';
     
     // Hide delete button for new category
@@ -371,6 +461,27 @@ function showNew() {
         requestAnimationFrame(() => backdrop.classList.add('opacity-100'));
     }
 }
+
+// Helper -> Auto-generate URL slug from category name (only if slug field is empty)
+function autoSlug(name) {
+    var slugField = document.getElementById('f-slug');
+    if (!slugField || slugField.dataset.manuallyEdited === 'true') return;
+    slugField.value = name.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/[\s_]+/g, '-')
+        .replace(/-+/g, '-');
+}
+
+// Mark slug field as manually edited if user types in it
+document.addEventListener('DOMContentLoaded', () => {
+    var slugField = document.getElementById('f-slug');
+    if (slugField) {
+        slugField.addEventListener('input', () => {
+            slugField.dataset.manuallyEdited = slugField.value ? 'true' : 'false';
+        });
+    }
+});
 
 // Image Preview -> Displaying preview when selecting a local image file
 function previewSelectedImage(input) {

@@ -12,19 +12,20 @@ $pending_count = 0;
 $approved_count = 0;
 $suspended_count = 0;
 
+$view_type = isset($_GET['type']) && $_GET['type'] === 'individual' ? 'individual' : 'wholesale';
+
 if (isset($pdo) && $pdo !== null) {
     try {
-        /*
-        // [VIVA TASK 06 - STEP 1: Self-Healing DB]: Auto-create credit_limit column in users table if missing
-        $checkCredit = $pdo->query("SHOW COLUMNS FROM users LIKE 'credit_limit'");
-        if (!$checkCredit->fetch()) {
-            $pdo->exec("ALTER TABLE users ADD COLUMN credit_limit DECIMAL(10,2) DEFAULT 0.00 AFTER status");
+        // Fetching -> Fetch registered users strictly matching user_type filter with zero overlapping
+        if ($view_type === 'individual') {
+            $stmt = $pdo->prepare("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.whatsapp_number, u.user_type, COALESCE(NULLIF(u.business_name, ''), 'Individual Shopper') AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
+                                 FROM users u WHERE u.user_type = 'individual' ORDER BY u.created_at DESC");
+            $stmt->execute();
+        } else {
+            $stmt = $pdo->prepare("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.whatsapp_number, u.user_type, COALESCE(NULLIF(u.business_name, ''), 'Wholesale Customer') AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
+                                 FROM users u WHERE (u.user_type = 'wholesale' OR u.user_type IS NULL) ORDER BY u.created_at DESC");
+            $stmt->execute();
         }
-        */
-
-        // Fetching -> Fetch all registered users to display in the customer list
-        $stmt = $pdo->query("SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.phone AS whatsapp_number, u.business_name AS company, u.business_type AS type, u.br_number AS br, u.address AS addr, u.status, u.created_at 
-                             FROM users u");
         $users_db = $stmt->fetchAll();
 
         // Processing -> Preparing details, metrics, and status badges for each customer
@@ -95,9 +96,10 @@ if (isset($pdo) && $pdo !== null) {
                 'email' => $usr['email'],
                 'phone' => $usr['phone'],
                 'whatsapp' => $usr['whatsapp_number'] ?? '',
-                'type' => $usr['type'],
-                'br' => $usr['br'],
-                'addr' => $usr['addr'],
+                'user_type' => $usr['user_type'] ?? 'wholesale',
+                'type' => $usr['type'] ?: 'Individual',
+                'br' => $usr['br'] ?: 'N/A (Individual)',
+                'addr' => $usr['addr'] ?: 'Not provided',
                 'badge' => $badgeClass,
                 'badgeText' => $badgeText,
                 'spent' => $spent,
@@ -126,8 +128,8 @@ if (empty($admin_customers)) {
         <!-- Header -->
         <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900">Customers</h1>
-                <p class="text-sm text-gray-500 mt-1">Manage wholesale buyer accounts and verification.</p>
+                <h1 class="text-2xl font-bold text-gray-900"><?= $view_type === 'individual' ? 'Individual Customers' : 'Wholesale Customers' ?></h1>
+                <p class="text-sm text-gray-500 mt-1"><?= $view_type === 'individual' ? 'Manage retail shoppers and individual accounts.' : 'Manage wholesale buyer accounts and Business Registration (BR) verification.' ?></p>
             </div>
             <!-- Stats -->
             <div class="flex items-center gap-6">
@@ -211,6 +213,7 @@ if (empty($admin_customers)) {
                                 <tr id="customer-row-<?= $idx ?>"
                                     class="customer-row bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
                                     data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($c['id']) ?>"
+                                    data-usertype="<?= htmlspecialchars($c['user_type']) ?>"
                                     data-name="<?= htmlspecialchars(strtolower($c['name'])) ?>"
                                     data-company="<?= htmlspecialchars(strtolower($c['company'])) ?>"
                                     data-email="<?= htmlspecialchars(strtolower($c['email'])) ?>"
@@ -670,8 +673,21 @@ if (empty($admin_customers)) {
 
         var actionDiv = document.getElementById('d-actions');
         var actions = el.dataset.actions;
+        var userType = el.dataset.usertype;
         var cid = el.dataset.id;
-        if (actions === 'pending') {
+
+        if (userType === 'individual') {
+            actionDiv.innerHTML = `
+            <div class="space-y-3">
+                <button onclick="upgradeCustomerToWholesale(${cid}, this)" class="w-full bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2">
+                    <i class="ti ti-arrow-up-circle text-lg"></i> <span>Upgrade to Wholesale Access (Auto Approve)</span>
+                </button>
+                <button onclick="updateStatus(${cid}, 'suspended', this)" class="w-full bg-white border border-red-100 text-red-650 font-bold py-2.5 rounded-xl text-xs uppercase tracking-widest hover:bg-red-50 hover:border-red-200 transition-all flex items-center justify-center gap-2">
+                    <i class="ti ti-ban"></i> <span>Suspend Account</span>
+                </button>
+            </div>
+            `;
+        } else if (actions === 'pending') {
             actionDiv.innerHTML = `
             <div class="grid grid-cols-2 gap-3">
                 <button onclick="updateStatus(${cid}, 'approved', this)" class="bg-brand text-brand-light font-bold py-3 rounded-xl text-xs uppercase tracking-widest hover:bg-brand-dark transition-all shadow-lg shadow-brand/10 flex items-center justify-center gap-2"><span>Approve</span></button>
@@ -700,6 +716,30 @@ if (empty($admin_customers)) {
 
         // Load persisted admin comment for this customer
         loadComment(cid);
+    }
+
+    function upgradeCustomerToWholesale(id, btn) {
+        if (!confirm('Upgrade this Individual Customer to a Wholesale Account? They will gain instant access to Wholesale Bulk Pricing.')) return;
+        if (btn) setButtonLoading(btn, true, 'Upgrading...');
+        fetch('/api/customers.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'convert_to_wholesale', id: id })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (typeof showToast === 'function') showToast(data.message || 'Customer upgraded!', 'success');
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                if (btn) setButtonLoading(btn, false);
+                if (typeof showToast === 'function') showToast(data.message || 'Error upgrading customer.', 'error');
+            }
+        })
+        .catch(err => {
+            if (btn) setButtonLoading(btn, false);
+            if (typeof showToast === 'function') showToast('Network error.', 'error');
+        });
     }
 
     // Filtering -> Filtering customer cards by status tab, search term, and sorting options
@@ -953,4 +993,4 @@ if (empty($admin_customers)) {
    - User Profile Page: my_account.php (if displaying newly added customer attributes)
 =============================================================================
 */
-?>
+?>

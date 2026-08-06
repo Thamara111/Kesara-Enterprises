@@ -11,6 +11,29 @@ header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers
 // Getting data -> Loading database connection settings
 require_once __DIR__ . "/../database/connection.php";
 
+// Self-Healing Database: Ensure user_type column, nullable business columns, and mock_whatsapp_messages table exist
+if (isset($pdo) && $pdo !== null) {
+    try {
+        $checkUserType = $pdo->query("SHOW COLUMNS FROM users LIKE 'user_type'");
+        if (!$checkUserType->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN user_type ENUM('wholesale', 'individual') DEFAULT 'individual'");
+        }
+        $pdo->exec("ALTER TABLE users MODIFY COLUMN business_name VARCHAR(255) NULL");
+        $pdo->exec("ALTER TABLE users MODIFY COLUMN br_number VARCHAR(100) NULL");
+        $pdo->exec("ALTER TABLE users MODIFY COLUMN business_type VARCHAR(100) NULL");
+        $pdo->exec("ALTER TABLE users MODIFY COLUMN address TEXT NULL");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mock_whatsapp_messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            customer_id INT DEFAULT NULL,
+            phone VARCHAR(50) DEFAULT NULL,
+            message TEXT DEFAULT NULL,
+            status VARCHAR(50) DEFAULT 'delivered',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+    } catch (\Exception $e) {}
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 
 // Checking request -> Ensuring request method is POST
@@ -27,6 +50,7 @@ if (!$input) {
 }
 
 // Getting data -> Extracting and trimming registration fields
+$account_type    = trim($input['account_type'] ?? 'individual');
 $first_name      = trim($input['first_name'] ?? '');
 $last_name       = trim($input['last_name'] ?? '');
 $email           = trim($input['email'] ?? '');
@@ -36,14 +60,22 @@ $password        = $input['password'] ?? '';
 $business_name   = trim($input['business_name'] ?? '');
 $br_number       = trim($input['br_number'] ?? '');
 $business_type   = trim($input['business_type'] ?? '');
-// $tin_number = trim($input['tin_number'] ?? '');
 $address         = trim($input['address'] ?? '');
 
-// Checking data -> Ensuring no required registration fields are empty
-if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($whatsapp_number) || empty($password) || empty($business_name) || empty($br_number) || empty($business_type) || empty($address)) {
-    http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "All fields are required, including your WhatsApp number."]);
-    exit;
+$is_individual = ($account_type === 'individual');
+
+if ($is_individual) {
+    if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($whatsapp_number) || empty($password)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "All contact fields are required."]);
+        exit;
+    }
+} else {
+    if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($whatsapp_number) || empty($password) || empty($business_name) || empty($br_number) || empty($business_type) || empty($address)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "All wholesale business fields are required."]);
+        exit;
+    }
 }
 
 // Checking data -> Validating email address format
@@ -53,7 +85,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     exit;
 }
 
-// Saving data -> Saving new wholesale customer account to database
+// Saving data -> Saving customer account to database
 if (isset($pdo) && $pdo !== null) {
     try {
         // Checking data -> Checking if an account with this email already exists
@@ -68,22 +100,42 @@ if (isset($pdo) && $pdo !== null) {
         // Processing data -> Hashing password using bcrypt algorithm
         $hashed_pass = password_hash($password, PASSWORD_BCRYPT);
         
-        // Saving data -> Inserting new customer account into users table with pending status
-        $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, business_name, br_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
-        $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $business_type, $address]);
+        if ($is_individual) {
+            $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, user_type, status) VALUES (?, ?, ?, ?, ?, ?, 'individual', 'approved')");
+            $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass]);
+            $new_id = $pdo->lastInsertId();
 
-        // Response -> Returning success response for account creation
-        http_response_code(201);
-        echo json_encode(["status" => "success", "message" => "Your wholesale account request has been submitted successfully! We will contact you within 24h."]);
+            // Record thank-you WhatsApp message
+            try {
+                $wa_msg = "Hello {$first_name}, thank you for joining Kesara Enterprises! Your individual account is active. You can shop our retail collection right away!";
+                $stmt_wa = $pdo->prepare("INSERT INTO mock_whatsapp_messages (customer_id, phone, message, status) VALUES (?, ?, ?, 'delivered')");
+                $stmt_wa->execute([$new_id, $whatsapp_number, $wa_msg]);
+            } catch (\Exception $ex) {}
+
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['user_id'] = $new_id;
+            $_SESSION['user_email'] = $email;
+            $_SESSION['user_name'] = $first_name . ' ' . $last_name;
+            $_SESSION['user_type'] = 'individual';
+
+            http_response_code(201);
+            echo json_encode(["status" => "success", "success_code" => 2, "message" => "Your account has been created successfully! Welcome to Kesara Enterprises."]);
+        } else {
+            $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, user_type, business_name, br_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, 'wholesale', ?, ?, ?, ?, 'pending')");
+            $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $business_type, $address]);
+
+            http_response_code(201);
+            echo json_encode(["status" => "success", "success_code" => 1, "message" => "Your wholesale account request has been submitted successfully! We will contact you within 24h."]);
+        }
     } catch (\Exception $e) {
-        // Handling errors -> Catching database exceptions and returning error response
         http_response_code(500);
         echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
     }
 } else {
-    // Fallback -> Returning success response in demo mode
     http_response_code(201);
-    echo json_encode(["status" => "success", "message" => "Your wholesale account request has been submitted successfully! We will contact you within 24h. (Demo Mode)"]);
+    echo json_encode(["status" => "success", "success_code" => $is_individual ? 2 : 1, "message" => "Account created (Demo Mode)."]);
 }
 
 /*

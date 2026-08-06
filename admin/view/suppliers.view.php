@@ -248,14 +248,15 @@ if (empty($admin_suppliers)) {
     $admin_suppliers = [];
 }
 
-$inv_options = '';
+$inv_products_json = '[]';
 if (isset($pdo) && $pdo !== null) {
     try {
-        $prod_list = $pdo->query("SELECT p.id AS p_id, p.name AS p_name FROM products p WHERE p.deleted_at IS NULL ORDER BY p.name ASC")->fetchAll();
+        $prod_list = $pdo->query("SELECT p.name AS p_name FROM products p WHERE p.deleted_at IS NULL ORDER BY p.name ASC")->fetchAll();
+        $prod_names = [];
         foreach ($prod_list as $prod) {
-            $pName = htmlspecialchars($prod['p_name']);
-            $inv_options .= '<option value="' . $pName . '">' . $pName . '</option>';
+            $prod_names[] = $prod['p_name'];
         }
+        $inv_products_json = json_encode($prod_names, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
     } catch (\Exception $e) {
         // Ignore
     }
@@ -636,23 +637,53 @@ foreach ($admin_suppliers as $s) {
                         </div>
                     </div>
 
-                    <!-- Supplied Items -->
+                    <!-- Supplied Items — redesigned picker card -->
                     <div class="mt-6 pt-6 border-t border-gray-100">
-                        <label class="text-xs font-bold text-gray-500 uppercase tracking-wider block mb-3">Supplied
-                            Items</label>
-                        <div class="flex flex-wrap gap-2 mb-4" id="modalSuppliedItemsContainer"></div>
-                        <div class="flex gap-2">
-                            <input id="modalAddItemInput" list="productListDatalist" placeholder="Select or type product name..."
-                                class="flex-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
-                            <datalist id="productListDatalist">
-                                <?= $inv_options ?>
-                            </datalist>
-                            <input type="number" id="modalAddItemCost" step="0.01" min="0"
-                                class="w-32 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none"
-                                placeholder="Unit Cost">
-                            <button type="button" onclick="modalAddSuppliedItem()"
-                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl text-xs font-bold hover:bg-gray-300 transition-all">Add
-                                Item</button>
+                        <div class="rounded-2xl border border-brand/20 overflow-hidden shadow-sm">
+
+                            <!-- Card header -->
+                            <div class="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-brand/5 to-transparent border-b border-brand/10">
+                                <div class="flex items-center gap-2">
+                                    <i class="ti ti-package text-brand text-base"></i>
+                                    <span class="text-[10px] font-black text-brand uppercase tracking-[0.2em]">Supplied Items</span>
+                                    <span id="modalItemCountBadge" class="hidden px-2 py-0.5 bg-brand text-white text-[9px] font-bold rounded-full">0</span>
+                                </div>
+                                <span class="text-[9px] text-gray-400 font-semibold">Type product name &amp; set unit cost, then press Enter or Add</span>
+                            </div>
+
+                            <!-- Search + Cost + Add row -->
+                            <div class="px-5 py-4 bg-white border-b border-gray-100 flex items-center gap-2">
+                                <!-- Custom product dropdown -->
+                                <div class="relative flex-1" id="itemPickerWrapper">
+                                    <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-sm pointer-events-none z-10"></i>
+                                    <input id="modalAddItemInput"
+                                        autocomplete="off"
+                                        placeholder="Search product name..."
+                                        class="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all"
+                                        oninput="filterItemDropdown(this.value)"
+                                        onfocus="showItemDropdown()"
+                                        onkeydown="handleItemDropdownKey(event)">
+                                    <!-- Dropdown portal appended to body by JS -->
+                                </div>
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-300 pointer-events-none">LKR</span>
+                                    <input type="number" id="modalAddItemCost" step="0.01" min="0"
+                                        placeholder="Unit cost"
+                                        class="w-32 pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all"
+                                        onkeydown="if(event.key==='Enter'){event.preventDefault();modalAddSuppliedItem();}">
+                                </div>
+                                <button type="button" onclick="modalAddSuppliedItem()"
+                                    class="px-4 py-2.5 bg-brand text-white rounded-xl text-xs font-bold hover:bg-brand-dark transition-all flex items-center gap-1.5 shrink-0 shadow-sm shadow-brand/20">
+                                    <i class="ti ti-plus text-sm"></i> Add
+                                </button>
+                            </div>
+
+                            <!-- Tag chips preview -->
+                            <div id="modalSuppliedItemsContainer"
+                                class="px-5 py-4 flex flex-wrap gap-2 bg-white min-h-[56px]">
+                                <p id="modalItemsEmptyHint" class="text-[10px] text-gray-300 font-semibold italic w-full text-center py-1">No items added yet</p>
+                            </div>
+
                         </div>
                     </div>
 
@@ -676,6 +707,121 @@ foreach ($admin_suppliers as $s) {
     </div>
 
     <script>
+        // ── Custom Supplied-Items Dropdown (portal, fixed positioning) ─────
+        var allProducts = <?= $inv_products_json ?>;
+        var dropdownFocusIdx = -1;
+
+        // Create portal dropdown div attached to body so modal overflow never clips it
+        (function() {
+            var el = document.createElement('div');
+            el.id = 'itemDropdownList';
+            el.style.cssText = 'display:none; position:fixed; background:#fff; border:1.5px solid #b8c9f5; border-radius:12px; box-shadow:0 8px 32px rgba(30,50,120,0.13); z-index:9999; max-height:220px; overflow-y:auto; min-width:200px;';
+            document.body.appendChild(el);
+        })();
+
+        function positionItemDropdown() {
+            var input = document.getElementById('modalAddItemInput');
+            var list  = document.getElementById('itemDropdownList');
+            if (!input || !list) return;
+            var rect = input.getBoundingClientRect();
+            list.style.top    = (rect.bottom + 6) + 'px';
+            list.style.left   = rect.left + 'px';
+            list.style.width  = rect.width + 'px';
+        }
+
+        function renderItemDropdownItems(filtered) {
+            var list = document.getElementById('itemDropdownList');
+            if (!list) return;
+            dropdownFocusIdx = -1;
+            if (filtered.length === 0) {
+                list.innerHTML = '<div style="padding:12px 16px;font-size:11px;color:#9ca3af;text-align:center;font-style:italic;">No products found</div>';
+                return;
+            }
+            list.innerHTML = filtered.map((name, i) => {
+                var border = i < filtered.length - 1 ? 'border-bottom:1px solid #f3f4f6;' : '';
+                var safe = escapeHtml(name);
+                var safeJs = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                return `<div class="item-dropdown-row" style="padding:11px 16px;font-size:13px;font-weight:600;color:#1a2454;cursor:pointer;background:#fff;${border}" onmouseenter="highlightDropdownRow(this)" onmouseleave="unhighlightDropdownRow(this)" onmousedown="selectDropdownItem(event,'${safeJs}')">${safe}</div>`;
+            }).join('');
+        }
+
+        function highlightDropdownRow(el) { el.style.background = '#e8edf9'; }
+        function unhighlightDropdownRow(el) { if (!el.classList.contains('dd-keyboard-focus')) el.style.background = '#fff'; }
+
+        function showItemDropdown() {
+            positionItemDropdown();
+            var val = document.getElementById('modalAddItemInput').value;
+            var query = val.toLowerCase().trim();
+            var filtered = query === '' ? allProducts.slice(0, 60) : allProducts.filter(n => n.toLowerCase().includes(query)).slice(0, 60);
+            renderItemDropdownItems(filtered);
+            var list = document.getElementById('itemDropdownList');
+            if (list) list.style.display = 'block';
+        }
+
+        function hideItemDropdown() {
+            var list = document.getElementById('itemDropdownList');
+            if (list) list.style.display = 'none';
+            dropdownFocusIdx = -1;
+        }
+
+        function filterItemDropdown(q) {
+            positionItemDropdown();
+            var query = q.toLowerCase().trim();
+            var filtered = query === '' ? allProducts.slice(0, 60) : allProducts.filter(n => n.toLowerCase().includes(query)).slice(0, 60);
+            renderItemDropdownItems(filtered);
+            var list = document.getElementById('itemDropdownList');
+            if (list) list.style.display = 'block';
+        }
+
+        function selectDropdownItem(e, name) {
+            e.preventDefault();
+            document.getElementById('modalAddItemInput').value = name;
+            hideItemDropdown();
+            document.getElementById('modalAddItemCost').focus();
+        }
+
+        function handleItemDropdownKey(e) {
+            var list = document.getElementById('itemDropdownList');
+            var hidden = !list || list.style.display === 'none';
+            if (hidden) {
+                if (e.key === 'Enter') { e.preventDefault(); modalAddSuppliedItem(); }
+                return;
+            }
+            var rows = list.querySelectorAll('.item-dropdown-row');
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                rows.forEach(r => { r.style.background = '#fff'; r.classList.remove('dd-keyboard-focus'); });
+                dropdownFocusIdx = Math.min(dropdownFocusIdx + 1, rows.length - 1);
+                if (rows[dropdownFocusIdx]) { rows[dropdownFocusIdx].style.background = '#e8edf9'; rows[dropdownFocusIdx].classList.add('dd-keyboard-focus'); rows[dropdownFocusIdx].scrollIntoView({ block: 'nearest' }); }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                rows.forEach(r => { r.style.background = '#fff'; r.classList.remove('dd-keyboard-focus'); });
+                dropdownFocusIdx = Math.max(dropdownFocusIdx - 1, 0);
+                if (rows[dropdownFocusIdx]) { rows[dropdownFocusIdx].style.background = '#e8edf9'; rows[dropdownFocusIdx].classList.add('dd-keyboard-focus'); rows[dropdownFocusIdx].scrollIntoView({ block: 'nearest' }); }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (dropdownFocusIdx >= 0 && rows[dropdownFocusIdx]) {
+                    document.getElementById('modalAddItemInput').value = rows[dropdownFocusIdx].textContent.trim();
+                    hideItemDropdown();
+                    document.getElementById('modalAddItemCost').focus();
+                } else { modalAddSuppliedItem(); }
+            } else if (e.key === 'Escape') {
+                hideItemDropdown();
+            }
+        }
+
+        // Reposition on scroll/resize so it tracks the input
+        window.addEventListener('scroll', positionItemDropdown, true);
+        window.addEventListener('resize', positionItemDropdown);
+
+        // Close on outside click
+        document.addEventListener('click', function(e) {
+            var wrapper = document.getElementById('itemPickerWrapper');
+            var list    = document.getElementById('itemDropdownList');
+            if (wrapper && !wrapper.contains(e.target) && list && !list.contains(e.target)) hideItemDropdown();
+        });
+        // ────────────────────────────────────────────────────────────────────
+
         function barColor(w) { return w >= 90 ? '#10b981' : w >= 75 ? '#f59e0b' : '#ef4444'; }
         function barText(w) { return w >= 90 ? '#047857' : w >= 75 ? '#b45309' : '#b91c1c'; }
 
@@ -753,12 +899,27 @@ foreach ($admin_suppliers as $s) {
         function renderModalTags() {
             var container = document.getElementById('modalSuppliedItemsContainer');
             if (!container) return;
-            container.innerHTML = '';
+            // Remove existing chips but preserve the empty hint element
+            container.querySelectorAll('.supplied-tag').forEach(t => t.remove());
+
+            var hint  = document.getElementById('modalItemsEmptyHint');
+            var badge = document.getElementById('modalItemCountBadge');
+
+            if (modalSuppliedItems.length === 0) {
+                if (hint)  hint.classList.remove('hidden');
+                if (badge) badge.classList.add('hidden');
+            } else {
+                if (hint)  hint.classList.add('hidden');
+                if (badge) { badge.textContent = modalSuppliedItems.length; badge.classList.remove('hidden'); }
+            }
+
             modalSuppliedItems.forEach((item, idx) => {
                 var tag = document.createElement('span');
-                tag.className = 'group flex items-center gap-2 px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-lg text-xs font-bold text-brand';
-                let costStr = (item.cost !== null && item.cost !== undefined && item.cost !== '') ? ' - LKR ' + parseFloat(item.cost).toFixed(2) : '';
-                tag.innerHTML = `${escapeHtml(item.name)}${costStr} <button type="button" onclick="modalRemoveTag(${idx})" class="ti ti-x hover:text-red-500 ml-1"></button>`;
+                tag.className = 'supplied-tag group flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 bg-brand/5 border border-brand/20 rounded-xl text-xs font-bold text-brand hover:bg-brand/10 transition-all';
+                let costStr = (item.cost !== null && item.cost !== undefined && item.cost !== '')
+                    ? `<span class="text-[10px] font-semibold text-gray-400 ml-0.5 mr-1">· LKR ${parseFloat(item.cost).toFixed(2)}</span>`
+                    : '';
+                tag.innerHTML = `<i class="ti ti-package text-[10px] text-brand/50 mr-0.5"></i>${escapeHtml(item.name)}${costStr}<button type="button" onclick="modalRemoveTag(${idx})" class="ti ti-x text-[11px] text-brand/40 hover:text-red-500 transition-colors" title="Remove"></button>`;
                 container.appendChild(tag);
             });
             document.getElementById('suppliedItemsInput').value = JSON.stringify(modalSuppliedItems);

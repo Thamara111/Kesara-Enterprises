@@ -6,27 +6,29 @@
 require_once __DIR__ . "/database/connection.php";
 
 $is_ajax = isset($_GET['ajax']) && $_GET['ajax'] == '1';
-$can_see_prices = false;
 
-if ($is_ajax) {
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    $is_logged_in = isset($_SESSION['user_id']);
-    $buyer_approved = false;
-    if ($is_logged_in && isset($pdo)) {
-        try {
-            // Checking data -> Checking if customer user is logged in and approved for viewing price catalog
-            $auth_stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? LIMIT 1");
-            $auth_stmt->execute([$_SESSION['user_id']]);
-            $auth_user = $auth_stmt->fetch();
-            if ($auth_user && $auth_user['status'] === 'approved') {
-                $buyer_approved = true;
-            }
-        } catch (\Exception $e) {}
-    }
-    $can_see_prices = $is_logged_in && $buyer_approved;
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
+$is_logged_in = isset($_SESSION['user_id']);
+$user_type = $_SESSION['user_type'] ?? 'individual';
+$buyer_approved = false;
+
+if ($is_logged_in && isset($pdo)) {
+    try {
+        $auth_stmt = $pdo->prepare("SELECT status, user_type FROM users WHERE id = ? LIMIT 1");
+        $auth_stmt->execute([$_SESSION['user_id']]);
+        $auth_user = $auth_stmt->fetch();
+        if ($auth_user && $auth_user['status'] === 'approved') {
+            $buyer_approved = true;
+        }
+        if ($auth_user) {
+            $user_type = $auth_user['user_type'] ?? 'individual';
+        }
+    } catch (\Exception $e) {}
+}
+$is_wholesale_buyer = $is_logged_in && ($user_type === 'wholesale') && $buyer_approved;
+$can_see_prices = true;
 
 $filter_search     = trim($_GET['search']     ?? '');
 $filter_category   = trim($_GET['category']   ?? '');
@@ -34,9 +36,8 @@ $filter_sizes      = isset($_GET['sizes']) && is_array($_GET['sizes']) ? array_m
 $filter_stock      = isset($_GET['stock']) && is_array($_GET['stock'])  ? array_map('trim', $_GET['stock'])  : [];
 $filter_discounted = isset($_GET['discounted']) && ($_GET['discounted'] === '1' || $_GET['discounted'] === 'true');
 $filter_sort       = $_GET['sort'] ?? 'newest';
-
-// $filter_min_price = isset($_GET['min_price']) && is_numeric($_GET['min_price']) ? (float)$_GET['min_price'] : null;
-// $filter_max_price = isset($_GET['max_price']) && is_numeric($_GET['max_price']) ? (float)$_GET['max_price'] : null;
+$filter_min_price  = isset($_GET['min_price']) && is_numeric($_GET['min_price']) ? (float)$_GET['min_price'] : null;
+$filter_max_price  = isset($_GET['max_price']) && is_numeric($_GET['max_price']) ? (float)$_GET['max_price'] : null;
 
 $all_categories = [];
 if ($pdo) {
@@ -49,23 +50,27 @@ if ($pdo) {
 $catalog_products = [];
 if ($pdo) {
     try {
-        // STEP 2: Self-Healing Database]: Auto-create index on base_price if missing
-        // $checkIndex = $pdo->query("SHOW INDEX FROM products WHERE Key_name = 'idx_products_base_price'");
-        // if (!$checkIndex || !$checkIndex->fetch()) {
-        //     $pdo->exec("CREATE INDEX idx_products_base_price ON products(base_price)");
-        // }
+        $checkRetail = $pdo->query("SHOW COLUMNS FROM products LIKE 'retail_price'");
+        if (!$checkRetail->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN retail_price DECIMAL(10,2) DEFAULT NULL AFTER base_price");
+        }
+        $checkRetailMoq = $pdo->query("SHOW COLUMNS FROM products LIKE 'retail_moq'");
+        if (!$checkRetailMoq->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN retail_moq INT DEFAULT 1 AFTER moq");
+        }
+        $checkRetailDisc = $pdo->query("SHOW COLUMNS FROM products LIKE 'retail_discount'");
+        if (!$checkRetailDisc->fetch()) {
+            $pdo->exec("ALTER TABLE products ADD COLUMN retail_discount DECIMAL(10,2) DEFAULT 0.00 AFTER discount");
+        }
+        $checkTierType = $pdo->query("SHOW COLUMNS FROM pricing_tiers LIKE 'tier_type'");
+        if (!$checkTierType->fetch()) {
+            $pdo->exec("ALTER TABLE pricing_tiers ADD COLUMN tier_type ENUM('wholesale', 'retail') DEFAULT 'wholesale' AFTER product_id");
+        }
+    } catch (\Exception $e) {}
 
+    try {
         $where2  = ["p.deleted_at IS NULL"];
         $params2 = [];
-
-        // if ($filter_min_price !== null && $filter_min_price >= 0) {
-        //     $where2[]  = "p.base_price >= ?";
-        //     $params2[] = $filter_min_price;
-        // }
-        // if ($filter_max_price !== null && $filter_max_price > 0) {
-        //     $where2[]  = "p.base_price <= ?";
-        //     $params2[] = $filter_max_price;
-        // }
 
         // Filtering data -> Building search, category, discount, stock, and size query filters
         if ($filter_search !== '') {
@@ -78,7 +83,12 @@ if ($pdo) {
             $params2[] = $filter_category;
         }
         if ($filter_discounted) {
-            $where2[]  = "(p.discount > 0 AND (p.discount_start IS NULL OR p.discount_start <= CURDATE()) AND (p.discount_end IS NULL OR p.discount_end >= CURDATE()))";
+            if ($is_wholesale_buyer) {
+                $where2[]  = "(p.discount > 0 AND (p.discount_start IS NULL OR p.discount_start <= CURDATE()) AND (p.discount_end IS NULL OR p.discount_end >= CURDATE()))";
+            } else {
+                $where2[]  = "(p.retail_discount > 0 AND (p.retail_discount_start IS NULL OR p.retail_discount_start <= CURDATE()) AND (p.retail_discount_end IS NULL OR p.retail_discount_end >= CURDATE()))
+                           OR (p.discount > 0 AND (p.discount_start IS NULL OR p.discount_start <= CURDATE()) AND (p.discount_end IS NULL OR p.discount_end >= CURDATE()))";
+            }
         }
         if (!empty($filter_stock)) {
             $stock_conditions = [];
@@ -102,8 +112,8 @@ if ($pdo) {
         $order_map = ['newest'=>'p.created_at DESC','price_asc'=>'p.base_price ASC','price_desc'=>'p.base_price DESC','alpha'=>'p.name ASC'];
         $order = $order_map[$filter_sort] ?? 'p.created_at DESC';
         
-        // Getting data -> Executing SQL query to retrieve filtered wholesale product items
-        $sql2 = "SELECT DISTINCT p.name, p.sku, p.base_price AS price, p.discount, p.discount_start, p.discount_end, p.images, c.name AS category_name, c.slug AS category_slug, COALESCE((SELECT MAX(quantity) FROM inventory WHERE product_id = p.id), 0) AS max_inv
+        // Getting data -> Executing SQL query to retrieve filtered product items
+        $sql2 = "SELECT DISTINCT p.id, p.name, p.sku, p.base_price AS price, p.retail_price, p.retail_discount, p.retail_discount_start, p.retail_discount_end, p.discount, p.discount_start, p.discount_end, p.images, c.name AS category_name, c.slug AS category_slug, COALESCE((SELECT MAX(quantity) FROM inventory WHERE product_id = p.id), 0) AS max_inv
                  FROM products p LEFT JOIN categories c ON c.id = p.category_id $size_join2
                  WHERE " . implode(' AND ', $where2) . " ORDER BY $order";
         $stmt = $pdo->prepare($sql2);
@@ -233,7 +243,7 @@ if (!$is_ajax) {
           <hr class="border-gray-100 my-6">
 
           <!-- Discounted Items -->
-          <!-- <div class="mb-8">
+          <div class="mb-8">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-4 tracking-widest">Offers & Deals</label>
             <label class="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" name="discounted" value="1"
@@ -244,7 +254,7 @@ if (!$is_ajax) {
               </span>
             </label>
           </div>
-          <hr class="border-gray-100 my-6"> -->
+          <hr class="border-gray-100 my-6">
 
           <!-- Stock -->
           <div class="mb-8">
@@ -308,8 +318,7 @@ if (!$is_ajax) {
         <div id="product-list-container" class="flex flex-col gap-6">
 <?php endif; ?>
         <?php
-        // $has_active = $filter_search!==''||$filter_category!==''||!empty($filter_sizes)||!empty($filter_stock)||$filter_discounted||$filter_min_price!==null||$filter_max_price!==null;
-        $has_active = $filter_search!==''||$filter_category!==''||!empty($filter_sizes)||!empty($filter_stock)||$filter_discounted;
+        $has_active = $filter_search!==''||$filter_category!==''||!empty($filter_sizes)||!empty($filter_stock)||$filter_discounted||$filter_min_price!==null||$filter_max_price!==null;
         if ($has_active):
         ?>
         <div class="flex items-center gap-3 flex-wrap">
@@ -372,12 +381,31 @@ if (!$is_ajax) {
                     $is_discount_active = true;
                 }
             }
+
+            if ($is_wholesale_buyer) {
+                $card_price_label = "Wholesale Price";
+                $card_price_val = (float)$p['price'];
+                $card_discount = $is_discount_active ? $discount_pct : 0;
+            } else {
+                $card_price_label = "Retail Price";
+                $card_price_val = $p['retail_price'] !== null ? (float)$p['retail_price'] : (float)$p['price'];
+                $retail_disc = (float)($p['retail_discount'] ?? 0);
+                $rd_start = !empty($p['retail_discount_start']) ? $p['retail_discount_start'] : null;
+                $rd_end   = !empty($p['retail_discount_end'])   ? $p['retail_discount_end']   : null;
+                $is_retail_disc_active = false;
+                if ($retail_disc > 0) {
+                    $r_valid_s = empty($rd_start) || ($today_str >= $rd_start);
+                    $r_valid_e = empty($rd_end)   || ($today_str <= $rd_end);
+                    if ($r_valid_s && $r_valid_e) $is_retail_disc_active = true;
+                }
+                $card_discount = $is_retail_disc_active ? $retail_disc : ($is_discount_active ? $discount_pct : 0);
+            }
           ?>
           <a href="/product?sku=<?php echo htmlspecialchars($p['sku']); ?>" class="bg-white border border-gray-100 rounded-2xl overflow-hidden group hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
             <div class="bg-gray-50 h-48 flex items-center justify-center border-b border-gray-50 relative overflow-hidden">
-              <?php if ($is_discount_active): ?>
+              <?php if ($card_discount > 0): ?>
               <div class="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-md z-10 shadow-sm flex items-center gap-1">
-                <i class="ti ti-discount-2"></i> <?php echo floatval($discount_pct); ?>% OFF
+                <i class="ti ti-discount-2"></i> <?php echo floatval($card_discount); ?>% OFF
               </div>
               <?php endif; ?>
               <?php $prod_images=json_decode($p['images']??'[]',true); if(!empty($prod_images)&&!empty($prod_images[0])): ?>
@@ -407,17 +435,13 @@ if (!$is_ajax) {
               <p class="text-[11px] text-gray-400 font-medium mb-4 tracking-wider uppercase"><?php echo htmlspecialchars($p['sku']); ?></p>
               <div class="flex items-center justify-between mt-auto">
                 <div class="space-y-1">
-                  <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Wholesale Price</p>
+                  <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest"><?= $card_price_label ?></p>
                   <p class="text-sm font-bold text-gray-900">
-                    <?php if ($can_see_prices): ?>
-                      <?php if ($is_discount_active && is_numeric($p['price'])): ?>
-                        <span class="text-gray-400 line-through text-[11px] mr-1">LKR <?php echo number_format($p['price'], 2); ?></span>
-                        <span class="text-red-600">LKR <?php echo number_format($p['price'] * (1 - $discount_pct / 100), 2); ?></span>
-                      <?php else: ?>
-                        LKR <?php echo is_numeric($p['price'])?number_format($p['price'],2):htmlspecialchars($p['price']); ?>
-                      <?php endif; ?>
+                    <?php if ($card_discount > 0): ?>
+                      <span class="text-gray-400 line-through text-[11px] mr-1">LKR <?php echo number_format($card_price_val, 2); ?></span>
+                      <span class="text-red-600">LKR <?php echo number_format($card_price_val * (1 - $card_discount / 100), 2); ?></span>
                     <?php else: ?>
-                      <span style="filter: blur(4px); user-select: none; pointer-events: none;" class="select-none pointer-events-none" title="Log in to view prices">LKR <?php echo is_numeric($p['price'])?number_format($p['price'],2):htmlspecialchars($p['price']); ?></span>
+                      LKR <?php echo number_format($card_price_val, 2); ?>
                     <?php endif; ?>
                   </p>
                 </div>

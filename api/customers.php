@@ -19,12 +19,16 @@ if ($method === 'OPTIONS') {
     exit;
 }
 
-// Getting data -> Ensuring admin_comment column exists in users table
+// Getting data -> Ensuring admin_comment and user_type columns exist in users table
 if (isset($pdo) && $pdo !== null) {
     try {
         $check = $pdo->query("SHOW COLUMNS FROM users LIKE 'admin_comment'");
         if (!$check->fetch()) {
             $pdo->exec("ALTER TABLE users ADD COLUMN admin_comment TEXT DEFAULT NULL");
+        }
+        $checkUserType = $pdo->query("SHOW COLUMNS FROM users LIKE 'user_type'");
+        if (!$checkUserType->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN user_type ENUM('wholesale', 'individual') DEFAULT 'individual'");
         }
     } catch (\Exception $e) {
         // Ignore database structure check errors if column already exists
@@ -45,6 +49,23 @@ $id = isset($input['id']) ? (int)$input['id'] : 0;
 if ($id <= 0) {
     http_response_code(400);
     echo json_encode(["status" => "error", "message" => "Invalid customer ID."]);
+    exit;
+}
+
+// Action -> Upgrade individual customer to wholesale status
+if ($method === 'POST' && $action === 'convert_to_wholesale') {
+    if (isset($pdo) && $pdo !== null) {
+        try {
+            $stmt = $pdo->prepare("UPDATE users SET user_type = 'wholesale', status = 'approved' WHERE id = ?");
+            $stmt->execute([$id]);
+            echo json_encode(["status" => "success", "message" => "Customer upgraded to Wholesale with auto-approval successfully."]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
+        }
+    } else {
+        echo json_encode(["status" => "success", "message" => "Customer upgraded (Demo Mode)."]);
+    }
     exit;
 }
 

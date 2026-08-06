@@ -10,6 +10,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 $is_logged_in = isset($_SESSION['user_id']);
+$user_type = $_SESSION['user_type'] ?? 'individual';
 $buyer_approved = false;
 $user_full_name = '';
 $user_business = '';
@@ -19,7 +20,7 @@ $user_email = '';
 if ($is_logged_in && isset($pdo)) {
     try {
         // Querying authenticated customer user profile details and status
-        $auth_stmt = $pdo->prepare("SELECT first_name, last_name, email, phone, business_name, status FROM users WHERE id = ? LIMIT 1");
+        $auth_stmt = $pdo->prepare("SELECT first_name, last_name, email, phone, business_name, status, user_type FROM users WHERE id = ? LIMIT 1");
         $auth_stmt->execute([$_SESSION['user_id']]);
         $auth_user = $auth_stmt->fetch();
 
@@ -28,18 +29,19 @@ if ($is_logged_in && isset($pdo)) {
             $user_business = $auth_user['business_name'] ?? '';
             $user_phone = $auth_user['phone'] ?? '';
             $user_email = $auth_user['email'] ?? '';
+            $user_type = $auth_user['user_type'] ?? 'individual';
 
             if ($auth_user['status'] === 'approved') {
                 $buyer_approved = true;
             }
         }
     } catch (\Exception $e) {
-        // Falling back to guest access on database connection error
         $buyer_approved = false;
     }
 }
-$can_see_prices = $is_logged_in && $buyer_approved;
 
+$is_wholesale_buyer = $is_logged_in && ($user_type === 'wholesale') && $buyer_approved;
+$can_see_prices = true;
 
 $sku = $_GET['sku'] ?? 'KB-001';
 
@@ -60,7 +62,11 @@ if (isset($pdo) && $pdo !== null) {
             $category_name = $product['category_name'];
 
             // Querying pricing tiers and variant inventory records from database
-            $stmt_tiers = $pdo->prepare("SELECT * FROM pricing_tiers WHERE product_id = ? ORDER BY min_qty ASC");
+            if ($is_wholesale_buyer) {
+                $stmt_tiers = $pdo->prepare("SELECT * FROM pricing_tiers WHERE product_id = ? AND (tier_type = 'wholesale' OR tier_type IS NULL) ORDER BY min_qty ASC");
+            } else {
+                $stmt_tiers = $pdo->prepare("SELECT * FROM pricing_tiers WHERE product_id = ? AND tier_type = 'retail' ORDER BY min_qty ASC");
+            }
             $stmt_tiers->execute([$product['id']]);
             $pricing_tiers = $stmt_tiers->fetchAll();
 
@@ -108,23 +114,63 @@ $prod_specs = [
     'packaging' => 'Bulk pack',
     'lead' => '3–5 Business Days'
 ];
-// Determine effective Minimum Order Quantity (MOQ) from the first pricing tier if available
-$effective_moq = (!empty($pricing_tiers) && isset($pricing_tiers[0]['min_qty']))
-    ? (int) $pricing_tiers[0]['min_qty']
-    : (int) ($product['moq'] ?? 50);
+// Determine pricing, MOQ, discount, and labels based on user mode (Wholesale vs Retail)
+if ($is_wholesale_buyer) {
+    $display_base_price = (float)($product['base_price'] ?? 0);
+    $effective_moq = (!empty($pricing_tiers) && isset($pricing_tiers[0]['min_qty']))
+        ? (int) $pricing_tiers[0]['min_qty']
+        : (int) ($product['moq'] ?? 50);
+    $discount_pct = isset($product['discount']) ? (float) $product['discount'] : 0;
+    $pricing_title = "Wholesale Volume-Based Pricing";
+    $pricing_base_label = "Base Wholesale Price";
+    $qty_step = 10;
+} else {
+    $display_base_price = $product['retail_price'] !== null ? (float)$product['retail_price'] : (float)($product['base_price'] ?? 0);
+    $effective_moq = (!empty($pricing_tiers) && isset($pricing_tiers[0]['min_qty']))
+        ? (int) $pricing_tiers[0]['min_qty']
+        : (int) ($product['retail_moq'] ?? 1);
+    $retail_disc = (float)($product['retail_discount'] ?? 0);
+    $rd_start = !empty($product['retail_discount_start']) ? $product['retail_discount_start'] : null;
+    $rd_end   = !empty($product['retail_discount_end'])   ? $product['retail_discount_end']   : null;
+    $pricing_title = "Retail Pricing & Quantity Tiers";
+    $pricing_base_label = "Retail Base Price";
+    $qty_step = 1;
+}
 
-// Extract discount with active date range validation
-$discount_pct = isset($product['discount']) ? (float) $product['discount'] : 0;
 $d_start = !empty($product['discount_start']) ? $product['discount_start'] : null;
 $d_end   = !empty($product['discount_end'])   ? $product['discount_end']   : null;
 
 $today_str = date('Y-m-d');
 $discount = 0;
-if ($discount_pct > 0) {
-    $valid_s = empty($d_start) || ($today_str >= $d_start);
-    $valid_e = empty($d_end)   || ($today_str <= $d_end);
-    if ($valid_s && $valid_e) {
-        $discount = $discount_pct;
+if ($is_wholesale_buyer) {
+    // Wholesale discount with its own date window
+    $discount_pct = isset($product['discount']) ? (float) $product['discount'] : 0;
+    if ($discount_pct > 0) {
+        $valid_s = empty($d_start) || ($today_str >= $d_start);
+        $valid_e = empty($d_end)   || ($today_str <= $d_end);
+        if ($valid_s && $valid_e) {
+            $discount = $discount_pct;
+        }
+    }
+} else {
+    // Retail discount: check retail_discount_start / retail_discount_end first
+    if (isset($retail_disc) && $retail_disc > 0) {
+        $r_valid_s = empty($rd_start) || ($today_str >= $rd_start);
+        $r_valid_e = empty($rd_end)   || ($today_str <= $rd_end);
+        if ($r_valid_s && $r_valid_e) {
+            $discount = $retail_disc;
+        }
+    }
+    // Fallback: wholesale discount if no active retail discount
+    if ($discount === 0) {
+        $discount_pct = isset($product['discount']) ? (float) $product['discount'] : 0;
+        if ($discount_pct > 0) {
+            $valid_s = empty($d_start) || ($today_str >= $d_start);
+            $valid_e = empty($d_end)   || ($today_str <= $d_end);
+            if ($valid_s && $valid_e) {
+                $discount = $discount_pct;
+            }
+        }
     }
 }
 
@@ -323,39 +369,20 @@ require_once __DIR__ . "/layouts/header.php";
 
                 <hr class="border-gray-50 mb-8">
 
-                <!-- Wholesale Pricing Tiers -->
+                <!-- Wholesale / Retail Pricing Tiers -->
                 <div
                     class="p-6 bg-gradient-to-br from-brand/5 to-transparent border-2 border-brand/20 rounded-3xl mb-8 shadow-sm">
                     <div class="flex items-center gap-2 mb-4">
                         <i class="ti ti-tags text-brand text-lg"></i>
-                        <label class="block text-[11px] font-bold text-brand uppercase tracking-widest">Wholesale
-                            Volume-Based Pricing</label>
+                        <label class="block text-[11px] font-bold text-brand uppercase tracking-widest"><?= htmlspecialchars($pricing_title) ?></label>
                     </div>
                     <div
                         class="border border-brand/10 rounded-2xl overflow-hidden divide-y divide-brand/10 shadow-sm bg-white">
                         <?php $tier_idx = 1;
                         foreach ($pricing_tiers as $index => $t): ?>
                             <?php
-                            // Determine if this is the default middle tier for active class (e.g. 2nd tier or 1st tier if count is small)
                             $is_active = (count($pricing_tiers) > 1 && $index === 1) || (count($pricing_tiers) === 1 && $index === 0);
                             ?>
-                            <!--                             
-                            [VIVA TASK 03 - UI: Dynamic Tier Row Data-Attributes & Upper Bound Rendering]
-                            <div class="flex justify-between items-center p-4 text-sm tier-row <?= $is_active ? 'bg-brand-light/30 border-y border-brand/10 text-brand' : 'bg-white text-gray-500' ?>"
-                                 id="tier-<?= $tier_idx++ ?>"
-                                 data-min="<?= (int)$t['min_qty'] ?>" 
-                                 data-max="<?= !empty($t['max_qty']) ? (int)$t['max_qty'] : 999999 ?>"
-                                 data-price="<?= (float)$t['price'] ?>">
-                                <div class="flex items-center gap-3">
-                                    <span class="<?= $is_active ? 'font-bold' : '' ?>">
-                                        <?= htmlspecialchars($t['min_qty']) ?>
-                                        <?= !empty($t['max_qty']) ? ' – ' . htmlspecialchars($t['max_qty']) : '+' ?> units
-                                    </span>
-                                    <span class="active-badge px-2 py-0.5 bg-brand text-brand-light text-[9px] font-bold rounded-full <?= $is_active ? '' : 'hidden' ?>">
-                                        ACTIVE TIER
-                                    </span>
-                                </div>
-                            -->
                             <div class="flex justify-between items-center p-4 text-sm <?= $is_active ? 'bg-brand-light/30 border-y border-brand/10 text-brand' : 'bg-white text-gray-500' ?>"
                                 id="tier-<?= $tier_idx++ ?>">
                                 <div class="flex items-center gap-3">
@@ -396,24 +423,24 @@ require_once __DIR__ . "/layouts/header.php";
                             <div class="flex justify-between items-center p-4 text-sm bg-brand-light/30 border-y border-brand/10 text-brand"
                                 id="tier-1">
                                 <div class="flex items-center gap-3">
-                                    <span class="font-bold">Base Wholesale Price</span>
+                                    <span class="font-bold"><?= htmlspecialchars($pricing_base_label) ?></span>
                                 </div>
                                 <span class="text-brand font-extrabold">
                                     <?php if ($can_see_prices): ?>
                                         <?php if ($discount > 0): ?>
                                             <span class="text-gray-400 line-through text-xs mr-2">LKR
-                                                <?= number_format($product['base_price']) ?></span>
-                                            LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
+                                                <?= number_format($display_base_price) ?></span>
+                                            LKR <?= number_format($display_base_price * (1 - $discount / 100)) ?> / pc
                                         <?php else: ?>
-                                            LKR <?= number_format($product['base_price']) ?> / pc
+                                            LKR <?= number_format($display_base_price) ?> / pc
                                         <?php endif; ?>
                                     <?php else: ?>
                                         <span style="filter: blur(4px); user-select: none; pointer-events: none;"
                                             class="select-none pointer-events-none" title="Log in to view prices">
                                             <?php if ($discount > 0): ?>
-                                                LKR <?= number_format($product['base_price'] * (1 - $discount / 100)) ?> / pc
+                                                LKR <?= number_format($display_base_price * (1 - $discount / 100)) ?> / pc
                                             <?php else: ?>
-                                                LKR <?= number_format($product['base_price']) ?> / pc
+                                                LKR <?= number_format($display_base_price) ?> / pc
                                             <?php endif; ?>
                                         </span>
                                     <?php endif; ?>
@@ -506,20 +533,20 @@ require_once __DIR__ . "/layouts/header.php";
                                             class="<?= $initial_out ? '' : 'hidden' ?> text-[9px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded uppercase tracking-widest border border-red-100">Out
                                             of Stock</span>
                                     </div>
-                                    <div class="flex items-center bg-gray-100 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
+                                     <div class="flex items-center bg-gray-100 border border-gray-200 rounded-xl overflow-hidden shadow-sm"
                                         onclick="event.stopPropagation()">
                                         <button type="button" id="size-minus-<?= htmlspecialchars($so) ?>"
-                                            onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', -10)"
+                                            onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', -<?= $qty_step ?>)"
                                             class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed <?= $initial_out ? 'opacity-50 cursor-not-allowed' : '' ?>"
                                             <?= ($is_out_of_stock || $initial_out) ? 'disabled' : '' ?>><i
                                                 class="ti ti-minus text-xs"></i></button>
                                         <input type="number" id="size-qty-<?= htmlspecialchars($so) ?>" value="0" min="0"
-                                            step="10" onfocus="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')"
+                                            step="<?= $qty_step ?>" onfocus="selectSize(<?= $idx ?>, '<?= htmlspecialchars($so) ?>')"
                                             onchange="onSizeQtyChange('<?= htmlspecialchars($so) ?>')"
                                             class="w-12 text-center text-xs font-black text-gray-900 bg-transparent border-none outline-none focus:ring-0 transition-all duration-300 py-1 disabled:opacity-50 disabled:cursor-not-allowed <?= $initial_out ? 'opacity-50 cursor-not-allowed' : '' ?>"
                                             <?= ($is_out_of_stock || $initial_out) ? 'disabled' : '' ?>>
                                         <button type="button" id="size-plus-<?= htmlspecialchars($so) ?>"
-                                            onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', 10)"
+                                            onclick="changeSizeQty('<?= htmlspecialchars($so) ?>', <?= $qty_step ?>)"
                                             class="w-8 h-8 flex items-center justify-center text-gray-400 hover:bg-gray-200 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed <?= $initial_out ? 'opacity-50 cursor-not-allowed' : '' ?>"
                                             <?= ($is_out_of_stock || $initial_out) ? 'disabled' : '' ?>><i
                                                 class="ti ti-plus text-xs"></i></button>
@@ -538,12 +565,12 @@ require_once __DIR__ . "/layouts/header.php";
                     <div class="flex items-center gap-6">
                         <div
                             class="flex items-center bg-gray-50 border border-gray-100 rounded-xl overflow-hidden group focus-within:ring-2 focus-within:ring-brand/20 transition-all">
-                            <button id="global-qty-minus" onclick="changeQty(-10)"
+                            <button id="global-qty-minus" onclick="changeQty(-<?= $qty_step ?>)"
                                 class="w-12 h-12 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-minus text-sm"></i></button>
                             <span id="qty-display"
                                 class="w-16 text-center text-sm font-bold <?= $is_out_of_stock ? 'text-gray-400' : 'text-gray-900' ?>">0</span>
-                            <button id="global-qty-plus" onclick="changeQty(10)"
+                            <button id="global-qty-plus" onclick="changeQty(<?= $qty_step ?>)"
                                 class="w-12 h-12 flex items-center justify-center text-gray-400 hover:bg-gray-100 hover:text-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 <?= $is_out_of_stock ? 'disabled' : '' ?>><i class="ti ti-plus text-sm"></i></button>
                         </div>

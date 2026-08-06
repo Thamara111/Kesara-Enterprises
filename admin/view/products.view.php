@@ -50,7 +50,7 @@ if (isset($pdo) && $pdo !== null) {
         $all_suppliers = $supp_stmt->fetchAll();
 
         // Fetching -> Fetch all active products, joined with their category names and inventory stock
-        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband,
+        $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.retail_price, p.retail_moq, p.retail_discount, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband,
                                     COALESCE((SELECT SUM(quantity) FROM inventory WHERE product_id = p.id), 0) AS total_stock
                              FROM products p 
                              LEFT JOIN categories c ON p.category_id = c.id 
@@ -60,16 +60,28 @@ if (isset($pdo) && $pdo !== null) {
         // Processing -> Preparing detailed information for each product
         foreach ($prods as $pr) {
             // Fetching -> Fetch wholesale pricing tiers for this product
-            $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ?");
+            $t_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ? AND (tier_type = 'wholesale' OR tier_type IS NULL) ORDER BY min_qty ASC");
             $t_stmt->execute([$pr['id']]);
             $tiers = $t_stmt->fetchAll();
 
-            // Convert types appropriately for JSON/JS consumption
             $formatted_tiers = [];
             foreach ($tiers as $t) {
                 $formatted_tiers[] = [
                     'q' => (int) $t['q'],
                     'p' => (float) $t['p']
+                ];
+            }
+
+            // Fetching -> Fetch retail pricing tiers for this product
+            $rt_stmt = $pdo->prepare("SELECT min_qty AS q, price AS p FROM pricing_tiers WHERE product_id = ? AND tier_type = 'retail' ORDER BY min_qty ASC");
+            $rt_stmt->execute([$pr['id']]);
+            $r_tiers = $rt_stmt->fetchAll();
+
+            $formatted_retail_tiers = [];
+            foreach ($r_tiers as $rt) {
+                $formatted_retail_tiers[] = [
+                    'q' => (int) $rt['q'],
+                    'p' => (float) $rt['p']
                 ];
             }
 
@@ -112,6 +124,9 @@ if (isset($pdo) && $pdo !== null) {
                 $badge = 'bg-green-50 text-green-600 border-green-100';
             }
 
+            $base_p = (float)$pr['price'];
+            $ret_p = $pr['retail_price'] !== null ? (float)$pr['retail_price'] : $base_p;
+
             // Bundling product data into array for frontend rendering
             $admin_products[] = [
                 'id' => (int) $pr['id'],
@@ -120,7 +135,10 @@ if (isset($pdo) && $pdo !== null) {
                 'cat' => $pr['cat'] ?? 'Uncategorized',
                 'supplier' => $assigned_supplier ?: '',
                 'moq' => (int) $pr['moq'],
-                'price' => (float) $pr['price'],
+                'price' => $base_p,
+                'retail_price' => $ret_p,
+                'retail_moq' => (int)($pr['retail_moq'] ?? 1),
+                'retail_discount' => (float)($pr['retail_discount'] ?? 0),
                 'status' => $status,
                 'badge' => $badge,
                 'desc' => $pr['desc'] ?? '',
@@ -133,6 +151,7 @@ if (isset($pdo) && $pdo !== null) {
                 'gsm' => $pr['gsm'] ?? '',
                 'waistband' => $pr['waistband'] ?? '',
                 'tiers' => $formatted_tiers,
+                'retail_tiers' => $formatted_retail_tiers,
                 'color_variations' => $color_vars_map
             ];
         }
@@ -204,7 +223,8 @@ if (empty($all_suppliers)) {
                             <th class="px-4 py-3 rounded-l-xl w-16">IMG</th>
                             <th class="px-4 py-3">Product Detail</th>
                             <th class="px-4 py-3 w-20 text-center">MOQ</th>
-                            <th class="px-4 py-3 w-24">Base</th>
+                            <th class="px-4 py-3 w-24">Retail</th>
+                            <th class="px-4 py-3 w-24">Wholesale</th>
                             <th class="px-4 py-3 w-24">Status</th>
                             <th class="px-4 py-3 text-right rounded-r-xl w-24">Actions</th>
                         </tr>
@@ -212,7 +232,7 @@ if (empty($all_suppliers)) {
                     <tbody id="prod-list">
                         <?php if (empty($admin_products)): ?>
                             <tr id="empty-state">
-                                <td colspan="6">
+                                <td colspan="7">
                                     <div class="flex flex-col items-center justify-center py-24 text-center gap-4">
                                         <div
                                             class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300">
@@ -240,6 +260,12 @@ if (empty($all_suppliers)) {
                                     data-discount="<?= htmlspecialchars($p['discount']) ?>"
                                     data-discount-start="<?= htmlspecialchars($p['discount_start']) ?>"
                                     data-discount-end="<?= htmlspecialchars($p['discount_end']) ?>"
+                                    data-retail-price="<?= htmlspecialchars($p['retail_price']) ?>"
+                                    data-retail-moq="<?= htmlspecialchars($p['retail_moq']) ?>"
+                                    data-retail-discount="<?= htmlspecialchars($p['retail_discount']) ?>"
+                                    data-retail-discount-start="<?= htmlspecialchars($p['retail_discount_start'] ?? '') ?>"
+                                    data-retail-discount-end="<?= htmlspecialchars($p['retail_discount_end'] ?? '') ?>"
+                                    data-retail-tiers="<?= htmlspecialchars(json_encode($p['retail_tiers'])) ?>"
                                     data-gsm="<?= htmlspecialchars($p['gsm']) ?>"
                                     data-waistband="<?= htmlspecialchars($p['waistband']) ?>"
                                     data-status="<?= htmlspecialchars($p['status']) ?>"
@@ -270,8 +296,13 @@ if (empty($all_suppliers)) {
                                     </td>
 
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
+                                        <span class="text-xs font-black text-brand truncate">LKR
+                                            <?= number_format($p['retail_price'], 2) ?></span>
+                                    </td>
+
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
                                         <span class="text-xs font-black text-gray-900 truncate">LKR
-                                            <?= htmlspecialchars($p['price']) ?></span>
+                                            <?= number_format($p['price'], 2) ?></span>
                                     </td>
 
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
@@ -312,215 +343,341 @@ if (empty($all_suppliers)) {
     <div id="product-form-backdrop"
         class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300"
         onclick="closeProductFormPane()"></div>
+
     <div id="product-form-pane"
-        class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-gray-50 border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
-        <!-- Form Header -->
-        <div class="p-8 border-b border-gray-100 bg-white flex items-center justify-between">
-            <h2 id="form-mode-label" class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Edit Product
-            </h2>
+        class="fixed inset-y-0 right-0 z-50 w-[640px] max-w-full bg-[#f5f6fa] border-l border-gray-200 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300">
+
+        <!-- ── Form Header ── -->
+        <div class="shrink-0 px-8 py-5 bg-white border-b border-gray-100 flex items-center justify-between shadow-sm">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-xl bg-brand/10 flex items-center justify-center">
+                    <i class="ti ti-package text-brand text-base"></i>
+                </div>
+                <div>
+                    <p id="form-mode-label" class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] leading-none">Edit Product</p>
+                    <p class="text-xs font-bold text-gray-900 mt-0.5" id="form-product-name-preview">—</p>
+                </div>
+            </div>
             <button onclick="closeProductFormPane()"
-                class="p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none"
+                class="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-all"
                 aria-label="Close form">
-                <i class="ti ti-x text-xl"></i>
+                <i class="ti ti-x text-base"></i>
             </button>
         </div>
 
-        <!-- Form Content -->
-        <div class="flex-1 overflow-y-auto p-10 space-y-10">
+        <!-- ── Scrollable Form Body ── -->
+        <div class="flex-1 overflow-y-auto">
             <input type="hidden" id="f-id" value="">
 
-            <!-- Main Info -->
-            <div class="space-y-6">
-                <div class="space-y-2">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Product
-                        Title</label>
-                    <input type="text" id="f-name"
-                        class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-sm font-bold text-gray-900 outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
-                </div>
-                <div class="grid grid-cols-3 gap-6">
-                    <div class="space-y-2">
-                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">SKU
-                            Code</label>
-                        <input type="text" id="f-sku"
-                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
+            <div class="p-6 space-y-4 bg-white">
+
+                <!-- ┌─ SECTION 1: Product Identity ─────────────────────────┐ -->
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-brand/5 to-transparent">
+                        <i class="ti ti-id-badge text-brand text-lg"></i>
+                        <h3 class="text-[10px] font-black text-brand uppercase tracking-[0.2em]">Product Identity</h3>
                     </div>
-                    <div class="space-y-2">
-                        <label
-                            class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Category</label>
-                        <select id="f-cat"
-                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm appearance-none">
-                            <?php foreach ($all_categories as $cat): ?>
-                                <option value="<?= htmlspecialchars($cat['name']) ?>"><?= htmlspecialchars($cat['name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="space-y-2">
-                        <label
-                            class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Supplier</label>
-                        <select id="f-supplier"
-                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm appearance-none">
-                            <option value="">Select Supplier...</option>
-                            <?php foreach ($all_suppliers as $supp): ?>
-                                <option value="<?= htmlspecialchars($supp['name']) ?>">
-                                    <?= htmlspecialchars($supp['name']) ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                </div>
-                <div class="grid grid-cols-2 gap-6">
-                    <div class="space-y-2">
-                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">GSM</label>
-                        <input type="text" id="f-gsm"
-                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
-                    </div>
-                    <div class="space-y-2">
-                        <label
-                            class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Waistband</label>
-                        <input type="text" id="f-waistband"
-                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm">
-                    </div>
-                </div>
-                <div class="grid grid-cols-3 gap-6">
-                    <div class="space-y-2">
-                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Discount
-                            (%)</label>
-                        <input type="number" step="0.01" id="f-discount"
-                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm"
-                            value="0">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid
-                            From</label>
-                        <input type="date" id="f-discount-start" min="<?= date('Y-m-d') ?>"
-                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm text-gray-500">
-                    </div>
-                    <div class="space-y-2">
-                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid
-                            To</label>
-                        <input type="date" id="f-discount-end" min="<?= date('Y-m-d') ?>"
-                            class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm text-gray-500">
+                    <div class="p-6 space-y-4">
+                        <!-- Name -->
+                        <div class="space-y-1.5">
+                            <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Product Title</label>
+                            <input type="text" id="f-name" oninput="document.getElementById('form-product-name-preview').textContent = this.value || '—'"
+                                placeholder="e.g. Classic Cotton Briefs"
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold text-gray-900 outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all">
+                        </div>
+
+                        <!-- SKU / Category / Supplier -->
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">SKU Code</label>
+                                <input type="text" id="f-sku" placeholder="e.g. BRF-001"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Category</label>
+                                <select id="f-cat"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all appearance-none">
+                                    <?php foreach ($all_categories as $cat): ?>
+                                        <option value="<?= htmlspecialchars($cat['name']) ?>"><?= htmlspecialchars($cat['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Supplier</label>
+                                <select id="f-supplier"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all appearance-none">
+                                    <option value="">Select Supplier...</option>
+                                    <?php foreach ($all_suppliers as $supp): ?>
+                                        <option value="<?= htmlspecialchars($supp['name']) ?>"><?= htmlspecialchars($supp['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="space-y-1.5">
+                            <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Product Description</label>
+                            <textarea id="f-desc" rows="3" placeholder="Describe the product features, materials, and fit..."
+                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all resize-none"></textarea>
+                        </div>
                     </div>
                 </div>
-                <div class="space-y-2">
-                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Product
-                        Description</label>
-                    <textarea id="f-desc" rows="4"
-                        class="w-full px-5 py-4 bg-white border border-gray-100 rounded-2xl text-xs font-medium outline-none focus:ring-1 focus:ring-brand transition-all shadow-sm resize-none"></textarea>
+                <!-- └──────────────────────────────────────────────────────┘ -->
+
+                <!-- ┌─ SECTION 2: Specifications ───────────────────────────┐ -->
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-gray-500/5 to-transparent">
+                        <i class="ti ti-ruler text-gray-500 text-lg"></i>
+                        <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">Specifications</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">GSM <span class="normal-case font-normal">(fabric weight)</span></label>
+                                <input type="text" id="f-gsm" placeholder="e.g. 180"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all">
+                            </div>
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Waistband</label>
+                                <input type="text" id="f-waistband" placeholder="e.g. Elastic, Rubber"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all">
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+                <!-- └──────────────────────────────────────────────────────┘ -->
 
-            <!-- Variations (Color - Size Choices) -->
-            <div class="space-y-6">
-                <div class="flex items-center justify-between border-b border-gray-100 pb-2">
-                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Variations (Color & Size
-                        Choices)</h4>
-                    <span class="text-[10px] text-gray-400 font-semibold">Select sizes for each color</span>
-                </div>
+                <!-- ┌─ SECTION 3: Retail Pricing & Discounts ───────────────┐ -->
+                <div class="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+                    <div class="flex items-center gap-3 px-6 py-4 border-b border-emerald-100 bg-gradient-to-r from-emerald-50 to-transparent">
+                        <i class="ti ti-building-store text-emerald-600 text-lg"></i>
+                        <div>
+                            <h3 class="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em]">Retail Pricing &amp; Discounts</h3>
+                            <p class="text-[9px] text-emerald-500 font-semibold mt-0.5">For individual / walk-in customers</p>
+                        </div>
+                    </div>
+                    <div class="p-6 space-y-5">
 
-                <!-- Container for Color Cards with Size Chips -->
-                <div id="variation-color-list" class="space-y-3">
-                    <!-- Injected dynamically by JS -->
-                </div>
-
-                <!-- Button to Add Custom Color -->
-                <div class="flex items-center gap-2 pt-2">
-                    <input type="text" id="new-custom-color-input" placeholder="Custom color name (e.g. Olive, Coral)"
-                        class="px-4 py-2.5 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand shadow-sm flex-1">
-                    <button type="button" onclick="addCustomColorVariation()"
-                        class="px-4 py-2.5 bg-brand/10 text-brand rounded-xl text-xs font-bold hover:bg-brand/20 transition-all flex items-center gap-1">
-                        <i class="ti ti-plus"></i> Add Color
-                    </button>
-                </div>
-
-                <input type="hidden" id="f-color-variations" name="color_variations" value="">
-                <input type="hidden" id="f-colors" name="colors" value="">
-                <input type="hidden" id="f-sizes" name="sizes" value="">
-            </div>
-
-            <!-- Pricing Tiers -->
-            <div class="space-y-6">
-                <h4
-                    class="text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em] border-b border-gray-100 pb-2">
-                    Wholesale Tiers</h4>
-
-                <div class="grid grid-cols-[1fr_1fr_40px] gap-3 px-1 -mb-4">
-                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Min. Qty</label>
-                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Unit Price</label>
-                    <div></div>
-                </div>
-
-                <div id="tier-rows" class="space-y-3">
-                    <!-- Injected by JS -->
-                </div>
-                <button onclick="addTier()"
-                    class="text-[10px] font-bold text-brand uppercase tracking-widest flex items-center gap-2 hover:underline">
-                    <i class="ti ti-plus"></i> Add Price Tier
-                </button>
-            </div>
-
-            <!-- Media -->
-            <div class="space-y-6">
-                <h4
-                    class="text-[10px] font-bold text-gray-300 uppercase tracking-[0.2em] border-b border-gray-100 pb-2">
-                    Media Assets (Upload up to 6 images, PNG/JPG up to 5MB)</h4>
-
-                <div class="grid grid-cols-3 gap-4">
-                    <?php for ($i = 0; $i < 6; $i++): ?>
-                        <div class="space-y-2">
-                            <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider block text-center">
-                                <?= $i === 0 ? 'Slot 1 (Primary)' : 'Slot ' . ($i + 1) ?>
-                            </span>
-
-                            <input type="file" id="f-image-file-<?= $i ?>" accept="image/*" class="hidden"
-                                onchange="previewProductImage(this, <?= $i ?>)">
-
-                            <div onclick="document.getElementById('f-image-file-<?= $i ?>').click();"
-                                class="border-2 border-dashed border-gray-200 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-brand/40 hover:bg-white transition-all cursor-pointer bg-white shadow-sm relative overflow-hidden min-h-[100px] w-full">
-                                <div id="upload-placeholder-<?= $i ?>" class="flex flex-col items-center justify-center">
-                                    <i
-                                        class="ti ti-cloud-upload text-xl text-gray-300 group-hover:text-brand transition-all mb-1"></i>
-                                    <p class="text-[9px] font-bold text-gray-900">Upload</p>
-                                </div>
-                                <img id="form-image-preview-<?= $i ?>" src="" alt="Preview"
-                                    class="hidden absolute inset-0 w-full h-full object-cover">
-
-                                <!-- Overlay to clear or change image -->
-                                <div id="preview-actions-<?= $i ?>"
-                                    class="hidden absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1.5 opacity-0 hover:opacity-100 transition-opacity">
-                                    <button type="button"
-                                        onclick="event.stopPropagation(); document.getElementById('f-image-file-<?= $i ?>').click();"
-                                        class="bg-brand text-white text-[9px] font-bold py-1 px-2.5 rounded-lg hover:bg-brand-dark transition-all">Change</button>
-                                    <button type="button" onclick="event.stopPropagation(); clearProductImage(<?= $i ?>);"
-                                        class="bg-red-500 text-white text-[9px] font-bold py-1 px-2.5 rounded-lg hover:bg-red-600 transition-all">Delete</button>
+                        <!-- Retail Price + MOQ row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Retail Price <span class="normal-case font-normal">(LKR)</span></label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-300">LKR</span>
+                                    <input type="number" step="0.01" id="f-retail-price" placeholder="0.00"
+                                        class="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 focus:bg-white transition-all">
                                 </div>
                             </div>
-
-                            <!-- Manual image URL input -->
-                            <input type="text" id="f-image-url-<?= $i ?>"
-                                oninput="updateProductPreviewFromUrl(this.value, <?= $i ?>)" placeholder="Image URL"
-                                class="w-full px-3 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-bold outline-none focus:ring-1 focus:ring-brand shadow-sm">
+                            <div class="space-y-1.5">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Retail MOQ <span class="normal-case font-normal">(min order qty)</span></label>
+                                <input type="number" id="f-retail-moq" placeholder="1" value="1"
+                                    class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 focus:bg-white transition-all">
+                            </div>
                         </div>
-                    <?php endfor; ?>
-                </div>
-            </div>
 
-            <!-- Controls -->
-            <div class="flex gap-4 pt-10">
+                        <!-- Retail Discount band -->
+                        <div class="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-3">
+                            <p class="text-[9px] font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
+                                <i class="ti ti-discount-2 text-xs"></i> Retail Discount Window
+                            </p>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="space-y-1.5">
+                                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Discount (%)</label>
+                                    <input type="number" step="0.01" id="f-retail-discount" placeholder="0" value="0"
+                                        class="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 transition-all">
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid From</label>
+                                    <input type="date" id="f-retail-discount-start" min="<?= date('Y-m-d') ?>"
+                                        class="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 transition-all text-gray-500">
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid To</label>
+                                    <input type="date" id="f-retail-discount-end" min="<?= date('Y-m-d') ?>"
+                                        class="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-400 transition-all text-gray-500">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Retail Quantity Tiers -->
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                    <i class="ti ti-stack text-xs text-emerald-500"></i> Retail Quantity Tiers
+                                </label>
+                                <button type="button" onclick="addRetailTier()"
+                                    class="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 hover:underline">
+                                    <i class="ti ti-plus text-xs"></i> Add Tier
+                                </button>
+                            </div>
+                            <div id="retail-tier-rows" class="space-y-2">
+                                <!-- Injected by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- └──────────────────────────────────────────────────────┘ -->
+
+                <!-- ┌─ SECTION 4: Wholesale Pricing ────────────────────────┐ -->
+                <div class="bg-white rounded-2xl border border-blue-100 shadow-sm overflow-hidden">
+                    <div class="flex items-center gap-3 px-6 py-4 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-transparent">
+                        <i class="ti ti-truck-delivery text-blue-600 text-lg"></i>
+                        <div>
+                            <h3 class="text-[10px] font-black text-blue-700 uppercase tracking-[0.2em]">Wholesale Pricing</h3>
+                            <p class="text-[9px] text-blue-500 font-semibold mt-0.5">For approved wholesale buyers</p>
+                        </div>
+                    </div>
+                    <div class="p-6 space-y-5">
+
+                        <!-- Wholesale Discount band -->
+                        <div class="rounded-xl border border-blue-100 bg-blue-50/50 p-4 space-y-3">
+                            <p class="text-[9px] font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
+                                <i class="ti ti-discount-2 text-xs"></i> Wholesale Discount Window
+                            </p>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="space-y-1.5">
+                                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Discount (%)</label>
+                                    <input type="number" step="0.01" id="f-discount"
+                                        class="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
+                                        value="0">
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid From</label>
+                                    <input type="date" id="f-discount-start" min="<?= date('Y-m-d') ?>"
+                                        class="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all text-gray-500">
+                                </div>
+                                <div class="space-y-1.5">
+                                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1">Valid To</label>
+                                    <input type="date" id="f-discount-end" min="<?= date('Y-m-d') ?>"
+                                        class="w-full px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all text-gray-500">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Wholesale Price Tiers -->
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                                    <i class="ti ti-stack text-xs text-blue-500"></i> Quantity Price Tiers
+                                </label>
+                                <button onclick="addTier()"
+                                    class="text-[10px] font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 hover:underline">
+                                    <i class="ti ti-plus text-xs"></i> Add Tier
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-[1fr_1fr_36px] gap-2 px-1">
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Min. Qty</label>
+                                <label class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Unit Price (LKR)</label>
+                                <div></div>
+                            </div>
+                            <div id="tier-rows" class="space-y-2">
+                                <!-- Injected by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- └──────────────────────────────────────────────────────┘ -->
+
+                <!-- ┌─ SECTION 5: Variations (Color & Size) ────────────────┐ -->
+                <div class="bg-white rounded-2xl border border-purple-100 shadow-sm overflow-hidden">
+                    <div class="flex items-center justify-between px-6 py-4 border-b border-purple-100 bg-gradient-to-r from-purple-50 to-transparent">
+                        <div class="flex items-center gap-3">
+                            <i class="ti ti-palette text-purple-600 text-lg"></i>
+                            <div>
+                                <h3 class="text-[10px] font-black text-purple-700 uppercase tracking-[0.2em]">Variations</h3>
+                                <p class="text-[9px] text-purple-500 font-semibold mt-0.5">Colors &amp; sizes per color</p>
+                            </div>
+                        </div>
+                        <span class="text-[9px] text-gray-400 font-semibold">Select sizes for each color</span>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <!-- Color cards container -->
+                        <div id="variation-color-list" class="space-y-3">
+                            <!-- Injected dynamically by JS -->
+                        </div>
+                        <!-- Add custom color -->
+                        <div class="flex items-center gap-2 pt-1">
+                            <input type="text" id="new-custom-color-input" placeholder="Custom color (e.g. Olive, Coral)"
+                                class="px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-purple-300 focus:border-purple-400 focus:bg-white transition-all flex-1 shadow-sm">
+                            <button type="button" onclick="addCustomColorVariation()"
+                                class="px-4 py-2.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-xl text-xs font-bold hover:bg-purple-100 transition-all flex items-center gap-1">
+                                <i class="ti ti-plus"></i> Add Color
+                            </button>
+                        </div>
+                        <input type="hidden" id="f-color-variations" name="color_variations" value="">
+                        <input type="hidden" id="f-colors" name="colors" value="">
+                        <input type="hidden" id="f-sizes" name="sizes" value="">
+                    </div>
+                </div>
+                <!-- └──────────────────────────────────────────────────────┘ -->
+
+                <!-- ┌─ SECTION 6: Media Assets ──────────────────────────────┐ -->
+                <div class="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden">
+                    <div class="flex items-center gap-3 px-6 py-4 border-b border-amber-100 bg-gradient-to-r from-amber-50 to-transparent">
+                        <i class="ti ti-photo text-amber-600 text-lg"></i>
+                        <div>
+                            <h3 class="text-[10px] font-black text-amber-700 uppercase tracking-[0.2em]">Media Assets</h3>
+                            <p class="text-[9px] text-amber-500 font-semibold mt-0.5">Upload up to 6 images — PNG / JPG, max 5 MB each. Slot 1 is the primary image.</p>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <div class="grid grid-cols-3 gap-4">
+                            <?php for ($i = 0; $i < 6; $i++): ?>
+                                <div class="space-y-2">
+                                    <span class="text-[9px] font-bold text-gray-400 uppercase tracking-wider block text-center">
+                                        <?= $i === 0 ? '⭐ Slot 1 (Primary)' : 'Slot ' . ($i + 1) ?>
+                                    </span>
+                                    <input type="file" id="f-image-file-<?= $i ?>" accept="image/*" class="hidden"
+                                        onchange="previewProductImage(this, <?= $i ?>)">
+                                    <div onclick="document.getElementById('f-image-file-<?= $i ?>').click();"
+                                        class="border-2 border-dashed border-gray-200 rounded-2xl p-4 flex flex-col items-center justify-center text-center group hover:border-amber-300 hover:bg-amber-50/40 transition-all cursor-pointer bg-gray-50 relative overflow-hidden min-h-[100px] w-full">
+                                        <div id="upload-placeholder-<?= $i ?>" class="flex flex-col items-center justify-center">
+                                            <i class="ti ti-cloud-upload text-xl text-gray-300 group-hover:text-amber-500 transition-all mb-1"></i>
+                                            <p class="text-[9px] font-bold text-gray-400 group-hover:text-amber-600">Upload</p>
+                                        </div>
+                                        <img id="form-image-preview-<?= $i ?>" src="" alt="Preview"
+                                            class="hidden absolute inset-0 w-full h-full object-cover">
+                                        <div id="preview-actions-<?= $i ?>"
+                                            class="hidden absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1.5 opacity-0 hover:opacity-100 transition-opacity">
+                                            <button type="button"
+                                                onclick="event.stopPropagation(); document.getElementById('f-image-file-<?= $i ?>').click();"
+                                                class="bg-brand text-white text-[9px] font-bold py-1 px-2.5 rounded-lg hover:bg-brand-dark transition-all">Change</button>
+                                            <button type="button" onclick="event.stopPropagation(); clearProductImage(<?= $i ?>);"
+                                                class="bg-red-500 text-white text-[9px] font-bold py-1 px-2.5 rounded-lg hover:bg-red-600 transition-all">Delete</button>
+                                        </div>
+                                    </div>
+                                    <input type="text" id="f-image-url-<?= $i ?>"
+                                        oninput="updateProductPreviewFromUrl(this.value, <?= $i ?>)" placeholder="or paste image URL"
+                                        class="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-amber-300 focus:border-amber-400 focus:bg-white transition-all shadow-sm">
+                                </div>
+                            <?php endfor; ?>
+                        </div>
+                    </div>
+                </div>
+                <!-- └──────────────────────────────────────────────────────┘ -->
+
+            </div><!-- /p-6 space-y-4 -->
+        </div><!-- /scrollable body -->
+
+        <!-- ── Sticky Footer Actions ── -->
+        <div class="shrink-0 px-6 py-4 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+            <div class="flex gap-3">
                 <button id="btn-prod-save" onclick="saveProduct()"
-                    class="flex-[2] bg-brand text-brand-light font-bold py-5 rounded-[1.5rem] text-xs uppercase tracking-widest shadow-xl shadow-brand/20 hover:bg-brand-dark transition-all transform hover:-translate-y-px flex items-center justify-center gap-2">
-                    <span>Save Changes</span>
+                    class="flex-[2] bg-brand text-white font-bold py-4 rounded-2xl text-xs uppercase tracking-widest shadow-lg shadow-brand/20 hover:bg-brand-dark transition-all hover:-translate-y-px flex items-center justify-center gap-2">
+                    <i class="ti ti-device-floppy text-base"></i>
+                    <span>Save Product</span>
                 </button>
                 <button id="btn-prod-delete" onclick="deleteProduct()"
-                    class="flex-1 bg-white border border-red-100 text-red-500 font-bold py-5 rounded-[1.5rem] text-xs uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2">
+                    class="flex-1 bg-white border border-red-200 text-red-500 font-bold py-4 rounded-2xl text-xs uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2">
+                    <i class="ti ti-trash text-base"></i>
                     <span>Delete</span>
                 </button>
             </div>
-
         </div>
+
     </div>
 </main>
+
 
 <style>
     .prod-card.selected {
@@ -565,6 +722,7 @@ if (empty($all_suppliers)) {
         // Filling product form inputs with the selected product's information
         var id = parseInt(el.dataset.id || "0");
         document.getElementById('form-mode-label').textContent = 'Edit Product';
+        document.getElementById('form-product-name-preview').textContent = el.dataset.originalName || '—';
         document.getElementById('f-id').value = id;
         document.getElementById('f-name').value = el.dataset.originalName || '';
         document.getElementById('f-sku').value = el.dataset.originalSku || '';
@@ -574,6 +732,11 @@ if (empty($all_suppliers)) {
         document.getElementById('f-discount').value = el.dataset.discount || '0';
         document.getElementById('f-discount-start').value = el.dataset.discountStart || '';
         document.getElementById('f-discount-end').value = el.dataset.discountEnd || '';
+        document.getElementById('f-retail-price').value = el.dataset.retailPrice || '';
+        document.getElementById('f-retail-moq').value = el.dataset.retailMoq || '1';
+        document.getElementById('f-retail-discount').value = el.dataset.retailDiscount || '0';
+        document.getElementById('f-retail-discount-start').value = el.dataset.retailDiscountStart || '';
+        document.getElementById('f-retail-discount-end').value = el.dataset.retailDiscountEnd || '';
         document.getElementById('f-gsm').value = el.dataset.gsm || '';
         document.getElementById('f-waistband').value = el.dataset.waistband || '';
 
@@ -592,7 +755,7 @@ if (empty($all_suppliers)) {
         try { colorVars = JSON.parse(el.dataset.colorVariations || '{}'); } catch (e) { }
         renderColorVariationsUI(colorVars);
 
-        // Price Tiers -> Loading wholesale quantity discount tiers
+        // Price Tiers -> Loading wholesale and retail quantity discount tiers
         if (id > 0) {
             document.getElementById('btn-prod-delete').classList.remove('hidden');
         } else {
@@ -601,6 +764,10 @@ if (empty($all_suppliers)) {
         var tiers = [];
         try { tiers = JSON.parse(el.dataset.tiers || '[]'); } catch (e) { }
         renderTiers(tiers);
+
+        var retailTiers = [];
+        try { retailTiers = JSON.parse(el.dataset.retailTiers || '[]'); } catch (e) { }
+        renderRetailTiers(retailTiers);
 
         // Drawer Animation -> Sliding open the right-side form panel
         if (openDrawer) {
@@ -628,7 +795,6 @@ if (empty($all_suppliers)) {
     `).join('');
     }
 
-    // Action -> Adding a new empty wholesale price tier row
     function addTier() {
         var div = document.createElement('div');
         div.className = 'grid grid-cols-[1fr_1fr_40px] gap-3';
@@ -642,11 +808,39 @@ if (empty($all_suppliers)) {
         document.getElementById('tier-rows').appendChild(div);
     }
 
+    function renderRetailTiers(tiers) {
+        var cont = document.getElementById('retail-tier-rows');
+        if (!cont) return;
+        cont.innerHTML = tiers.map((t, i) => `
+        <div class="grid grid-cols-[1fr_1fr_40px] gap-3">
+            <input type="number" value="${t.q}" placeholder="Min Qty" class="px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand shadow-sm">
+            <input type="number" value="${t.p}" placeholder="Price" class="px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand shadow-sm">
+            <button type="button" onclick="this.parentElement.remove()" class="text-gray-300 hover:text-red-500 transition-colors text-lg flex items-center justify-center">
+                <i class="ti ti-x"></i>
+            </button>
+        </div>
+    `).join('');
+    }
+
+    function addRetailTier() {
+        var div = document.createElement('div');
+        div.className = 'grid grid-cols-[1fr_1fr_40px] gap-3';
+        div.innerHTML = `
+        <input type="number" placeholder="Min Qty" class="px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand shadow-sm">
+        <input type="number" placeholder="Price" class="px-4 py-3 bg-white border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-1 focus:ring-brand shadow-sm">
+        <button type="button" onclick="this.parentElement.remove()" class="text-gray-300 hover:text-red-500 transition-colors text-lg flex items-center justify-center">
+            <i class="ti ti-x"></i>
+        </button>
+    `;
+        document.getElementById('retail-tier-rows').appendChild(div);
+    }
+
     // Action -> Resetting the form and opening the drawer to add a brand new product
     function showNew() {
         selectedIdx = -1;
         document.querySelectorAll('.prod-card').forEach(c => c.classList.remove('selected', 'shadow-lg'));
         document.getElementById('form-mode-label').textContent = 'Add New Product';
+        document.getElementById('form-product-name-preview').textContent = 'New Product';
         document.getElementById('f-id').value = '';
         document.getElementById('f-name').value = '';
         document.getElementById('f-sku').value = '';
@@ -655,9 +849,15 @@ if (empty($all_suppliers)) {
         document.getElementById('f-discount').value = '0';
         document.getElementById('f-discount-start').value = '';
         document.getElementById('f-discount-end').value = '';
+        document.getElementById('f-retail-price').value = '';
+        document.getElementById('f-retail-moq').value = '1';
+        document.getElementById('f-retail-discount').value = '0';
+        document.getElementById('f-retail-discount-start').value = '';
+        document.getElementById('f-retail-discount-end').value = '';
         document.getElementById('f-gsm').value = '';
         document.getElementById('f-waistband').value = '';
         document.getElementById('tier-rows').innerHTML = '';
+        document.getElementById('retail-tier-rows').innerHTML = '';
         addTier();
 
         // Reset all image slots
@@ -911,6 +1111,20 @@ if (empty($all_suppliers)) {
             }
         }
 
+        // Collecting retail pricing tiers
+        var retailTiers = [];
+        var retailRows = document.getElementById('retail-tier-rows') ? document.getElementById('retail-tier-rows').children : [];
+        for (let row of retailRows) {
+            var inputs = row.getElementsByTagName('input');
+            if (inputs.length >= 2) {
+                var qty = parseInt(inputs[0].value);
+                var price = parseFloat(inputs[1].value);
+                if (!isNaN(qty) && !isNaN(price)) {
+                    retailTiers.push({ q: qty, p: price });
+                }
+            }
+        }
+
         if (!name || !sku) {
             showToast("Product Title and SKU Code are required.", "error");
             return;
@@ -927,8 +1141,14 @@ if (empty($all_suppliers)) {
         formData.append('description', description);
         formData.append('moq', tiers.length > 0 ? tiers[0].q : 50);
         formData.append('base_price', tiers.length > 0 ? tiers[0].p : 0);
+        formData.append('retail_price', document.getElementById('f-retail-price') ? document.getElementById('f-retail-price').value : 0);
+        formData.append('retail_moq', document.getElementById('f-retail-moq') ? document.getElementById('f-retail-moq').value : 1);
+        formData.append('retail_discount', document.getElementById('f-retail-discount') ? document.getElementById('f-retail-discount').value : 0);
+        formData.append('retail_discount_start', document.getElementById('f-retail-discount-start') ? document.getElementById('f-retail-discount-start').value : '');
+        formData.append('retail_discount_end', document.getElementById('f-retail-discount-end') ? document.getElementById('f-retail-discount-end').value : '');
         formData.append('status', 'In Stock');
         formData.append('tiers', JSON.stringify(tiers));
+        formData.append('retail_tiers', JSON.stringify(retailTiers));
         formData.append('colors', document.getElementById('f-colors').value);
         formData.append('sizes', document.getElementById('f-sizes').value);
         formData.append('color_variations', document.getElementById('f-color-variations') ? document.getElementById('f-color-variations').value : '');
@@ -1210,4 +1430,4 @@ if (empty($all_suppliers)) {
    - Customer Catalog: product_catalog.php (if displaying new product attributes)
 =============================================================================
 */
-?>
+?>

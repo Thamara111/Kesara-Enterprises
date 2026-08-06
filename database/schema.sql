@@ -8,7 +8,7 @@ USE kesara_db;
 -- 1. BASE TABLES (No Foreign Keys)
 -- ==========================================
 
--- Users Table (Wholesale Buyers)
+-- Users Table (Wholesale & Individual Customers)
 CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   first_name VARCHAR(50) NOT NULL,
@@ -17,10 +17,11 @@ CREATE TABLE users (
   phone VARCHAR(20) NOT NULL,
   whatsapp_number VARCHAR(20) DEFAULT NULL,
   password VARCHAR(255) NOT NULL,
-  business_name VARCHAR(100) NOT NULL,
-  br_number VARCHAR(50) NOT NULL,
-  business_type VARCHAR(50) NOT NULL,
-  address TEXT NOT NULL,
+  user_type ENUM('wholesale','individual') DEFAULT 'individual',
+  business_name VARCHAR(100) DEFAULT NULL,
+  br_number VARCHAR(50) DEFAULT NULL,
+  business_type VARCHAR(50) DEFAULT NULL,
+  address TEXT DEFAULT NULL,
   status ENUM('pending','approved','rejected','suspended') DEFAULT 'pending',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -46,6 +47,9 @@ CREATE TABLE products (
   description TEXT,
   moq INT NOT NULL DEFAULT 50,
   base_price DECIMAL(10,2) NOT NULL,
+  retail_price DECIMAL(10,2) DEFAULT NULL,
+  retail_moq INT DEFAULT 1,
+  retail_discount DECIMAL(10,2) DEFAULT 0.00,
   status ENUM('In Stock', 'Low Stock', 'Out of Stock', 'On Order', 'Discontinued') DEFAULT 'In Stock',
   images VARCHAR(255) DEFAULT NULL,
   deleted_at DATETIME DEFAULT NULL,
@@ -128,10 +132,11 @@ CREATE TABLE password_resets (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Pricing Tiers Table (Dynamic Wholesale Pricing by Quantity)
+-- Pricing Tiers Table (Dynamic Wholesale & Retail Pricing by Quantity)
 CREATE TABLE pricing_tiers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   product_id INT NOT NULL,
+  tier_type ENUM('wholesale', 'retail') DEFAULT 'wholesale',
   min_qty INT NOT NULL,
   max_qty INT,  -- NULL = no upper limit
   price DECIMAL(10,2) NOT NULL,

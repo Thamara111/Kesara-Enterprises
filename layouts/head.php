@@ -9,6 +9,7 @@ header("Expires: 0"); // Proxies.
 
 $is_logged_in = isset($_SESSION['user_id']);
 $buyer_approved = false;
+$user_type = $_SESSION['user_type'] ?? 'individual';
 
 if ($is_logged_in) {
     if (!isset($pdo)) {
@@ -20,18 +21,24 @@ if ($is_logged_in) {
     }
     if (isset($pdo)) {
         try {
-            $auth_stmt = $pdo->prepare("SELECT status FROM users WHERE id = ? LIMIT 1");
+            $auth_stmt = $pdo->prepare("SELECT status, user_type FROM users WHERE id = ? LIMIT 1");
             $auth_stmt->execute([$_SESSION['user_id']]);
             $auth_user = $auth_stmt->fetch();
-            if ($auth_user && $auth_user['status'] === 'approved') {
-                $buyer_approved = true;
+            if ($auth_user) {
+                if ($auth_user['status'] === 'approved') {
+                    $buyer_approved = true;
+                }
+                $user_type = $auth_user['user_type'] ?? 'individual';
+                $_SESSION['user_type'] = $user_type;
             }
         } catch (\Exception $e) {
             $buyer_approved = false;
         }
     }
 }
-$can_see_prices = $is_logged_in && $buyer_approved;
+
+$is_wholesale_buyer = $is_logged_in && ($user_type === 'wholesale') && $buyer_approved;
+$can_see_prices = true;
 ?>
 <!DOCTYPE html>
 <html lang="en">

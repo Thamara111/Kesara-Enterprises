@@ -115,17 +115,26 @@ if (isset($pdo)) {
             <?php endif; ?>
             
             <?php if ($is_admin): ?>
-            <a href="/admin-customers" class="flex items-center justify-between w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'customers' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
-                <div class="flex items-center gap-4">
-                    <i class="ti ti-users text-xl"></i>
-                    Customers
+            <div class="space-y-1 py-1">
+                <div class="flex items-center justify-between w-full px-5 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                    <span>Customers</span>
+                    <?php if ($pending_approvals_count > 0): ?>
+                        <span class="px-2 py-0.5 bg-amber-500 text-white text-[9px] font-extrabold rounded-full animate-pulse tracking-wider">
+                            <?= $pending_approvals_count ?> PENDING
+                        </span>
+                    <?php endif; ?>
                 </div>
-                <?php if ($pending_approvals_count > 0): ?>
-                    <span class="px-2 py-0.5 bg-amber-500 text-white text-[9px] font-extrabold rounded-full animate-pulse tracking-wider">
-                        <?= $pending_approvals_count ?> PENDING
-                    </span>
-                <?php endif; ?>
-            </a>
+                <a href="/admin-customers?type=individual" class="flex items-center gap-4 w-full pl-8 pr-5 py-2.5 rounded-xl text-xs font-bold transition-all <?php echo ($current_page === 'customers' && ($_GET['type'] ?? '') === 'individual') ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                    <i class="ti ti-user text-base"></i>
+                    Individual Customers
+                </a>
+                <a href="/admin-customers?type=wholesale" class="flex items-center justify-between w-full pl-8 pr-5 py-2.5 rounded-xl text-xs font-bold transition-all <?php echo ($current_page === 'customers' && (($_GET['type'] ?? 'wholesale') === 'wholesale')) ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                    <div class="flex items-center gap-4">
+                        <i class="ti ti-building-store text-base"></i>
+                        Wholesale Customers
+                    </div>
+                </a>
+            </div>
             <a href="/admin-users" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'users' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                 <i class="ti ti-user-cog text-xl"></i>
                 Users

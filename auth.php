@@ -5,8 +5,37 @@
  */
 require_once __DIR__ . "/database/connection.php";
 
+// Self-Healing Database: Ensure user_type column, nullable business columns, and mock_whatsapp_messages table exist
+if (isset($pdo) && $pdo !== null) {
+    try {
+        $checkUserType = $pdo->query("SHOW COLUMNS FROM users LIKE 'user_type'");
+        if (!$checkUserType->fetch()) {
+            $pdo->exec("ALTER TABLE users ADD COLUMN user_type ENUM('wholesale', 'individual') DEFAULT 'individual'");
+        }
+        $pdo->exec("ALTER TABLE users MODIFY COLUMN business_name VARCHAR(255) NULL");
+        $pdo->exec("ALTER TABLE users MODIFY COLUMN br_number VARCHAR(100) NULL");
+        $pdo->exec("ALTER TABLE users MODIFY COLUMN business_type VARCHAR(100) NULL");
+        $pdo->exec("ALTER TABLE users MODIFY COLUMN address TEXT NULL");
+
+        $pdo->exec("CREATE TABLE IF NOT EXISTS mock_whatsapp_messages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            customer_id INT DEFAULT NULL,
+            phone VARCHAR(50) DEFAULT NULL,
+            message TEXT DEFAULT NULL,
+            status VARCHAR(50) DEFAULT 'delivered',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+    } catch (\Exception $e) {}
+}
+
 $page_mode = isset($_GET['mode']) ? $_GET['mode'] : 'login';
-$success_message = isset($_GET['success']) && $_GET['success'] == 1 ? "Your wholesale account request has been submitted successfully! We will contact you within 24h." : "";
+$success_code = isset($_GET['success']) ? (int)$_GET['success'] : 0;
+$success_message = "";
+if ($success_code === 1) {
+    $success_message = "Your wholesale account request has been submitted successfully! We will contact you within 24h.";
+} elseif ($success_code === 2) {
+    $success_message = "Welcome to Kesara Enterprises! Your individual account is now active. A thank you message and WhatsApp notification have been sent. You can shop our retail collection right away!";
+}
 $error_message = "";
 $warning_message = "";
 $email_error = false;
@@ -15,66 +44,103 @@ $password_error = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Processing request -> Handling customer registration form submission
     if ($page_mode === 'register') {
+        $account_type = trim($_POST['account_type'] ?? 'individual');
         $first_name = trim($_POST['first_name'] ?? '');
         $last_name = trim($_POST['last_name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $phone = trim($_POST['phone'] ?? '');
         $whatsapp_number = trim($_POST['whatsapp_number'] ?? '');
         $password = $_POST['password'] ?? '';
+
         $business_name = trim($_POST['business_name'] ?? '');
         $br_number = trim($_POST['br_number'] ?? '');
         $business_type = trim($_POST['business_type'] ?? '');
         $address = trim($_POST['address'] ?? '');
 
-        // Checking data -> Ensuring required registration fields are not empty
-        if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($whatsapp_number) || empty($password) || empty($business_name) || empty($br_number) || empty($business_type) || empty($address)) {
-            $error_message = "All fields are required.";
-        // Checking data -> Validating email address format
-        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $error_message = "Invalid email format.";
-        // Checking data -> Validating Sri Lankan 10-digit phone number format
-        } elseif (!preg_match('/^0[0-9]{9}$/', $phone)) {
-            $error_message = "Phone number must start with 0 and be exactly 10 digits.";
-        // Checking data -> Validating Sri Lankan 10-digit WhatsApp number format
-        } elseif (!preg_match('/^0[0-9]{9}$/', $whatsapp_number)) {
-            $error_message = "WhatsApp number must start with 0 and be exactly 10 digits.";
-        } else {
-            if ($pdo) {
-                try {
-                    /*
-                    // [VIVA TASK 05 - STEP 1: Self-Healing DB]: Auto-create tin_number column in users table if missing
-                    $checkTin = $pdo->query("SHOW COLUMNS FROM users LIKE 'tin_number'");
-                    if (!$checkTin->fetch()) {
-                        $pdo->exec("ALTER TABLE users ADD COLUMN tin_number VARCHAR(30) UNIQUE DEFAULT NULL AFTER br_number");
-                    }
+        $is_individual = ($account_type === 'individual');
 
-                    // [VIVA TASK 05 - STEP 2: Extract & Insert TIN Input]: Read TIN number and insert into users table
-                    $tin_number = trim($_POST['tin_number'] ?? '');
-                    $insert_tin_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, business_name, br_number, tin_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
-                    $insert_tin_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $tin_number, $business_type, $address]);
-                    */
-
-                    // Checking data -> Checking if an account with this email address already exists
-                    $check_stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-                    $check_stmt->execute([$email]);
-                    if ($check_stmt->fetch()) {
-                        $error_message = "An account with this email address already exists.";
-                    } else {
-                        // Processing data -> Hashing customer password using bcrypt algorithm
-                        $hashed_pass = password_hash($password, PASSWORD_BCRYPT);
-                        // Saving data -> Inserting new customer account into users table with pending status
-                        $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, business_name, br_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
-                        $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $business_type, $address]);
-
-                        header("Location: ?mode=register&success=1", true, 303);
-                        exit;
-                    }
-                } catch (\Exception $e) {
-                    $error_message = "Database error: " . $e->getMessage();
-                }
+        if ($is_individual) {
+            // Checking data -> Individual Customer Required Fields
+            if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($whatsapp_number) || empty($password)) {
+                $error_message = "All contact fields are required.";
+            } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $error_message = "Invalid email format.";
+            } elseif (!preg_match('/^0[0-9]{9}$/', $phone)) {
+                $error_message = "Phone number must start with 0 and be exactly 10 digits.";
+            } elseif (!preg_match('/^0[0-9]{9}$/', $whatsapp_number)) {
+                $error_message = "WhatsApp number must start with 0 and be exactly 10 digits.";
             } else {
-                header("Location: ?mode=register&success=1", true, 303);
-                exit;
+                if ($pdo) {
+                    try {
+                        $check_stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+                        $check_stmt->execute([$email]);
+                        if ($check_stmt->fetch()) {
+                            $error_message = "An account with this email address already exists.";
+                        } else {
+                            $hashed_pass = password_hash($password, PASSWORD_BCRYPT);
+                            $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, user_type, status) VALUES (?, ?, ?, ?, ?, ?, 'individual', 'approved')");
+                            $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass]);
+                            $new_id = $pdo->lastInsertId();
+
+                            // Record thank you WhatsApp notification
+                            try {
+                                $wa_msg = "Hello {$first_name}, thank you for joining Kesara Enterprises! Your individual account is now active. You can shop our retail collection right away!";
+                                $stmt_wa = $pdo->prepare("INSERT INTO mock_whatsapp_messages (customer_id, phone, message, status) VALUES (?, ?, ?, 'delivered')");
+                                $stmt_wa->execute([$new_id, $whatsapp_number, $wa_msg]);
+                            } catch (\Exception $ex) {}
+
+                            // Auto-login Individual Customer immediately
+                            if (session_status() === PHP_SESSION_NONE) {
+                                session_start();
+                            }
+                            $_SESSION['user_id'] = $new_id;
+                            $_SESSION['user_email'] = $email;
+                            $_SESSION['user_name'] = $first_name . ' ' . $last_name;
+                            $_SESSION['user_type'] = 'individual';
+
+                            header("Location: ?mode=register&success=2", true, 303);
+                            exit;
+                        }
+                    } catch (\Exception $e) {
+                        $error_message = "Database error: " . $e->getMessage();
+                    }
+                } else {
+                    header("Location: ?mode=register&success=2", true, 303);
+                    exit;
+                }
+            }
+        } else {
+            // Wholesale Customer Registration
+            if (empty($first_name) || empty($last_name) || empty($email) || empty($phone) || empty($whatsapp_number) || empty($password) || empty($business_name) || empty($br_number) || empty($business_type) || empty($address)) {
+                $error_message = "All wholesale fields are required.";
+            } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $error_message = "Invalid email format.";
+            } elseif (!preg_match('/^0[0-9]{9}$/', $phone)) {
+                $error_message = "Phone number must start with 0 and be exactly 10 digits.";
+            } elseif (!preg_match('/^0[0-9]{9}$/', $whatsapp_number)) {
+                $error_message = "WhatsApp number must start with 0 and be exactly 10 digits.";
+            } else {
+                if ($pdo) {
+                    try {
+                        $check_stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+                        $check_stmt->execute([$email]);
+                        if ($check_stmt->fetch()) {
+                            $error_message = "An account with this email address already exists.";
+                        } else {
+                            $hashed_pass = password_hash($password, PASSWORD_BCRYPT);
+                            $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, user_type, business_name, br_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, 'wholesale', ?, ?, ?, ?, 'pending')");
+                            $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $business_type, $address]);
+
+                            header("Location: ?mode=register&success=1", true, 303);
+                            exit;
+                        }
+                    } catch (\Exception $e) {
+                        $error_message = "Database error: " . $e->getMessage();
+                    }
+                } else {
+                    header("Location: ?mode=register&success=1", true, 303);
+                    exit;
+                }
             }
         }
     // Processing request -> Handling customer login form submission
@@ -82,40 +148,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = trim($_POST['email'] ?? '');
         $password = $_POST['password'] ?? '';
 
-        // Checking data -> Validating email address and password inputs
         if (empty($email) || empty($password)) {
             $error_message = "Email and password are required.";
-            if (empty($email))
-                $email_error = true;
-            if (empty($password))
-                $password_error = true;
+            if (empty($email)) $email_error = true;
+            if (empty($password)) $password_error = true;
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error_message = "Invalid email format.";
             $email_error = true;
         } else {
             if ($pdo) {
                 try {
-                    // Getting data -> Fetching customer user record matching email
                     $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
                     $stmt->execute([$email]);
                     $user = $stmt->fetch();
 
-                    // Checking data -> Verifying password hash and account approval status
                     if ($user && password_verify($password, $user['password'])) {
                         if ($user['status'] === 'approved') {
                             if (session_status() === PHP_SESSION_NONE) {
                                 session_start();
                             }
-                            // Saving session -> Storing authenticated user credentials in session
                             $_SESSION['user_id'] = $user['id'];
                             $_SESSION['user_email'] = $user['email'];
                             $_SESSION['user_name'] = $user['first_name'] . ' ' . $user['last_name'];
+                            $_SESSION['user_type'] = $user['user_type'] ?? 'wholesale';
 
                             header("Location: /account");
                             exit;
                         } else {
                             if ($user['status'] === 'pending') {
-                                $warning_message = "Your account approval is currently pending. We will notify you once approved.";
+                                $warning_message = "Your wholesale account approval is currently pending. We will notify you once approved.";
                             } else {
                                 $error_message = "Your account is currently " . htmlspecialchars($user['status']) . ".";
                             }
@@ -301,44 +362,72 @@ require_once __DIR__ . "/layouts/head.php";
                     <button class="text-brand font-bold hover:underline" onclick="window.location.href='/'">Back to Shop</button>
                 </div>
 
-                <h2 class="text-2xl font-bold text-gray-900 mb-2">Request wholesale access</h2>
-                <p class="text-sm text-gray-500 mb-8">Your account will be reviewed before activation</p>
+                <!-- Registration Type Selector Tabs -->
+                <div class="grid grid-cols-2 gap-3 p-1.5 bg-gray-100 rounded-2xl mb-8">
+                    <button type="button" id="tab-individual-btn" onclick="switchRegisterTab('individual')"
+                        class="py-3 px-6 rounded-xl font-bold text-sm transition-all shadow-sm bg-white text-gray-900 flex items-center justify-center gap-2">
+                        <i class="ti ti-user text-lg text-brand"></i>
+                        Individual Customer
+                        <span class="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-extrabold rounded-full">INSTANT ACCESS</span>
+                    </button>
+                    <button type="button" id="tab-wholesale-btn" onclick="switchRegisterTab('wholesale')"
+                        class="py-3 px-6 rounded-xl font-bold text-sm transition-all text-gray-500 hover:text-gray-900 flex items-center justify-center gap-2">
+                        <i class="ti ti-building-store text-lg"></i>
+                        Wholesale Business
+                        <span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-extrabold rounded-full">ADMIN REVIEW</span>
+                    </button>
+                </div>
+
+                <div id="reg-header-individual">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Create Individual Account</h2>
+                    <p class="text-sm text-gray-500 mb-6">No waiting period! Register with your details and start shopping retail immediately.</p>
+                </div>
+
+                <div id="reg-header-wholesale" class="hidden">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-2">Request Wholesale Access</h2>
+                    <p class="text-sm text-gray-500 mb-6">Register your business details to unlock wholesale bulk pricing tiers.</p>
+                </div>
 
                 <?php if (!empty($error_message)): ?>
-                    <div
-                        class="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-650 text-xs font-bold flex items-center gap-3">
+                    <div class="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-650 text-xs font-bold flex items-center gap-3">
                         <i class="ti ti-alert-circle text-lg"></i>
                         <span><?= htmlspecialchars($error_message) ?></span>
                     </div>
                 <?php endif; ?>
 
-                <div class="bg-brand-light/50 border border-brand/20 rounded-xl p-4 flex gap-4 mb-8">
+                <div id="reg-banner-individual" class="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-4 mb-8">
+                    <i class="ti ti-circle-check text-emerald-600 text-xl shrink-0 mt-0.5"></i>
+                    <p class="text-xs text-emerald-800 font-medium leading-relaxed">
+                        Individual accounts are automatically approved! You will receive a thank you email and WhatsApp notification immediately upon sign up.
+                    </p>
+                </div>
+
+                <div id="reg-banner-wholesale" class="hidden bg-brand-light/50 border border-brand/20 rounded-xl p-4 flex gap-4 mb-8">
                     <i class="ti ti-info-circle text-brand text-xl shrink-0 mt-0.5"></i>
                     <p class="text-xs text-brand leading-relaxed">
-                        This platform is for registered businesses only. Personal orders are not accepted.
+                        Wholesale accounts require valid Business Registration (BR) details and manual admin approval.
                     </p>
                 </div>
 
                 <form id="register-form" action="" method="POST" class="space-y-8">
-                    <div class="grid md:grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                    <input type="hidden" name="account_type" id="account_type_input" value="individual">
+
+                    <div id="form-grid-container" class="grid md:grid-cols-1 lg:grid-cols-1 gap-6 mb-4">
                         <!-- Contact Details -->
-                        <div>
-                            <h3
-                                class="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-6 flex items-center gap-4">
-                                Contact Details
+                        <div id="contact-details-sec">
+                            <h3 class="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-6 flex items-center gap-4">
+                                Personal & Contact Details
                                 <div class="h-px bg-gray-100 flex-1"></div>
                             </h3>
 
-                            <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div class="space-y-2">
-                                    <label class="block text-sm font-semibold text-gray-700">First name <span
-                                            class="text-red-500">*</span></label>
+                                    <label class="block text-sm font-semibold text-gray-700">First name <span class="text-red-500">*</span></label>
                                     <input type="text" name="first_name" required placeholder="Kamal"
                                         class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-sm font-semibold text-gray-700">Last name <span
-                                            class="text-red-500">*</span></label>
+                                    <label class="block text-sm font-semibold text-gray-700">Last name <span class="text-red-500">*</span></label>
                                     <input type="text" name="last_name" required placeholder="Perera"
                                         class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
                                 </div>
@@ -346,15 +435,13 @@ require_once __DIR__ . "/layouts/head.php";
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                 <div class="space-y-2">
-                                    <label class="block text-sm font-semibold text-gray-700">Email address <span
-                                            class="text-red-500">*</span></label>
-                                    <input type="email" name="email" required placeholder="you@company.com"
+                                    <label class="block text-sm font-semibold text-gray-700">Email address <span class="text-red-500">*</span></label>
+                                    <input type="email" name="email" required placeholder="you@example.com"
                                         pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
                                         class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-sm font-semibold text-gray-700">Phone number <span
-                                            class="text-red-500">*</span></label>
+                                    <label class="block text-sm font-semibold text-gray-700">Phone number <span class="text-red-500">*</span></label>
                                     <input type="tel" id="register-phone" name="phone" required maxlength="10"
                                         pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits"
                                         oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
@@ -363,11 +450,9 @@ require_once __DIR__ . "/layouts/head.php";
                                     <div id="phone-warning" class="hidden text-xs text-red-500 mt-1 font-medium">Please enter exactly 10 digits starting with 0.</div>
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-sm font-semibold text-gray-700">WhatsApp number <span
-                                            class="text-red-500">*</span></label>
+                                    <label class="block text-sm font-semibold text-gray-700">WhatsApp number <span class="text-red-500">*</span></label>
                                     <div class="relative">
-                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-green-500"><i
-                                                class="ti ti-brand-whatsapp text-lg"></i></span>
+                                        <span class="absolute left-4 top-1/2 -translate-y-1/2 text-green-500"><i class="ti ti-brand-whatsapp text-lg"></i></span>
                                         <input type="tel" id="register-whatsapp" name="whatsapp_number" required
                                             maxlength="10" pattern="^0[0-9]{9}$" title="Phone number must start with 0 and contain exactly 10 digits"
                                             oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
@@ -376,8 +461,7 @@ require_once __DIR__ . "/layouts/head.php";
                                     </div>
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-sm font-semibold text-gray-700">Password <span
-                                            class="text-red-500">*</span></label>
+                                    <label class="block text-sm font-semibold text-gray-700">Password <span class="text-red-500">*</span></label>
                                     <div class="relative">
                                         <input type="password" id="register-password" name="password" required minlength="8" maxlength="12"
                                             placeholder="Min. 8 characters"
@@ -386,50 +470,36 @@ require_once __DIR__ . "/layouts/head.php";
                                         <i onclick="togglePasswordVisibility(this)"
                                             class="ti ti-eye absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-lg cursor-pointer"></i>
                                     </div>
-                                    <!-- Strength bar -->
                                     <div class="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                                        <div id="strengthBar"
-                                            class="h-full rounded-full transition-all duration-300 w-0 bg-gray-300"></div>
+                                        <div id="strengthBar" class="h-full rounded-full transition-all duration-300 w-0 bg-gray-300"></div>
                                     </div>
                                     <p id="strengthLabel" class="text-xs mt-1 text-gray-400"></p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Business Info -->
-                        <div class="border-l-2 pl-6 border-gray-200">
-                            <h3
-                                class="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-6 flex items-center gap-4">
+                        <!-- Business Info (Wholesale Only) -->
+                        <div id="business-info-sec" class="hidden border-t md:border-t-0 md:border-l-2 pt-6 md:pt-0 md:pl-6 border-gray-200">
+                            <h3 class="text-[10px] font-bold tracking-widest text-gray-400 uppercase mb-6 flex items-center gap-4">
                                 Business Information
                                 <div class="h-px bg-gray-100 flex-1"></div>
                             </h3>
 
                             <div class="space-y-4">
                                 <div class="space-y-2">
-                                    <label class="block text-sm font-semibold text-gray-700">Business name <span
-                                            class="text-red-500">*</span></label>
-                                    <input type="text" name="business_name" required placeholder="ABC Garments (Pvt) Ltd"
+                                    <label class="block text-sm font-semibold text-gray-700">Business name <span class="text-red-500">*</span></label>
+                                    <input type="text" name="business_name" id="input_business_name" placeholder="ABC Garments (Pvt) Ltd"
                                         class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div class="space-y-2">
-                                        <label class="block text-sm font-semibold text-gray-700">BR Number <span
-                                                class="text-red-500">*</span></label>
-                                        <input type="text" name="br_number" required placeholder="PV 12345"
+                                        <label class="block text-sm font-semibold text-gray-700">BR Number <span class="text-red-500">*</span></label>
+                                        <input type="text" name="br_number" id="input_br_number" placeholder="PV 12345"
                                             class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
                                     </div>
-                                    <!-- [VIVA TASK 05 - STEP 3: Frontend UI Registration Form - Tax Identification Number (TIN) Field (Commented out for later use)]
                                     <div class="space-y-2">
-                                        <label class="block text-sm font-semibold text-gray-700">TIN Number (Tax ID) <span
-                                                class="text-red-500">*</span></label>
-                                        <input type="text" name="tin_number" required placeholder="123456789-0000"
-                                            class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm">
-                                    </div>
-                                    -->
-                                    <div class="space-y-2">
-                                        <label class="block text-sm font-semibold text-gray-700">Business type <span
-                                                class="text-red-500">*</span></label>
-                                        <select name="business_type" required
+                                        <label class="block text-sm font-semibold text-gray-700">Business type <span class="text-red-500">*</span></label>
+                                        <select name="business_type" id="input_business_type"
                                             class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm appearance-none">
                                             <option value="">Select type</option>
                                             <option>Retailer</option>
@@ -440,9 +510,8 @@ require_once __DIR__ . "/layouts/head.php";
                                     </div>
                                 </div>
                                 <div class="space-y-2">
-                                    <label class="block text-sm font-semibold text-gray-700">Address <span
-                                            class="text-red-500">*</span></label>
-                                    <textarea name="address" required rows="2" placeholder="No. 12, Main Street, Colombo 03"
+                                    <label class="block text-sm font-semibold text-gray-700">Address <span class="text-red-500">*</span></label>
+                                    <textarea name="address" id="input_address" rows="2" placeholder="No. 12, Main Street, Colombo 03"
                                         class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-brand focus:border-brand outline-none transition-all text-sm resize-none"></textarea>
                                 </div>
                             </div>
@@ -453,14 +522,14 @@ require_once __DIR__ . "/layouts/head.php";
                         <input type="checkbox" id="terms" required
                             class="mt-1 rounded text-brand focus:ring-brand border-gray-300">
                         <label for="terms" class="text-xs text-gray-500 leading-relaxed">
-                            I confirm this is a registered business and I agree to the <a href="/terms-&-conditions" target="_blank"
-                                class="text-brand font-semibold hover:underline">wholesale terms and conditions</a>.
+                            I agree to the <a href="/terms-and-conditions" target="_blank"
+                                class="text-brand font-semibold hover:underline">terms and conditions</a> and confirm my details are accurate.
                         </label>
                     </div>
 
-                    <button type="submit"
+                    <button type="submit" id="submit-reg-btn"
                         class="w-full bg-brand text-brand-light font-bold py-3.5 rounded-lg hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg">
-                        Submit application
+                        Create Account & Start Shopping
                     </button>
                 </form>
 
@@ -531,6 +600,58 @@ require_once __DIR__ . "/layouts/head.php";
         label.className = textClass;
     };
 
+    window.switchRegisterTab = function(type) {
+        const inputType = document.getElementById('account_type_input');
+        const tabIndividualBtn = document.getElementById('tab-individual-btn');
+        const tabWholesaleBtn = document.getElementById('tab-wholesale-btn');
+        const headerIndividual = document.getElementById('reg-header-individual');
+        const headerWholesale = document.getElementById('reg-header-wholesale');
+        const bannerIndividual = document.getElementById('reg-banner-individual');
+        const bannerWholesale = document.getElementById('reg-banner-wholesale');
+        const businessSec = document.getElementById('business-info-sec');
+        const submitBtn = document.getElementById('submit-reg-btn');
+        const formContainer = document.getElementById('form-grid-container');
+
+        const bName = document.getElementById('input_business_name');
+        const bBr = document.getElementById('input_br_number');
+        const bType = document.getElementById('input_business_type');
+        const bAddr = document.getElementById('input_address');
+
+        if (inputType) inputType.value = type;
+
+        if (type === 'wholesale') {
+            tabIndividualBtn.className = "py-3 px-6 rounded-xl font-bold text-sm transition-all text-gray-500 hover:text-gray-900 flex items-center justify-center gap-2";
+            tabWholesaleBtn.className = "py-3 px-6 rounded-xl font-bold text-sm transition-all shadow-sm bg-white text-gray-900 flex items-center justify-center gap-2";
+            headerIndividual.classList.add('hidden');
+            headerWholesale.classList.remove('hidden');
+            bannerIndividual.classList.add('hidden');
+            bannerWholesale.classList.remove('hidden');
+            businessSec.classList.remove('hidden');
+            if (formContainer) formContainer.className = "grid md:grid-cols-1 lg:grid-cols-2 gap-6 mb-4";
+            if (submitBtn) submitBtn.textContent = "Submit Wholesale Application";
+
+            if (bName) bName.required = true;
+            if (bBr) bBr.required = true;
+            if (bType) bType.required = true;
+            if (bAddr) bAddr.required = true;
+        } else {
+            tabIndividualBtn.className = "py-3 px-6 rounded-xl font-bold text-sm transition-all shadow-sm bg-white text-gray-900 flex items-center justify-center gap-2";
+            tabWholesaleBtn.className = "py-3 px-6 rounded-xl font-bold text-sm transition-all text-gray-500 hover:text-gray-900 flex items-center justify-center gap-2";
+            headerIndividual.classList.remove('hidden');
+            headerWholesale.classList.add('hidden');
+            bannerIndividual.classList.remove('hidden');
+            bannerWholesale.classList.add('hidden');
+            businessSec.classList.add('hidden');
+            if (formContainer) formContainer.className = "grid md:grid-cols-1 lg:grid-cols-1 gap-6 mb-4";
+            if (submitBtn) submitBtn.textContent = "Create Account & Start Shopping";
+
+            if (bName) bName.required = false;
+            if (bBr) bBr.required = false;
+            if (bType) bType.required = false;
+            if (bAddr) bAddr.required = false;
+        }
+    };
+
     function initAuthForm() {
         const phoneInput = document.getElementById('register-phone');
         const phoneWarning = document.getElementById('phone-warning');
@@ -559,7 +680,12 @@ require_once __DIR__ . "/layouts/head.php";
                 e.preventDefault();
                 const formData = new FormData(this);
                 const btn = this.querySelector('button[type="submit"]');
-                if (btn) setButtonLoading(btn, true, 'Submitting Request...');
+                if (btn && typeof setButtonLoading === 'function') {
+                    setButtonLoading(btn, true, 'Creating Account...');
+                } else if (btn) {
+                    btn.disabled = true;
+                    btn.textContent = 'Creating Account...';
+                }
 
                 fetch('api/register.php', {
                     method: 'POST',
@@ -568,16 +694,35 @@ require_once __DIR__ . "/layouts/head.php";
                     .then(res => res.json())
                     .then(data => {
                         if (data.status === 'success') {
-                            window.location.search = '?success=1';
+                            const code = data.success_code || 1;
+                            window.location.href = '?mode=register&success=' + code;
                         } else {
-                            if (btn) setButtonLoading(btn, false);
-                            if(typeof showToast === 'function') showToast(data.message || 'Error requesting account.', 'error');
+                            if (btn && typeof setButtonLoading === 'function') {
+                                setButtonLoading(btn, false);
+                            } else if (btn) {
+                                btn.disabled = false;
+                                btn.textContent = 'Create Account & Start Shopping';
+                            }
+                            if (typeof showToast === 'function') {
+                                showToast(data.message || 'Error requesting account.', 'error');
+                            } else {
+                                alert(data.message || 'Error requesting account.');
+                            }
                         }
                     })
                     .catch(err => {
                         console.error(err);
-                        if (btn) setButtonLoading(btn, false);
-                        if(typeof showToast === 'function') showToast('Network error occurred.', 'error');
+                        if (btn && typeof setButtonLoading === 'function') {
+                            setButtonLoading(btn, false);
+                        } else if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = 'Create Account & Start Shopping';
+                        }
+                        if (typeof showToast === 'function') {
+                            showToast('Network error occurred.', 'error');
+                        } else {
+                            alert('Network error occurred.');
+                        }
                     });
             });
         }
@@ -588,6 +733,8 @@ require_once __DIR__ . "/layouts/head.php";
         document.addEventListener('DOMContentLoaded', initAuthForm);
     }
 </script>
+
+<?php require_once __DIR__ . "/layouts/footer.php"; ?>
 
 <?php
 /*
