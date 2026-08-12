@@ -70,4 +70,18 @@ try {
     // Handling errors -> Catching database connection failure
     $db_error = $e->getMessage();
 }
+
+// Load JWT Security Component
+require_once __DIR__ . '/../src/JWT.php';
+
+// Auto-authenticate request from JWT cookie or Bearer token if session not already established
+if (!isset($_SESSION['user_id'])) {
+    \App\JWT::authenticateUser();
+}
+if (!isset($_SESSION['admin_id'])) {
+    \App\JWT::authenticateAdmin();
+}
+if (!isset($_SESSION['driver_id'])) {
+    \App\JWT::authenticateDriver();
+}
 ?>

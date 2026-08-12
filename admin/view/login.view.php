@@ -35,10 +35,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Processing -> Verifying admin password hash or falling back to offline demo credentials
     if ($admin) {
         if (password_verify($password, $admin['password'])) {
-            $_SESSION['admin_id'] = $admin['id'];
+            $_SESSION['admin_id'] = (int)$admin['id'];
             $_SESSION['admin_username'] = $admin['username'];
             $_SESSION['admin_role'] = $admin['role'];
-            echo json_encode(['success' => true]);
+
+            $jwt_token = \App\JWT::encode([
+                'admin_id' => (int)$admin['id'],
+                'username' => $admin['username'],
+                'email' => $admin['email'] ?? $email,
+                'role' => $admin['role'],
+                'is_admin' => true
+            ]);
+            \App\JWT::setAuthCookie(\App\JWT::COOKIE_ADMIN, $jwt_token);
+            $_SESSION['admin_jwt'] = $jwt_token;
+
+            echo json_encode(['success' => true, 'token' => $jwt_token]);
             exit;
         }
     } else {
@@ -51,10 +62,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ];
         
         if (isset($offline_admins[$email]) && $password === $offline_admins[$email]['password']) {
-            $_SESSION['admin_id'] = $offline_admins[$email]['id'];
-            $_SESSION['admin_username'] = $offline_admins[$email]['username'];
-            $_SESSION['admin_role'] = $offline_admins[$email]['role'];
-            echo json_encode(['success' => true]);
+            $adm = $offline_admins[$email];
+            $_SESSION['admin_id'] = $adm['id'];
+            $_SESSION['admin_username'] = $adm['username'];
+            $_SESSION['admin_role'] = $adm['role'];
+
+            $jwt_token = \App\JWT::encode([
+                'admin_id' => $adm['id'],
+                'username' => $adm['username'],
+                'email' => $email,
+                'role' => $adm['role'],
+                'is_admin' => true
+            ]);
+            \App\JWT::setAuthCookie(\App\JWT::COOKIE_ADMIN, $jwt_token);
+            $_SESSION['admin_jwt'] = $jwt_token;
+
+            echo json_encode(['success' => true, 'token' => $jwt_token]);
             exit;
         }
     }

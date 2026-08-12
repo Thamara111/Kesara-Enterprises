@@ -7,8 +7,10 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Processing logout request and clearing active user session
+// Processing logout request and clearing active user session and JWT cookie
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    require_once __DIR__ . "/src/JWT.php";
+    \App\JWT::clearAuthCookie(\App\JWT::COOKIE_USER);
     session_destroy();
     header("Location: /login");
     exit;

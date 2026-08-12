@@ -10,6 +10,13 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . "/../src/JWT.php";
+
+// Auto-authenticate driver from JWT cookie if session is missing
+if (!isset($_SESSION['driver_id'])) {
+    \App\JWT::authenticateDriver();
+}
+
 $error_message = "";
 $success_message = "";
 
@@ -28,10 +35,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $driver = $stmt->fetch();
                     
                     if ($driver && password_verify($password, $driver['password'])) {
-                        $_SESSION['driver_id'] = $driver['id'];
+                        $_SESSION['driver_id'] = (int)$driver['id'];
                         $_SESSION['driver_name'] = $driver['name'];
                         $_SESSION['driver_vehicle'] = ucfirst($driver['vehicle_type']) . ' · ' . $driver['vehicle_number'];
                         
+                        // Generate and set driver JWT token
+                        $jwt_token = \App\JWT::encode([
+                            'driver_id' => (int)$driver['id'],
+                            'name' => $driver['name'],
+                            'email' => $driver['email'],
+                            'vehicle' => ucfirst($driver['vehicle_type']) . ' · ' . $driver['vehicle_number'],
+                            'role' => 'driver'
+                        ]);
+                        \App\JWT::setAuthCookie(\App\JWT::COOKIE_DRIVER, $jwt_token);
+                        $_SESSION['driver_jwt'] = $jwt_token;
+
                         header("Location: /driver");
                         exit;
                     } else {
@@ -72,7 +90,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         $hashed = password_hash($password, PASSWORD_BCRYPT);
                         $ins = $pdo->prepare("INSERT INTO delivery_personnel (name, email, password, phone, nic, licence_class, licence_expiry, vehicle_type, vehicle_number, status, joined_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'available', CURDATE())");
                         $ins->execute([$name, $email, $hashed, $phone, $nic, $licence_class, $licence_expiry, $vehicle_type, $vehicle_number]);
-                        
+                        $new_driver_id = (int)$pdo->lastInsertId();
+
+                        // Issue JWT token on driver registration
+                        $jwt_token = \App\JWT::encode([
+                            'driver_id' => $new_driver_id,
+                            'name' => $name,
+                            'email' => $email,
+                            'vehicle' => ucfirst($vehicle_type) . ' · ' . $vehicle_number,
+                            'role' => 'driver'
+                        ]);
+                        \App\JWT::setAuthCookie(\App\JWT::COOKIE_DRIVER, $jwt_token);
+                        $_SESSION['driver_jwt'] = $jwt_token;
+
                         // Send welcome email to driver
                         require_once __DIR__ . "/../src/Mailer.php";
                         $subject = "Welcome to Kesara Delivery Team!";
@@ -119,10 +149,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     }
 }
 
+// Handle driver logout and clear JWT cookie
 if (isset($_GET['logout'])) {
+    \App\JWT::clearAuthCookie(\App\JWT::COOKIE_DRIVER);
     unset($_SESSION['driver_id']);
     unset($_SESSION['driver_name']);
     unset($_SESSION['driver_vehicle']);
+    unset($_SESSION['driver_jwt']);
     header("Location: /driver");
     exit;
 }

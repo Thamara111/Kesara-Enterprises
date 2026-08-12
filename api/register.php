@@ -103,7 +103,7 @@ if (isset($pdo) && $pdo !== null) {
         if ($is_individual) {
             $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, user_type, status) VALUES (?, ?, ?, ?, ?, ?, 'individual', 'approved')");
             $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass]);
-            $new_id = $pdo->lastInsertId();
+            $new_id = (int)$pdo->lastInsertId();
 
             // Record thank-you WhatsApp message
             try {
@@ -120,14 +120,40 @@ if (isset($pdo) && $pdo !== null) {
             $_SESSION['user_name'] = $first_name . ' ' . $last_name;
             $_SESSION['user_type'] = 'individual';
 
+            // Generate JWT Token
+            $jwt_token = \App\JWT::encode([
+                'user_id' => $new_id,
+                'email' => $email,
+                'name' => $first_name . ' ' . $last_name,
+                'user_type' => 'individual',
+                'role' => 'customer'
+            ]);
+            \App\JWT::setAuthCookie(\App\JWT::COOKIE_USER, $jwt_token);
+            $_SESSION['jwt_token'] = $jwt_token;
+
             http_response_code(201);
-            echo json_encode(["status" => "success", "success_code" => 2, "message" => "Your account has been created successfully! Welcome to Kesara Enterprises."]);
+            echo json_encode([
+                "status" => "success",
+                "success_code" => 2,
+                "token" => $jwt_token,
+                "user" => [
+                    "id" => $new_id,
+                    "email" => $email,
+                    "name" => $first_name . ' ' . $last_name,
+                    "user_type" => "individual"
+                ],
+                "message" => "Your account has been created successfully! Welcome to Kesara Enterprises."
+            ]);
         } else {
             $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, user_type, business_name, br_number, business_type, address, status) VALUES (?, ?, ?, ?, ?, ?, 'wholesale', ?, ?, ?, ?, 'pending')");
             $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass, $business_name, $br_number, $business_type, $address]);
 
             http_response_code(201);
-            echo json_encode(["status" => "success", "success_code" => 1, "message" => "Your wholesale account request has been submitted successfully! We will contact you within 24h."]);
+            echo json_encode([
+                "status" => "success",
+                "success_code" => 1,
+                "message" => "Your wholesale account request has been submitted successfully! We will contact you within 24h."
+            ]);
         }
     } catch (\Exception $e) {
         http_response_code(500);

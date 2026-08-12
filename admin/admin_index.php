@@ -7,16 +7,33 @@
  * 3. Layout Rendering -> Assembling admin layout with sidebar, mobile header, and active view component.
  */
 
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Auth -> Handling logout action and terminating session
+require_once __DIR__ . "/../database/connection.php";
+require_once __DIR__ . "/../src/JWT.php";
+
+// Auth -> Handling logout action and terminating session & JWT cookie
 if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    \App\JWT::clearAuthCookie(\App\JWT::COOKIE_ADMIN);
+    $_SESSION = [];
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+            $params["path"], $params["domain"],
+            $params["secure"], $params["httponly"]
+        );
+    }
     session_destroy();
     header("Location: /admin-login");
     exit;
 }
 
-require_once __DIR__ . "/../database/connection.php";
+// Auto-authenticate admin from JWT cookie if session is empty
+if (!isset($_SESSION['admin_id'])) {
+    \App\JWT::authenticateAdmin();
+}
 
 // Routing -> Resolving active view parameter from URL query string
 $view = $_GET['view'] ?? 'dashboard';

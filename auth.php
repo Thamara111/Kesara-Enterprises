@@ -28,6 +28,25 @@ if (isset($pdo) && $pdo !== null) {
     } catch (\Exception $e) {}
 }
 
+// Handle Logout Action
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    \App\JWT::clearAuthCookie(\App\JWT::COOKIE_USER);
+    $_SESSION = [];
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+            $params["path"], $params["domain"],
+            $params["secure"], $params["httponly"]
+        );
+    }
+    session_destroy();
+    header("Location: /login");
+    exit;
+}
+
 $page_mode = isset($_GET['mode']) ? $_GET['mode'] : 'login';
 $success_code = isset($_GET['success']) ? (int)$_GET['success'] : 0;
 $success_message = "";
@@ -80,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $hashed_pass = password_hash($password, PASSWORD_BCRYPT);
                             $insert_stmt = $pdo->prepare("INSERT INTO users (first_name, last_name, email, phone, whatsapp_number, password, user_type, status) VALUES (?, ?, ?, ?, ?, ?, 'individual', 'approved')");
                             $insert_stmt->execute([$first_name, $last_name, $email, $phone, $whatsapp_number, $hashed_pass]);
-                            $new_id = $pdo->lastInsertId();
+                            $new_id = (int)$pdo->lastInsertId();
 
                             // Record thank you WhatsApp notification
                             try {
@@ -89,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 $stmt_wa->execute([$new_id, $whatsapp_number, $wa_msg]);
                             } catch (\Exception $ex) {}
 
-                            // Auto-login Individual Customer immediately
+                            // Auto-login Individual Customer with JWT & Session
                             if (session_status() === PHP_SESSION_NONE) {
                                 session_start();
                             }
@@ -97,6 +116,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $_SESSION['user_email'] = $email;
                             $_SESSION['user_name'] = $first_name . ' ' . $last_name;
                             $_SESSION['user_type'] = 'individual';
+
+                            // Generate and set secure JWT token
+                            $jwt_token = \App\JWT::encode([
+                                'user_id' => $new_id,
+                                'email' => $email,
+                                'name' => $first_name . ' ' . $last_name,
+                                'user_type' => 'individual',
+                                'role' => 'customer'
+                            ]);
+                            \App\JWT::setAuthCookie(\App\JWT::COOKIE_USER, $jwt_token);
+                            $_SESSION['jwt_token'] = $jwt_token;
 
                             header("Location: ?mode=register&success=2", true, 303);
                             exit;
@@ -167,10 +197,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             if (session_status() === PHP_SESSION_NONE) {
                                 session_start();
                             }
-                            $_SESSION['user_id'] = $user['id'];
+                            $_SESSION['user_id'] = (int)$user['id'];
                             $_SESSION['user_email'] = $user['email'];
                             $_SESSION['user_name'] = $user['first_name'] . ' ' . $user['last_name'];
                             $_SESSION['user_type'] = $user['user_type'] ?? 'wholesale';
+
+                            // Generate and set secure JWT token
+                            $jwt_token = \App\JWT::encode([
+                                'user_id' => (int)$user['id'],
+                                'email' => $user['email'],
+                                'name' => $user['first_name'] . ' ' . $user['last_name'],
+                                'user_type' => $user['user_type'] ?? 'wholesale',
+                                'business_name' => $user['business_name'] ?? '',
+                                'role' => 'customer'
+                            ]);
+                            \App\JWT::setAuthCookie(\App\JWT::COOKIE_USER, $jwt_token);
+                            $_SESSION['jwt_token'] = $jwt_token;
 
                             header("Location: /account");
                             exit;
