@@ -2,9 +2,10 @@
 <!-- Provides a real-time map interface (via Leaflet.js) for tracking active deliveries and dispatch routes. -->
 <h2 class="sr-only">Delivery tracking and live status monitoring page for Kesara Enterprises wholesale admin platform</h2>
 
-<!-- Leaflet.js Map Assets -->
+<!-- Leaflet.js & Road Snapping Assets -->
 <link rel="stylesheet" href="/assets/leaflet.css" />
 <script src="/assets/leaflet.js"></script>
+<script src="/assets/road-snapper.js"></script>
 
 <div class="flex-1 flex overflow-hidden relative">
     <!-- Floating Toggle Button (Mobile Only) -->
@@ -558,8 +559,11 @@ function drawRouteOnMap(run) {
     stopMarkers = [];
     if (vehicleMarker) map.removeLayer(vehicleMarker);
     vehicleMarker = null;
-    if (routePolyline) map.removeLayer(routePolyline);
-    routePolyline = null;
+    if (routePolyline) {
+        if (routePolyline._casing) map.removeLayer(routePolyline._casing);
+        map.removeLayer(routePolyline);
+        routePolyline = null;
+    }
     
     var warehouseCoords = getWarehouseCoords(run.zone || 'Colombo');
     
@@ -606,13 +610,38 @@ function drawRouteOnMap(run) {
         routeCoords.push([s.lat, s.lng]);
     });
     
-    // 3. Draw Route Polyline
-    routePolyline = L.polyline(routeCoords, {
-        color: '#0F6E56',
-        weight: 3,
-        opacity: 0.6,
-        dashArray: '8, 8'
-    }).addTo(map);
+    // 3. Draw Road-Snapped Route Polyline (Google Roads API snapToRoads with interpolate=true)
+    var currentDrawRunId = run.id;
+    RoadSnapper.fetchSnappedRoadPath(routeCoords, true).then(snappedCoords => {
+        if (!activeRun || activeRun.id !== currentDrawRunId) return; // Ignore stale async responses
+        
+        if (routePolyline) {
+            if (routePolyline._casing) map.removeLayer(routePolyline._casing);
+            map.removeLayer(routePolyline);
+        }
+        
+        // Subtle road casing glow
+        var routeCasing = L.polyline(snappedCoords, {
+            color: '#0F6E56',
+            weight: 7,
+            opacity: 0.18
+        }).addTo(map);
+
+        // Curvature road polyline
+        routePolyline = L.polyline(snappedCoords, {
+            color: '#0F6E56',
+            weight: 3.5,
+            opacity: 0.85,
+            dashArray: '6, 8'
+        }).addTo(map);
+
+        routePolyline._casing = routeCasing;
+
+        if (snappedCoords.length > 0) {
+            var bounds = L.latLngBounds(snappedCoords);
+            map.fitBounds(bounds, { padding: [50, 50] });
+        }
+    });
     
     // 4. Place Vehicle Marker
     var initialVehiclePos = warehouseCoords;
@@ -647,26 +676,10 @@ function drawRouteOnMap(run) {
     vehicleMarker = L.marker(initialVehiclePos, { icon: vIcon }).addTo(map)
         .bindPopup(`<b>Live Tracking: ${run.driver || 'Driver'}</b><br><span class="text-xs text-gray-500">${run.vehicle || ''}</span>`);
         
-    // 5. Fit map bounds to show route
+    // 5. Fit map bounds to show route immediately while async road snap loads
     if (routeCoords.length > 0) {
         var bounds = L.latLngBounds(routeCoords);
         map.fitBounds(bounds, { padding: [50, 50] });
-    }
-    
-    // 6. Precompute leg interpolation coordinates for simulation
-    legInterpolatedPaths = [];
-    for (let i = 0; i < routeCoords.length - 1; i++) {
-        legInterpolatedPaths.push(interpolatePoints(routeCoords[i], routeCoords[i+1], 40));
-    }
-    
-    // Determine active index for simulation leg
-    if (run.badgeText === 'Active') {
-        var activeIdx = stops.findIndex(s => !(s.status || '').startsWith('Delivered'));
-        currentLegIndex = activeIdx !== -1 ? activeIdx : 0;
-        currentStepIndex = 0;
-    } else {
-        currentLegIndex = 0;
-        currentStepIndex = 0;
     }
 }
 

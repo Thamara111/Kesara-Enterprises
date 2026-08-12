@@ -240,9 +240,10 @@ if ($is_logged_in && isset($pdo) && $pdo !== null) {
     <link href="/dist/output.css" rel="stylesheet">
     <!-- Tabler Icons -->
     <link rel="stylesheet" href="/assets/tabler-icons.min.css">
-    <!-- Leaflet.js Map Assets -->
+    <!-- Leaflet.js & Road Snapping Assets -->
     <link rel="stylesheet" href="/assets/leaflet.css" />
     <script src="/assets/leaflet.js"></script>
+    <script src="/assets/road-snapper.js"></script>
     
     <style>
         body {
@@ -1032,7 +1033,11 @@ function updateDriverTripMap() {
     driverStopMarkers.forEach(m => driverMap.removeLayer(m));
     driverStopMarkers = [];
     if (driverVehicleMarker) driverMap.removeLayer(driverVehicleMarker);
-    if (driverPolyline) driverMap.removeLayer(driverPolyline);
+    if (driverPolyline) {
+        if (driverPolyline._casing) driverMap.removeLayer(driverPolyline._casing);
+        driverMap.removeLayer(driverPolyline);
+        driverPolyline = null;
+    }
 
     // Adds warehouse marker
     driverWhMarker = L.marker(whCoords, { icon: window.driverWhIcon })
@@ -1066,12 +1071,32 @@ function updateDriverTripMap() {
         .bindPopup(`<b>My Location</b><br>Vehicle: ${activeRun.vehicle}`);
     bounds.extend(currentPos);
 
-    driverPolyline = L.polyline(routePoints, {
-        color: '#002B49',
-        weight: 3.5,
-        dashArray: '5, 8',
-        opacity: 0.85
-    }).addTo(driverMap);
+    // Fetch Google Roads Snap to Roads curved road polyline
+    const runIdForMap = activeRun.id;
+    RoadSnapper.fetchSnappedRoadPath(routePoints, true).then(snappedCoords => {
+        if (!activeRun || activeRun.id !== runIdForMap) return;
+        
+        if (driverPolyline) {
+            if (driverPolyline._casing) driverMap.removeLayer(driverPolyline._casing);
+            driverMap.removeLayer(driverPolyline);
+        }
+
+        var casing = L.polyline(snappedCoords, {
+            color: '#002B49',
+            weight: 7,
+            opacity: 0.15
+        }).addTo(driverMap);
+
+        driverPolyline = L.polyline(snappedCoords, {
+            color: '#002B49',
+            weight: 3.5,
+            dashArray: '5, 8',
+            opacity: 0.85
+        }).addTo(driverMap);
+
+        driverPolyline._casing = casing;
+        activeRun._snappedRoute = snappedCoords;
+    });
 
     driverMap.fitBounds(bounds, { padding: [30, 30] });
 
@@ -1546,10 +1571,18 @@ function getWarehouseCoords(zone) {
     return WAREHOUSES[zone] || WAREHOUSES['Colombo'];
 }
 
+let activeLegRoadPath = null;
+let activeLegIndex = 0;
+let lastTargetKey = '';
+
 function startGPSSimulation() {
     if (gpsTimer) clearInterval(gpsTimer);
     
-    gpsTimer = setInterval(() => {
+    activeLegRoadPath = null;
+    activeLegIndex = 0;
+    lastTargetKey = '';
+    
+    gpsTimer = setInterval(async () => {
         if (!activeRun || activeRun.badgeText !== 'Active') return;
         
         const activeStop = activeRun.stops.find(s => s.status === 'In progress');
@@ -1573,33 +1606,70 @@ function startGPSSimulation() {
             } else {
                 currentPos = getWarehouseCoords(activeRun.zone);
             }
+            activeRun.sim_coords = currentPos;
         }
         
         const targetPos = [activeStop.lat, activeStop.lng];
+        const targetKey = `${activeStop.num}_${targetPos[0].toFixed(5)}_${targetPos[1].toFixed(5)}`;
         
-        let latDiff = targetPos[0] - currentPos[0];
-        let lngDiff = targetPos[1] - currentPos[1];
-        let distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-        
-        if (distance < 0.0008) {
-            activeRun.sim_coords = targetPos;
-            document.getElementById('sim-coords-text').textContent = `${targetPos[0].toFixed(5)}, ${targetPos[1].toFixed(5)} (Arrived)`;
-            showToast(`Arrived at Stop ${activeStop.num}!`, 'info');
-            
-            localStorage.setItem('ke_assignments', JSON.stringify(assignments));
-            renderDashboard();
-            return;
+        // Fetch road-snapped path for current leg if target changed or not yet loaded
+        if (targetKey !== lastTargetKey || !activeLegRoadPath || activeLegRoadPath.length === 0) {
+            lastTargetKey = targetKey;
+            activeLegIndex = 0;
+            activeLegRoadPath = await RoadSnapper.fetchSnappedRoadPath([currentPos, targetPos], true);
         }
         
-        const speed = 0.0015;
-        const nextLat = currentPos[0] + (latDiff / distance) * speed;
-        const nextLng = currentPos[1] + (lngDiff / distance) * speed;
-        
-        activeRun.sim_coords = [nextLat, nextLng];
-        document.getElementById('sim-coords-text').textContent = `${nextLat.toFixed(5)}, ${nextLng.toFixed(5)}`;
-        
-        localStorage.setItem('ke_assignments', JSON.stringify(assignments));
-    }, 1000);
+        if (activeLegRoadPath && activeLegRoadPath.length > 0) {
+            activeLegIndex++;
+            if (activeLegIndex >= activeLegRoadPath.length) {
+                // Arrived at destination stop along road
+                activeRun.sim_coords = targetPos;
+                document.getElementById('sim-coords-text').textContent = `${targetPos[0].toFixed(5)}, ${targetPos[1].toFixed(5)} (Arrived)`;
+                showToast(`Arrived at Stop ${activeStop.num}!`, 'info');
+                
+                activeLegRoadPath = null;
+                activeLegIndex = 0;
+                
+                localStorage.setItem('ke_assignments', JSON.stringify(assignments));
+                renderDashboard();
+                return;
+            }
+            
+            const nextCoord = activeLegRoadPath[activeLegIndex];
+            activeRun.sim_coords = nextCoord;
+            document.getElementById('sim-coords-text').textContent = `${nextCoord[0].toFixed(5)}, ${nextCoord[1].toFixed(5)}`;
+            
+            localStorage.setItem('ke_assignments', JSON.stringify(assignments));
+            
+            // Move map marker in driver portal if open
+            if (driverVehicleMarker) {
+                driverVehicleMarker.setLatLng(nextCoord);
+            }
+        } else {
+            // Fallback direct step
+            let latDiff = targetPos[0] - currentPos[0];
+            let lngDiff = targetPos[1] - currentPos[1];
+            let distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+            
+            if (distance < 0.0008) {
+                activeRun.sim_coords = targetPos;
+                document.getElementById('sim-coords-text').textContent = `${targetPos[0].toFixed(5)}, ${targetPos[1].toFixed(5)} (Arrived)`;
+                showToast(`Arrived at Stop ${activeStop.num}!`, 'info');
+                
+                localStorage.setItem('ke_assignments', JSON.stringify(assignments));
+                renderDashboard();
+                return;
+            }
+            
+            const speed = 0.0015;
+            const nextLat = currentPos[0] + (latDiff / distance) * speed;
+            const nextLng = currentPos[1] + (lngDiff / distance) * speed;
+            
+            activeRun.sim_coords = [nextLat, nextLng];
+            document.getElementById('sim-coords-text').textContent = `${nextLat.toFixed(5)}, ${nextLng.toFixed(5)}`;
+            localStorage.setItem('ke_assignments', JSON.stringify(assignments));
+        }
+    }, 1200);
 }
 
 function stopGPSSimulation() {

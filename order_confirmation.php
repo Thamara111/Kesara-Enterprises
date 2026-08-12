@@ -66,9 +66,10 @@ require_once __DIR__ . "/layouts/head.php";
 require_once __DIR__ . "/layouts/header.php";
 ?>
 
-<!-- Leaflet.js Map Assets -->
+<!-- Leaflet.js & Road Snapping Assets -->
 <link rel="stylesheet" href="/assets/leaflet.css" />
 <script src="/assets/leaflet.js"></script>
+<script src="/assets/road-snapper.js"></script>
 
 <main class="bg-gray-50 py-12 min-h-screen">
     <div class="max-w-8xl mx-auto px-6 md:px-12">
@@ -643,16 +644,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) { }
 
+        // Draw road-snapped polyline using Google Roads API (Snap to Roads with interpolate=true)
         if (window.orderRoutePolyline) {
+            if (window.orderRoutePolyline._casing) map.removeLayer(window.orderRoutePolyline._casing);
             map.removeLayer(window.orderRoutePolyline);
+            window.orderRoutePolyline = null;
         }
 
-        window.orderRoutePolyline = L.polyline(routePoints, {
-            color: '#002B49',
-            weight: 3.5,
-            dashArray: '6, 8',
-            opacity: 0.85
-        }).addTo(map);
+        RoadSnapper.fetchSnappedRoadPath(routePoints, true).then(snappedCoords => {
+            if (window.orderRoutePolyline) {
+                if (window.orderRoutePolyline._casing) map.removeLayer(window.orderRoutePolyline._casing);
+                map.removeLayer(window.orderRoutePolyline);
+            }
+
+            var casing = L.polyline(snappedCoords, {
+                color: '#002B49',
+                weight: 7,
+                opacity: 0.15
+            }).addTo(map);
+
+            window.orderRoutePolyline = L.polyline(snappedCoords, {
+                color: '#002B49',
+                weight: 3.5,
+                dashArray: '6, 8',
+                opacity: 0.85
+            }).addTo(map);
+
+            window.orderRoutePolyline._casing = casing;
+        });
 
         var bounds = L.latLngBounds([warehouseCoords, destCoords]);
         if (driverMarker) bounds.extend(driverMarker.getLatLng());
