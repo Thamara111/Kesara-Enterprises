@@ -10,12 +10,17 @@
 $success_msg = "";
 $error_msg = "";
 
-// Self-Healing DB: Ensure supplier_items has unit_cost column
+// Self-Healing DB: Ensure supplier_items has unit_cost column & suppliers has supplier_type column
 if (isset($pdo) && $pdo !== null) {
     try {
         $checkUnitCost = $pdo->query("SHOW COLUMNS FROM supplier_items LIKE 'unit_cost'");
         if (!$checkUnitCost->fetch()) {
             $pdo->exec("ALTER TABLE supplier_items ADD COLUMN unit_cost DECIMAL(10,2) DEFAULT NULL");
+        }
+        $checkType = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'supplier_type'");
+        if (!$checkType->fetch()) {
+            $pdo->exec("ALTER TABLE suppliers ADD COLUMN supplier_type ENUM('supplier', 'garment') DEFAULT 'supplier'");
+            $pdo->exec("UPDATE suppliers SET supplier_type = 'garment' WHERE category IN ('Innerwear Manufacturing', 'Cut-Make-Trim (CMT)', 'Apparel Finishing') OR id >= 6");
         }
     } catch (\Exception $e) {
         // Ignored
@@ -178,7 +183,7 @@ $overdue_count = 0;
 
 if (isset($pdo) && $pdo !== null) {
     try {
-        $suppliers_list = $pdo->query("SELECT id, name FROM suppliers ORDER BY name ASC")->fetchAll();
+        $suppliers_list = $pdo->query("SELECT id, name, category, supplier_type FROM suppliers WHERE deleted_at IS NULL ORDER BY name ASC")->fetchAll();
 
         $supplier_items_db = $pdo->query("SELECT supplier_id, item_name, unit_cost FROM supplier_items")->fetchAll();
         $supplier_items_map = [];
@@ -295,11 +300,22 @@ if (isset($pdo) && $pdo !== null) {
         } catch (\Exception $e) {
         }
 
-        $stmt = $pdo->query("SELECT po.id, po.status, po.ordered_at, po.expected_at, po.received_at, po.total, 
-                                    s.name AS supplier_name, s.contact_person, s.payment_terms
-                             FROM purchase_orders po
-                             JOIN suppliers s ON po.supplier_id = s.id
-                             ORDER BY po.ordered_at DESC");
+        $po_type_filter = $_GET['type'] ?? 'all';
+        if ($po_type_filter === 'garment' || $po_type_filter === 'supplier') {
+            $stmt = $pdo->prepare("SELECT po.id, po.status, po.ordered_at, po.expected_at, po.received_at, po.total, 
+                                        s.name AS supplier_name, s.contact_person, s.payment_terms, s.supplier_type
+                                 FROM purchase_orders po
+                                 JOIN suppliers s ON po.supplier_id = s.id
+                                 WHERE (s.supplier_type = ? OR (s.supplier_type IS NULL AND ? = 'supplier'))
+                                 ORDER BY po.ordered_at DESC");
+            $stmt->execute([$po_type_filter, $po_type_filter]);
+        } else {
+            $stmt = $pdo->query("SELECT po.id, po.status, po.ordered_at, po.expected_at, po.received_at, po.total, 
+                                        s.name AS supplier_name, s.contact_person, s.payment_terms, s.supplier_type
+                                 FROM purchase_orders po
+                                 JOIN suppliers s ON po.supplier_id = s.id
+                                 ORDER BY po.ordered_at DESC");
+        }
         $pos_db = $stmt->fetchAll();
         $total_pos = count($pos_db);
 
@@ -399,6 +415,7 @@ if (isset($pdo) && $pdo !== null) {
                 'badge' => $badge,
                 'badgeText' => $badgeText,
                 'supp' => $po['supplier_name'],
+                'supplier_type' => $po['supplier_type'] ?? 'supplier',
                 'contact' => $po['contact_person'] ?? 'Primary contact',
                 'payment' => $po['payment_terms'] ?? 'Net 30',
                 'expected' => $expected_date,
@@ -416,9 +433,27 @@ if (isset($pdo) && $pdo !== null) {
 }
 ?>
 
-<div class="flex-1 flex overflow-hidden">
-    <!-- List Pane -->
-    <div id="purchase-orders-list-container" class="flex-1 flex flex-col min-w-0 bg-white">
+<div class="flex-1 flex flex-col overflow-hidden bg-gray-50/50">
+    <!-- Top Type Tabs (Garment POs vs Supplier POs) -->
+    <div class="flex border-b border-gray-200 px-8 bg-white shrink-0">
+        <a href="/admin-purchase-orders" class="px-6 py-4 font-bold text-sm border-b-2 flex items-center gap-2.5 transition-all <?php echo (!isset($_GET['type']) || $_GET['type'] === 'all') ? 'border-brand text-brand bg-brand/5' : 'border-transparent text-gray-500 hover:text-gray-900'; ?>">
+            <i class="ti ti-file-invoice text-xl"></i>
+            <span>All Purchase Orders</span>
+        </a>
+        <a href="/admin-purchase-orders?type=garment" class="px-6 py-4 font-bold text-sm border-b-2 flex items-center gap-2.5 transition-all <?php echo (($_GET['type'] ?? '') === 'garment') ? 'border-brand text-brand bg-brand/5' : 'border-transparent text-gray-500 hover:text-gray-900'; ?>">
+            <i class="ti ti-building-factory-2 text-xl"></i>
+            <span>Garment Production POs</span>
+        </a>
+        <a href="/admin-purchase-orders?type=supplier" class="px-6 py-4 font-bold text-sm border-b-2 flex items-center gap-2.5 transition-all <?php echo (($_GET['type'] ?? '') === 'supplier') ? 'border-brand text-brand bg-brand/5' : 'border-transparent text-gray-500 hover:text-gray-900'; ?>">
+            <i class="ti ti-truck text-xl"></i>
+            <span>Raw Material POs</span>
+        </a>
+    </div>
+
+    <!-- Main Container -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- List Pane -->
+        <div id="purchase-orders-list-container" class="flex-1 flex flex-col min-w-0 bg-white">
         <!-- Header -->
         <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
             <div>
@@ -594,6 +629,11 @@ if (isset($pdo) && $pdo !== null) {
                                     </td>
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
                                         <p class="text-sm font-bold text-gray-700"><?= $po['supp'] ?></p>
+                                        <?php if (($po['supplier_type'] ?? '') === 'garment'): ?>
+                                            <span class="inline-block mt-1 px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-md text-[9px] font-extrabold uppercase tracking-wider"><i class="ti ti-building-factory-2 mr-0.5"></i> Garment Factory</span>
+                                        <?php else: ?>
+                                            <span class="inline-block mt-1 px-2 py-0.5 bg-teal-50 text-teal-700 border border-teal-100 rounded-md text-[9px] font-extrabold uppercase tracking-wider"><i class="ti ti-truck mr-0.5"></i> Material Supplier</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
                                         <p
@@ -729,6 +769,7 @@ if (isset($pdo) && $pdo !== null) {
             </button>
         </div>
     </div>
+</div>
 </div>
 
 <!-- Forms for actions -->

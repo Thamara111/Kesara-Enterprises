@@ -86,12 +86,15 @@ INSERT INTO users (id, first_name, last_name, email, phone, password, business_n
 -- ============================================================================
 -- 6. SEED SUPPLIERS
 -- ============================================================================
-INSERT INTO suppliers (id, name, email, contact_person, phone, address, payment_terms, category, status, hold_reason, hold_since) VALUES
-(1, 'Sri Lanka Cotton Mills', 'slcm@cottonmills.lk', 'Mr. Roshan Silva', '+94 11 456 7890', 'Colombo 10, WP', 'Net 30', 'Fabric', 'preferred', NULL, NULL),
-(2, 'Kandy Textiles', 'info@kandytex.lk', 'Ms. Priya Weerakoon', '+94 81 234 5678', 'Kandy, CP', 'Net 45', 'Fabric', 'active', NULL, NULL),
-(3, 'Premium Elastic Co.', 'sales@premiumelastic.lk', 'Mr. Nishantha Kumar', '+94 77 345 6789', 'Gampaha, WP', 'Net 15', 'Elastic / Trims', 'preferred', NULL, NULL),
-(4, 'Pacific Packaging', 'orders@pacpkg.lk', 'Mr. Saman Dias', '+94 11 789 0123', 'Colombo 15, WP', 'Net 30', 'Packaging', 'on_hold', 'Quality review pending', '2026-03-14'),
-(5, 'Galle Fabric House', 'gfh@gallefabric.lk', 'Mr. Channa Perera', '+94 91 234 5678', 'Galle, SP', 'COD', 'Fabric', 'inactive', 'Inactive for over 6 months', '2025-11-20');
+INSERT INTO suppliers (id, name, email, contact_person, phone, address, payment_terms, category, supplier_type, status, hold_reason, hold_since) VALUES
+(1, 'Sri Lanka Cotton Mills', 'slcm@cottonmills.lk', 'Mr. Roshan Silva', '+94 11 456 7890', 'Colombo 10, WP', 'Net 30', 'Fabric', 'supplier', 'preferred', NULL, NULL),
+(2, 'Kandy Textiles', 'info@kandytex.lk', 'Ms. Priya Weerakoon', '+94 81 234 5678', 'Kandy, CP', 'Net 45', 'Fabric', 'supplier', 'active', NULL, NULL),
+(3, 'Premium Elastic Co.', 'sales@premiumelastic.lk', 'Mr. Nishantha Kumar', '+94 77 345 6789', 'Gampaha, WP', 'Net 15', 'Elastic / Trims', 'supplier', 'preferred', NULL, NULL),
+(4, 'Pacific Packaging', 'orders@pacpkg.lk', 'Mr. Saman Dias', '+94 11 789 0123', 'Colombo 15, WP', 'Net 30', 'Packaging', 'supplier', 'on_hold', 'Quality review pending', '2026-03-14'),
+(5, 'Galle Fabric House', 'gfh@gallefabric.lk', 'Mr. Channa Perera', '+94 91 234 5678', 'Galle, SP', 'COD', 'Fabric', 'supplier', 'inactive', 'Inactive for over 6 months', '2025-11-20'),
+(6, 'MAS Matrix Garment Factory', 'info@masmatrix.lk', 'Mr. Kanishka Jayawardena', '+94 11 223 3445', 'Biyagama EPZ, WP', 'Net 60', 'Innerwear Manufacturing', 'garment', 'preferred', NULL, NULL),
+(7, 'Apex Apparel Manufacturing', 'orders@apexapparel.lk', 'Ms. Dilhani Perera', '+94 31 456 7890', 'Katunayake EPZ, WP', 'Net 60', 'Cut-Make-Trim (CMT)', 'garment', 'active', NULL, NULL),
+(8, 'Lanka Stitching Mills', 'contact@lankastitch.lk', 'Mr. Chaminda Bandara', '+94 33 890 1234', 'Veyangoda, WP', 'Net 45', 'Apparel Finishing', 'garment', 'active', NULL, NULL);
 
 -- ============================================================================
 -- 7. SEED SUPPLIER ITEMS & PRODUCTS
@@ -110,10 +113,15 @@ INSERT INTO supplier_items (supplier_id, item_name) VALUES
 (5, 'Cotton fabric');
 
 INSERT INTO supplier_products (supplier_id, product_id, unit_cost, lead_days, is_primary) VALUES
-(1, 1, 65.00, 7, TRUE),
-(1, 2, 110.00, 7, TRUE),
+(1, 1, 65.00, 7, FALSE),
+(1, 2, 110.00, 7, FALSE),
 (2, 1, 68.00, 10, FALSE),
-(3, 3, 80.00, 5, TRUE);
+(3, 3, 80.00, 5, FALSE),
+(6, 1, 450.00, 60, TRUE),
+(6, 2, 520.00, 75, TRUE),
+(7, 3, 380.00, 60, TRUE),
+(7, 4, 410.00, 90, TRUE),
+(8, 5, 490.00, 60, TRUE);
 
 -- ============================================================================
 -- 8. SEED INVENTORY

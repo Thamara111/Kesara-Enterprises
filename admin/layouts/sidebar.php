@@ -112,6 +112,10 @@ if (isset($pdo)) {
                 <i class="ti ti-category text-xl"></i>
                 Categories
             </a>
+            <a href="/admin-suppliers?type=supplier" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo ($current_page === 'suppliers' && ($_GET['type'] ?? '') === 'supplier') ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <i class="ti ti-box-seam text-xl"></i>
+                Materials
+            </a>
             <?php endif; ?>
             
             <?php if ($is_admin): ?>
@@ -173,10 +177,19 @@ if (isset($pdo)) {
         <!-- Supply Chain Section -->
         <div class="space-y-1 mb-4">
             <p class="px-5 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Supply Chain</p>
-            <a href="/admin-suppliers" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'suppliers' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
-                <i class="ti ti-building-warehouse text-xl"></i>
-                Suppliers
-            </a>
+            <div class="space-y-1 py-1">
+                <div class="flex items-center justify-between w-full px-5 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                    <span>Suppliers & Garments</span>
+                </div>
+                <a href="/admin-suppliers?type=supplier" class="flex items-center gap-4 w-full pl-8 pr-5 py-2.5 rounded-xl text-xs font-bold transition-all <?php echo ($current_page === 'suppliers' && ($_GET['type'] ?? '') === 'supplier') ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                    <i class="ti ti-truck text-base"></i>
+                    Suppliers (Raw Materials)
+                </a>
+                <a href="/admin-suppliers?type=garment" class="flex items-center gap-4 w-full pl-8 pr-5 py-2.5 rounded-xl text-xs font-bold transition-all <?php echo ($current_page === 'suppliers' && (($_GET['type'] ?? 'garment') === 'garment')) ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                    <i class="ti ti-building-factory-2 text-base"></i>
+                    Garments
+                </a>
+            </div>
             <div class="space-y-1">
                 <a href="/admin-purchase-orders" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'purchase_orders' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                     <i class="ti ti-file-invoice text-lg"></i>

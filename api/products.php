@@ -74,6 +74,11 @@ if (isset($pdo) && $pdo !== null) {
         if (!$checkUserType->fetch()) {
             $pdo->exec("ALTER TABLE users ADD COLUMN user_type ENUM('wholesale', 'individual') DEFAULT 'individual'");
         }
+        $checkSuppType = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'supplier_type'");
+        if (!$checkSuppType->fetch()) {
+            $pdo->exec("ALTER TABLE suppliers ADD COLUMN supplier_type ENUM('supplier', 'garment') DEFAULT 'supplier'");
+            $pdo->exec("UPDATE suppliers SET supplier_type = 'garment' WHERE category IN ('Innerwear Manufacturing', 'Cut-Make-Trim (CMT)', 'Apparel Finishing') OR id >= 6");
+        }
     } catch (\Exception $e) {
         // Ignore database structure check errors if columns already exist
     }

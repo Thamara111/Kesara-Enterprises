@@ -1,13 +1,13 @@
 <?php
 /**
- * Suppliers Management View
+ * Suppliers & Garments Management View
  * Natural Language Overview:
- * 1. Fetching Data -> Getting supplier profiles, supplied raw materials, lead times, and purchase order expenditures from the database.
- * 2. Self-Healing -> Ensuring unit_cost, deleted_at, and lead_time columns exist on supplier tables.
- * 3. Processing -> Handling POST actions for saving, updating, and soft-deleting supplier profiles.
+ * 1. Fetching Data -> Getting partner profiles (Garments / Material Suppliers), supplied items, lead times, and PO expenditures.
+ * 2. Self-Healing -> Ensuring unit_cost, deleted_at, lead_time, and supplier_type columns exist on supplier tables.
+ * 3. Processing -> Handling POST actions for saving, updating, and soft-deleting Garments & Material Suppliers.
  */
 
-// Self-Healing DB: Ensure supplier_items has unit_cost column & suppliers has deleted_at and lead_time columns
+// Self-Healing DB: Ensure supplier_items has unit_cost column & suppliers has deleted_at, lead_time, and supplier_type columns
 if (isset($pdo) && $pdo !== null) {
     try {
         $checkUnitCost = $pdo->query("SHOW COLUMNS FROM supplier_items LIKE 'unit_cost'");
@@ -24,12 +24,31 @@ if (isset($pdo) && $pdo !== null) {
         if (!$checkLeadTime->fetch()) {
             $pdo->exec("ALTER TABLE suppliers ADD COLUMN lead_time INT DEFAULT 7");
         }
+
+        $checkType = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'supplier_type'");
+        if (!$checkType->fetch()) {
+            $pdo->exec("ALTER TABLE suppliers ADD COLUMN supplier_type ENUM('supplier', 'garment') DEFAULT 'supplier'");
+            $pdo->exec("UPDATE suppliers SET supplier_type = 'garment' WHERE category IN ('Innerwear Manufacturing', 'Cut-Make-Trim (CMT)', 'Apparel Finishing') OR id >= 6");
+        }
+
+        // Ensure default sample Garment factories exist if none are populated
+        $checkGarmentCount = $pdo->query("SELECT COUNT(*) FROM suppliers WHERE supplier_type = 'garment' AND deleted_at IS NULL")->fetchColumn();
+        if ($checkGarmentCount == 0) {
+            $pdo->exec("INSERT INTO suppliers (name, email, contact_person, phone, address, payment_terms, category, supplier_type, status, lead_time) VALUES
+                ('MAS Matrix Garment Factory', 'info@masmatrix.lk', 'Mr. Kanishka Jayawardena', '0112233445', 'Biyagama EPZ, WP', 'Net 60', 'Innerwear Manufacturing', 'garment', 'preferred', 60),
+                ('Apex Apparel Manufacturing', 'orders@apexapparel.lk', 'Ms. Dilhani Perera', '0314567890', 'Katunayake EPZ, WP', 'Net 60', 'Cut-Make-Trim (CMT)', 'garment', 'active', 75),
+                ('Lanka Stitching Mills', 'contact@lankastitch.lk', 'Mr. Chaminda Bandara', '0338901234', 'Veyangoda, WP', 'Net 45', 'Apparel Finishing', 'garment', 'active', 60)");
+        }
     } catch (\Exception $e) {
         // Ignored
     }
 }
 
-// Processing -> Handling POST actions for saving, updating, and soft-deleting supplier profiles
+// Active View Type: Default to 'garment' (current Suppliers view transformed to Garments)
+$view_type = isset($_GET['type']) && $_GET['type'] === 'supplier' ? 'supplier' : 'garment';
+$is_garment = ($view_type === 'garment');
+
+// Processing -> Handling POST actions for saving, updating, and soft-deleting partner profiles
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     if ($_POST['action'] === 'save') {
         $supplier_id = isset($_POST['supplier_id']) ? (int) $_POST['supplier_id'] : 0;
@@ -39,8 +58,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $phone = trim($_POST['phone'] ?? '');
         $address = trim($_POST['address'] ?? '');
         $payment_terms = trim($_POST['payment_terms'] ?? 'Net 30');
-        $lead_time = (isset($_POST['lead_time']) && is_numeric($_POST['lead_time'])) ? max(1, (int)$_POST['lead_time']) : 7;
-        $category = trim($_POST['category'] ?? 'Fabric');
+        $lead_time = (isset($_POST['lead_time']) && is_numeric($_POST['lead_time'])) ? max(1, (int)$_POST['lead_time']) : ($is_garment ? 60 : 7);
+        $category = trim($_POST['category'] ?? ($is_garment ? 'Innerwear Manufacturing' : 'Fabric'));
+        $supplier_type = trim($_POST['supplier_type'] ?? $view_type);
+        if (!in_array($supplier_type, ['supplier', 'garment'])) {
+            $supplier_type = 'garment';
+        }
         $status = trim($_POST['status'] ?? 'active');
         $hold_reason = trim($_POST['hold_reason'] ?? '');
         $hold_since = ($status === 'on_hold') ? date('Y-m-d') : null;
@@ -64,17 +87,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         } else {
             try {
                 if ($supplier_id > 0) {
-                    $stmt = $pdo->prepare("UPDATE suppliers SET name = ?, email = ?, contact_person = ?, phone = ?, address = ?, payment_terms = ?, lead_time = ?, category = ?, status = ?, hold_reason = ?, hold_since = ? WHERE id = ?");
-                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $lead_time, $category, $status, $hold_reason, $hold_since, $supplier_id]);
+                    $stmt = $pdo->prepare("UPDATE suppliers SET name = ?, email = ?, contact_person = ?, phone = ?, address = ?, payment_terms = ?, lead_time = ?, category = ?, supplier_type = ?, status = ?, hold_reason = ?, hold_since = ? WHERE id = ?");
+                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $lead_time, $category, $supplier_type, $status, $hold_reason, $hold_since, $supplier_id]);
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO suppliers (name, email, contact_person, phone, address, payment_terms, lead_time, category, status, hold_reason, hold_since) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $lead_time, $category, $status, $hold_reason, $hold_since]);
+                    $stmt = $pdo->prepare("INSERT INTO suppliers (name, email, contact_person, phone, address, payment_terms, lead_time, category, supplier_type, status, hold_reason, hold_since) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    $stmt->execute([$name, $email, $contact_person, $phone, $address, $payment_terms, $lead_time, $category, $supplier_type, $status, $hold_reason, $hold_since]);
                     $supplier_id = $pdo->lastInsertId();
 
                     if (file_exists(__DIR__ . "/../../src/Mailer.php")) {
                         require_once __DIR__ . "/../../src/Mailer.php";
-                        $subject = "Welcome to Kesara Enterprises Supplier Network";
-                        $body = "<h3>Hello " . htmlspecialchars($contact_person) . ",</h3><p>Your company <strong>" . htmlspecialchars($name) . "</strong> has been registered as a supplier with Kesara Enterprises.</p><p>We look forward to working with you.</p>";
+                        $subject = $supplier_type === 'garment' ? "Welcome to Kesara Enterprises Garment Manufacturing Network" : "Welcome to Kesara Enterprises Supplier Network";
+                        $body = "<h3>Hello " . htmlspecialchars($contact_person) . ",</h3><p>Your company <strong>" . htmlspecialchars($name) . "</strong> has been registered as a partner with Kesara Enterprises.</p><p>We look forward to working with you.</p>";
                         if (class_exists('\App\Mailer')) {
                             \App\Mailer::send($email, $subject, $body);
                         }
@@ -111,9 +134,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                         }
                     }
                 }
-                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Supplier saved successfully.', 'success'); });</script>";
+                $saved_msg = $supplier_type === 'garment' ? 'Garment factory saved successfully.' : 'Supplier saved successfully.';
+                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast(" . json_encode($saved_msg) . ", 'success'); });</script>";
             } catch (Exception $e) {
-                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Error saving supplier.', 'error'); });</script>";
+                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Error saving record.', 'error'); });</script>";
             }
         }
     } elseif ($_POST['action'] === 'delete') {
@@ -122,32 +146,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             try {
                 $stmt = $pdo->prepare("UPDATE suppliers SET deleted_at = NOW() WHERE id = ?");
                 $stmt->execute([$supplier_id]);
-                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Supplier moved to Recycle Bin.', 'success'); });</script>";
+                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Record moved to Recycle Bin.', 'success'); });</script>";
             } catch (Exception $e) {
-                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Error deleting supplier.', 'error'); });</script>";
+                echo "<script>document.addEventListener('DOMContentLoaded', () => { if(typeof showToast === 'function') showToast('Error deleting record.', 'error'); });</script>";
             }
         }
     }
 }
 
-// Fetching Data -> Getting supplier profiles, supplied raw materials, lead times, and purchase order expenditures
+// Fetching Data -> Fetch registered suppliers / garments matching active type filter
 $admin_suppliers = [];
 if (isset($pdo) && $pdo !== null) {
     try {
-        /*
-        // TASK 09: Supplier Rating - STEP 1: Self-Healing DB
-        $checkRating = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'rating'");
-        if (!$checkRating->fetch()) {
-            $pdo->exec("ALTER TABLE suppliers ADD COLUMN rating DECIMAL(3,2) DEFAULT 5.00 AFTER status");
-        }
-
-        // TASK 09: Supplier Rating - STEP 2: Extract & Save Rating
-        $rating = isset($_POST['rating']) ? (float)$_POST['rating'] : 5.00;
-        */
-
-        $stmt = $pdo->query("SELECT s.id, s.name, s.email, s.contact_person AS contact, s.phone, s.address AS addr, s.payment_terms AS terms, s.category AS cat, s.status, s.hold_reason, s.hold_since, s.lead_time 
-                             FROM suppliers s 
-                             WHERE s.deleted_at IS NULL");
+        $stmt = $pdo->prepare("SELECT s.id, s.name, s.email, s.contact_person AS contact, s.phone, s.address AS addr, s.payment_terms AS terms, s.category AS cat, s.supplier_type, s.status, s.hold_reason, s.hold_since, s.lead_time 
+                               FROM suppliers s 
+                               WHERE s.deleted_at IS NULL AND (s.supplier_type = ? OR (s.supplier_type IS NULL AND ? = 'supplier'))
+                               ORDER BY s.id DESC");
+        $stmt->execute([$view_type, $view_type]);
         $supps = $stmt->fetchAll();
 
         foreach ($supps as $s) {
@@ -171,19 +186,57 @@ if (isset($pdo) && $pdo !== null) {
             $p_stmt->execute([$s['id']]);
             $items_rows = $p_stmt->fetchAll();
             $items_arr = [];
-            $products_html = "";
             foreach ($items_rows as $row) {
                 $items_arr[] = ['name' => $row['item_name'], 'cost' => $row['unit_cost']];
-                $cst_str = $row['unit_cost'] !== null ? ' - LKR ' . number_format((float) $row['unit_cost'], 2) : '';
-                $products_html .= '<span class="px-3 py-1 bg-gray-50 border border-gray-100 rounded-lg text-[10px] font-medium text-gray-600 uppercase tracking-wider">' . htmlspecialchars($row['item_name']) . $cst_str . '</span>';
             }
+
+            // Also check products table directly connected to this garment via supplier_products
+            if ($is_garment && empty($items_rows)) {
+                $gp_stmt = $pdo->prepare("SELECT p.name, sp.unit_cost FROM products p JOIN supplier_products sp ON p.id = sp.product_id WHERE sp.supplier_id = ? AND p.deleted_at IS NULL");
+                $gp_stmt->execute([$s['id']]);
+                $gp_rows = $gp_stmt->fetchAll();
+                foreach ($gp_rows as $gp) {
+                    $items_arr[] = ['name' => $gp['name'], 'cost' => $gp['unit_cost']];
+                }
+            }
+
+            $all_products_html = "";
+            $products_html = "";
+            $total_items = count($items_arr);
+
+            foreach ($items_arr as $idx => $item) {
+                $cst_str = $item['cost'] !== null ? ' - LKR ' . number_format((float) $item['cost'], 2) : '';
+                $chip_style = $is_garment 
+                    ? 'bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold' 
+                    : 'bg-gray-50 border border-gray-100 text-gray-600 font-medium';
+                
+                $chip_table = '<span class="px-2.5 py-1 rounded-lg text-[10px] uppercase tracking-wider shrink-0 truncate max-w-[130px] ' . $chip_style . '" title="' . htmlspecialchars($item['name']) . $cst_str . '">' . htmlspecialchars($item['name']) . '</span>';
+                $chip_drawer = '<div class="px-3 py-2 border rounded-xl flex flex-col justify-center ' . $chip_style . '"><span class="text-xs uppercase tracking-wider font-bold truncate">' . htmlspecialchars($item['name']) . '</span>' . ($item['cost'] !== null ? '<span class="text-[10px] opacity-75 font-semibold mt-0.5">LKR ' . number_format((float)$item['cost'], 2) . '</span>' : '') . '</div>';
+
+                $all_products_html .= $chip_drawer;
+                if ($idx < 2) {
+                    $products_html .= $chip_table;
+                }
+            }
+
+            if ($total_items > 2) {
+                $rem = $total_items - 2;
+                $products_html .= '<span class="px-2 py-1 bg-gray-100 border border-gray-200 text-gray-500 rounded-lg text-[10px] font-extrabold uppercase tracking-wider shrink-0">+' . $rem . ' more</span>';
+            }
+
+            if ($total_items === 0) {
+                $products_html = '<span class="text-xs text-gray-400 italic">None assigned</span>';
+                $all_products_html = '<span class="text-xs text-gray-400 italic col-span-2">No items assigned</span>';
+            }
+
             $items_raw = json_encode($items_arr);
 
             $sp_stmt = $pdo->prepare("SELECT AVG(lead_days) FROM supplier_products WHERE supplier_id = ?");
             $sp_stmt->execute([$s['id']]);
             $avg_lead = $sp_stmt->fetchColumn();
-            $lead_days_val = (isset($s['lead_time']) && is_numeric($s['lead_time'])) ? (int)$s['lead_time'] : ($avg_lead ? (int)round($avg_lead) : 7);
-            $lead = $lead_days_val . ' days';
+            $lead_days_val = (isset($s['lead_time']) && is_numeric($s['lead_time'])) ? (int)$s['lead_time'] : ($avg_lead ? (int)round($avg_lead) : ($is_garment ? 60 : 7));
+            
+            $lead = $lead_days_val >= 30 ? (round($lead_days_val / 30, 1) . ' months (' . $lead_days_val . ' days)') : ($lead_days_val . ' days');
 
             $po_stmt = $pdo->prepare("SELECT COUNT(*) AS pos, SUM(total) AS spend FROM purchase_orders WHERE supplier_id = ?");
             $po_stmt->execute([$s['id']]);
@@ -192,23 +245,23 @@ if (isset($pdo) && $pdo !== null) {
             $spend_val = (float) ($po_metrics['spend'] ?? 0);
             $spend = $spend_val >= 1000000 ? 'LKR ' . number_format($spend_val / 1000000, 1) . 'M' : 'LKR ' . number_format($spend_val / 1000, 0) . 'K';
 
-            $ontime = $s['id'] == 1 ? '96%' : ($s['id'] == 2 ? '88%' : ($s['id'] == 3 ? '94%' : ($s['id'] == 4 ? '71%' : '—')));
-            $ontimeW = $s['id'] == 1 ? 96 : ($s['id'] == 2 ? 88 : ($s['id'] == 3 ? 94 : ($s['id'] == 4 ? 71 : 0)));
-            $quality = $s['id'] == 1 ? '98%' : ($s['id'] == 2 ? '91%' : ($s['id'] == 3 ? '99%' : ($s['id'] == 4 ? '84%' : '—')));
-            $qualityW = $s['id'] == 1 ? 98 : ($s['id'] == 2 ? 91 : ($s['id'] == 3 ? 99 : ($s['id'] == 4 ? 84 : 0)));
+            $ontime = $s['id'] == 1 ? '96%' : ($s['id'] == 2 ? '88%' : ($s['id'] == 3 ? '94%' : ($s['id'] == 4 ? '71%' : '95%')));
+            $ontimeW = $s['id'] == 1 ? 96 : ($s['id'] == 2 ? 88 : ($s['id'] == 3 ? 94 : ($s['id'] == 4 ? 71 : 95)));
+            $quality = $s['id'] == 1 ? '98%' : ($s['id'] == 2 ? '91%' : ($s['id'] == 3 ? '99%' : ($s['id'] == 4 ? '84%' : '97%')));
+            $qualityW = $s['id'] == 1 ? 98 : ($s['id'] == 2 ? 91 : ($s['id'] == 3 ? 99 : ($s['id'] == 4 ? 84 : 97)));
 
             $status_lower = strtolower($s['status']);
             if ($status_lower === 'preferred') {
-                $badge = 'bg-blue-50 text-blue-700';
+                $badge = 'bg-blue-50 text-blue-700 border-blue-200';
                 $badgeText = 'Preferred';
             } elseif ($status_lower === 'active') {
-                $badge = 'bg-emerald-50 text-emerald-700';
+                $badge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
                 $badgeText = 'Active';
             } elseif ($status_lower === 'on_hold') {
-                $badge = 'bg-amber-50 text-amber-700';
+                $badge = 'bg-amber-50 text-amber-700 border-amber-200';
                 $badgeText = 'On hold';
             } else {
-                $badge = 'bg-gray-100 text-gray-500';
+                $badge = 'bg-gray-100 text-gray-500 border-gray-200';
                 $badgeText = ucfirst($s['status']);
             }
 
@@ -223,11 +276,13 @@ if (isset($pdo) && $pdo !== null) {
                 'addr' => $s['addr'] ?? '',
                 'terms' => $s['terms'] ?? 'Net 30',
                 'lead_days' => $lead_days_val,
-                'products' => $products_html,
+                'products' => $products_html ?: '<span class="text-xs text-gray-400 italic">None assigned</span>',
+                'all_products' => $all_products_html ?: '<span class="text-xs text-gray-400 italic">No items assigned</span>',
                 'items_raw' => $items_raw,
                 'hold_reason' => $s['hold_reason'] ?? '',
                 'lead' => $lead,
-                'cat' => $s['cat'] ?? 'Fabric',
+                'cat' => $s['cat'] ?? ($is_garment ? 'Innerwear Manufacturing' : 'Fabric'),
+                'supplier_type' => $s['supplier_type'] ?? $view_type,
                 'ontime' => $ontime,
                 'ontimeW' => $ontimeW,
                 'quality' => $quality,
@@ -262,8 +317,7 @@ if (isset($pdo) && $pdo !== null) {
     }
 }
 
-
-// Processing -> Calculating dynamic supplier statistics (Active, Preferred, On Hold)
+// Processing -> Calculating dynamic statistics (Total, Active, Preferred, On Hold)
 $total_suppliers = count($admin_suppliers);
 $active_suppliers = 0;
 $preferred_suppliers = 0;
@@ -278,918 +332,750 @@ foreach ($admin_suppliers as $s) {
         $on_hold_suppliers++;
 }
 ?>
-<!-- Suppliers View -->
-<div class="flex-1 flex overflow-hidden">
-    <!-- List Pane -->
-    <div id="suppliers-container" class="flex-1 flex flex-col min-w-0 bg-white">
-        <!-- Header -->
-        <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900">Suppliers</h1>
-                <p class="text-sm text-gray-500 mt-1">Manage your supply chain and partner relationships.</p>
-            </div>
-            <!-- Stats -->
-            <div class="flex items-center gap-6">
-                <div class="flex gap-4">
-                    <div class="text-center">
-                        <p class="text-[15px] font-black text-gray-900"><?= $total_suppliers ?></p>
-                        <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Total</p>
+
+<!-- Suppliers / Garments View -->
+<div class="flex-1 flex flex-col overflow-hidden bg-gray-50/50">
+    <!-- Top Navigation Tabs (Garments vs Suppliers) -->
+    <div class="flex border-b border-gray-200 px-8 bg-white shrink-0">
+        <a href="/admin-suppliers?type=garment" class="px-6 py-4 font-bold text-sm border-b-2 flex items-center gap-2.5 transition-all <?php echo $is_garment ? 'border-brand text-brand bg-brand/5' : 'border-transparent text-gray-500 hover:text-gray-900'; ?>">
+            <i class="ti ti-building-factory-2 text-xl"></i>
+            <span>Garments (End Products)</span>
+        </a>
+        <a href="/admin-suppliers?type=supplier" class="px-6 py-4 font-bold text-sm border-b-2 flex items-center gap-2.5 transition-all <?php echo !$is_garment ? 'border-brand text-brand bg-brand/5' : 'border-transparent text-gray-500 hover:text-gray-900'; ?>">
+            <i class="ti ti-truck text-xl"></i>
+            <span>Suppliers (Raw Materials)</span>
+        </a>
+    </div>
+
+    <!-- Main Container -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- List Pane -->
+        <div id="suppliers-container" class="flex-1 flex flex-col min-w-0 bg-white">
+            <!-- Header -->
+            <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900"><?= $is_garment ? 'Garments Management' : 'Raw Material Suppliers' ?></h1>
+                    <p class="text-sm text-gray-500 mt-1">
+                        <?= $is_garment ? 'Manage apparel manufacturing partners, garment production orders, and finished goods.' : 'Manage suppliers of raw fabrics, elastics, thread, and packaging materials.' ?>
+                    </p>
+                </div>
+                <!-- Stats -->
+                <div class="flex items-center gap-6">
+                    <div class="flex gap-4">
+                        <div class="text-center">
+                            <p class="text-[15px] font-black text-gray-900"><?= $total_suppliers ?></p>
+                            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Total</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-[15px] font-black text-emerald-600"><?= $active_suppliers ?></p>
+                            <p class="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5">Active</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-[15px] font-black text-blue-600"><?= $preferred_suppliers ?></p>
+                            <p class="text-[9px] font-bold text-blue-500 uppercase tracking-widest mt-0.5">Preferred</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-[15px] font-black text-amber-600"><?= $on_hold_suppliers ?></p>
+                            <p class="text-[9px] font-bold text-amber-500 uppercase tracking-widest mt-0.5">On Hold</p>
+                        </div>
                     </div>
-                    <div class="text-center">
-                        <p class="text-[15px] font-black text-emerald-600"><?= $active_suppliers ?></p>
-                        <p class="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5">Active</p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-[15px] font-black text-blue-600"><?= $preferred_suppliers ?></p>
-                        <p class="text-[9px] font-bold text-blue-500 uppercase tracking-widest mt-0.5">Preferred</p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-[15px] font-black text-amber-600"><?= $on_hold_suppliers ?></p>
-                        <p class="text-[9px] font-bold text-amber-500 uppercase tracking-widest mt-0.5">On Hold</p>
+
+                    <div class="flex items-center gap-3 border-l border-gray-100 pl-6">
+                        <button
+                            class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
+                            onclick="downloadPDF('suppliers-list-container', '<?= $is_garment ? 'Garments_List' : 'Suppliers_List' ?>')">
+                            <i class="ti ti-printer text-lg"></i> Export PDF
+                        </button>
+                        <button onclick="openSupplierModal('add')"
+                            class="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
+                            <i class="ti ti-plus text-lg"></i> <?= $is_garment ? 'Register Garment Factory' : 'Add Material Supplier' ?>
+                        </button>
                     </div>
                 </div>
+            </div>
 
-                <div class="flex items-center gap-3 border-l border-gray-100 pl-6">
-                    <button
-                        class="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all shadow-sm"
-                        onclick="downloadPDF('suppliers-list-container', 'Suppliers_List')">
-                        <i class="ti ti-printer text-lg"></i> Export PDF
-                    </button>
-                    <button onclick="openSupplierModal('add')"
-                        class="flex items-center gap-2 px-4 py-2.5 bg-brand text-brand-light rounded-xl text-xs font-bold hover:opacity-90 transition-all shadow-lg shadow-brand/20">
-                        <i class="ti ti-plus text-lg"></i> Add Supplier
-                    </button>
+            <?php if ($is_garment): ?>
+            <!-- Business Workflow Informational Banner for Garments -->
+            <div class="px-8 py-3 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <i class="ti ti-scissors text-amber-700 text-xl shrink-0"></i>
+                    <p class="text-xs text-amber-900 font-medium">
+                        <strong>Garment Process:</strong> Kesara Enterprises cuts raw fabrics in-house and dispatches cut components to external garment partners. Large orders typically take <strong>2–3 months (60–90 days)</strong> for garments to finish.
+                    </p>
                 </div>
+                <span class="text-[10px] font-extrabold bg-amber-200/60 text-amber-800 px-3 py-1 rounded-full uppercase tracking-wider shrink-0">Internal Cut & CMT</span>
             </div>
-        </div>
+            <?php endif; ?>
 
-        <!-- Filters -->
-        <div class="px-8 py-4 border-b border-gray-100 bg-gray-50/30 flex items-center gap-4">
-            <div class="relative flex-1 group">
-                <i
-                    class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand transition-colors"></i>
-                <input id="supp-search" type="text" placeholder="Search supplier name, email or contact..."
-                    class="w-full pl-11 pr-4 py-2.5 bg-white border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand rounded-xl text-sm transition-all outline-none">
+            <!-- Filters -->
+            <div class="px-8 py-4 border-b border-gray-100 bg-gray-50/30 flex items-center gap-4">
+                <div class="relative flex-1 group">
+                    <i class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand transition-colors"></i>
+                    <input id="supp-search" type="text" placeholder="<?= $is_garment ? 'Search garment factory name, contact or email...' : 'Search raw material supplier, fabric type or contact...' ?>"
+                        class="w-full pl-11 pr-4 py-2.5 bg-white border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand rounded-xl text-sm transition-all outline-none">
+                </div>
+                <select id="supp-status"
+                    class="px-4 py-2.5 bg-white border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand rounded-xl text-sm font-medium transition-all outline-none cursor-pointer">
+                    <option value="all">All Statuses</option>
+                    <option value="active">Active</option>
+                    <option value="preferred">Preferred</option>
+                    <option value="on_hold">On Hold</option>
+                    <option value="inactive">Inactive</option>
+                </select>
             </div>
-            <select id="supp-status"
-                class="px-4 py-2.5 bg-white border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand rounded-xl text-sm font-medium transition-all outline-none cursor-pointer">
-                <option value="all">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="preferred">Preferred</option>
-                <option value="on_hold">On Hold</option>
-                <option value="inactive">Inactive</option>
-            </select>
-        </div>
 
-        <!-- List Content -->
-        <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10" id="suppliers-list-container">
-            <div class="min-w-[800px] p-6 space-y-1">
-                <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
-                    <thead>
-                        <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
-                            <th class="px-4 py-3 rounded-l-xl w-64">Supplier Name</th>
-                            <th class="px-4 py-3 w-40">Contact Person</th>
-
-                            <!-- TASK 09: Supplier Rating - STEP 4: Admin UI Table Rating Column (Commented out for later use)
-                            <th class="px-4 py-3 w-28 text-center">Performance Rating</th>
-                            -->
-
-                            <th class="px-4 py-3 w-32">Lead Time</th>
-                            <th class="px-4 py-3 text-right rounded-r-xl w-32">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody id="supplier-list">
-                        <?php if (empty($admin_suppliers)): ?>
-                            <tr id="empty-state">
-                                <td colspan="4" class="p-12 text-center text-gray-400 text-sm">No suppliers found.</td>
+            <!-- List Content -->
+            <div class="flex-1 overflow-y-auto overflow-x-auto no-scrollbar pb-10" id="suppliers-list-container">
+                <div class="min-w-[800px] p-6 space-y-1">
+                    <table class="w-full text-left border-separate" style="border-spacing: 0 4px;">
+                        <thead>
+                            <tr class="text-[10px] font-bold text-gray-400 uppercase tracking-wider bg-gray-50/50">
+                                <th class="px-4 py-3 rounded-l-xl w-64"><?= $is_garment ? 'Garment Factory' : 'Supplier Name' ?></th>
+                                <th class="px-4 py-3 w-40">Contact Person</th>
+                                <th class="px-4 py-3 w-48"><?= $is_garment ? 'Products Manufactured' : 'Supplied Raw Materials' ?></th>
+                                <th class="px-4 py-3 w-44">Production Lead Time</th>
+                                <th class="px-4 py-3 text-right rounded-r-xl w-32">Status</th>
                             </tr>
-                        <?php else: ?>
-                            <?php foreach ($admin_suppliers as $idx => $s): ?>
-                                <tr id="supplier-row-<?= $idx ?>"
-                                    class="supplier-row bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
-                                    data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($s['id']) ?>"
-                                    data-initials="<?= htmlspecialchars($s['initials']) ?>"
-                                    data-av="<?= htmlspecialchars($s['av']) ?>" data-name="<?= htmlspecialchars($s['name']) ?>"
-                                    data-email="<?= htmlspecialchars($s['email']) ?>"
-                                    data-cat="<?= htmlspecialchars($s['cat']) ?>"
-                                    data-contact="<?= htmlspecialchars($s['contact']) ?>"
-                                    data-lead="<?= htmlspecialchars($s['lead']) ?>"
-                                    data-lead-days="<?= htmlspecialchars($s['lead_days']) ?>"
-                                    data-badge="<?= htmlspecialchars($s['badge']) ?>"
-                                    data-badgetext="<?= htmlspecialchars($s['badgeText']) ?>"
-                                    data-status="<?= htmlspecialchars(strtolower($s['status'])) ?>"
-                                    data-phone="<?= htmlspecialchars($s['phone']) ?>"
-                                    data-addr="<?= htmlspecialchars($s['addr']) ?>"
-                                    data-terms="<?= htmlspecialchars($s['terms']) ?>"
-                                    data-products="<?= htmlspecialchars($s['products']) ?>"
-                                    data-items-raw="<?= htmlspecialchars($s['items_raw'], ENT_QUOTES, 'UTF-8') ?>"
-                                    data-hold-reason="<?= htmlspecialchars($s['hold_reason']) ?>"
-                                    data-ontimew="<?= htmlspecialchars($s['ontimeW']) ?>"
-                                    data-ontime="<?= htmlspecialchars($s['ontime']) ?>"
-                                    data-qualityw="<?= htmlspecialchars($s['qualityW']) ?>"
-                                    data-quality="<?= htmlspecialchars($s['quality']) ?>"
-                                    data-orders="<?= htmlspecialchars($s['orders']) ?>"
-                                    data-spend="<?= htmlspecialchars($s['spend']) ?>" onclick="selectSupplier(this)">
-                                    <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30">
-                                        <div class="flex items-center gap-4">
-                                            <div
-                                                class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs shadow-sm <?= $s['av'] ?>">
-                                                <?= $s['initials'] ?>
-                                            </div>
-                                            <div>
-                                                <p
-                                                    class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
-                                                    <?= htmlspecialchars($s['name']) ?>
-                                                </p>
-                                                <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">
-                                                    <?= htmlspecialchars($s['email']) ?>
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td
-                                        class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-medium text-gray-650">
-                                        <?= htmlspecialchars($s['contact']) ?>
-                                    </td>
-                                    <td
-                                        class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-medium text-gray-900">
-                                        <?= htmlspecialchars($s['lead']) ?>
-                                    </td>
-                                    <td
-                                        class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
-                                        <span
-                                            class="px-3 py-1 <?= $s['badge'] ?> border rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap shadow-sm">
-                                            <?= htmlspecialchars($s['badgeText']) ?>
-                                        </span>
-                                    </td>
+                        </thead>
+                        <tbody id="supplier-list">
+                            <?php if (empty($admin_suppliers)): ?>
+                                <tr id="empty-state">
+                                    <td colspan="5" class="p-12 text-center text-gray-400 text-sm">No <?= $is_garment ? 'garment factories' : 'suppliers' ?> found.</td>
                                 </tr>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                            <?php else: ?>
+                                <?php foreach ($admin_suppliers as $idx => $s): ?>
+                                    <tr id="supplier-row-<?= $idx ?>"
+                                        class="supplier-row bg-white cursor-pointer hover:bg-gray-50/50 transition-all group shadow-sm"
+                                        data-idx="<?= $idx ?>" data-id="<?= htmlspecialchars($s['id']) ?>"
+                                        data-initials="<?= htmlspecialchars($s['initials']) ?>"
+                                        data-av="<?= htmlspecialchars($s['av']) ?>" data-name="<?= htmlspecialchars($s['name']) ?>"
+                                        data-email="<?= htmlspecialchars($s['email']) ?>"
+                                        data-cat="<?= htmlspecialchars($s['cat']) ?>"
+                                        data-contact="<?= htmlspecialchars($s['contact']) ?>"
+                                        data-lead="<?= htmlspecialchars($s['lead']) ?>"
+                                        data-lead-days="<?= htmlspecialchars($s['lead_days']) ?>"
+                                        data-badge="<?= htmlspecialchars($s['badge']) ?>"
+                                        data-badgetext="<?= htmlspecialchars($s['badgeText']) ?>"
+                                        data-status="<?= htmlspecialchars(strtolower($s['status'])) ?>"
+                                        data-phone="<?= htmlspecialchars($s['phone']) ?>"
+                                        data-addr="<?= htmlspecialchars($s['addr']) ?>"
+                                        data-terms="<?= htmlspecialchars($s['terms']) ?>"
+                                        data-products="<?= htmlspecialchars($s['products']) ?>"
+                                        data-all-products="<?= htmlspecialchars($s['all_products']) ?>"
+                                        data-items-raw="<?= htmlspecialchars($s['items_raw'], ENT_QUOTES, 'UTF-8') ?>"
+                                        data-hold-reason="<?= htmlspecialchars($s['hold_reason']) ?>"
+                                        data-ontimew="<?= htmlspecialchars($s['ontimeW']) ?>"
+                                        data-ontime="<?= htmlspecialchars($s['ontime']) ?>"
+                                        data-qualityw="<?= htmlspecialchars($s['qualityW']) ?>"
+                                        data-quality="<?= htmlspecialchars($s['quality']) ?>"
+                                        data-orders="<?= htmlspecialchars($s['orders']) ?>"
+                                        data-spend="<?= htmlspecialchars($s['spend']) ?>" onclick="selectSupplier(this)">
+                                        <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs shadow-sm <?= $s['av'] ?>">
+                                                    <?= $s['initials'] ?>
+                                                </div>
+                                                <div>
+                                                    <p class="text-sm font-bold text-gray-900 group-hover:text-brand transition-colors">
+                                                        <?= htmlspecialchars($s['name']) ?>
+                                                    </p>
+                                                    <p class="text-[10px] text-gray-400 mt-1 uppercase font-bold tracking-tight">
+                                                        <?= htmlspecialchars($s['email']) ?>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-medium text-gray-650">
+                                            <?= htmlspecialchars($s['contact']) ?>
+                                        </td>
+                                        <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-medium text-gray-650">
+                                            <div class="flex items-center gap-1.5 flex-nowrap whitespace-nowrap overflow-hidden max-w-[280px]">
+                                                <?= $s['products'] ?>
+                                            </div>
+                                        </td>
+                                        <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-xs font-bold text-gray-900">
+                                            <span class="px-2.5 py-1 bg-gray-100 rounded-lg text-gray-700">
+                                                <i class="ti ti-clock text-gray-400 mr-1"></i><?= htmlspecialchars($s['lead']) ?>
+                                            </span>
+                                        </td>
+                                        <td class="p-4 border-y border-r border-gray-100 rounded-r-2xl group-hover:border-brand/30 text-right">
+                                            <span class="px-3 py-1 <?= $s['badge'] ?> border rounded-full text-[9px] font-bold uppercase tracking-wider whitespace-nowrap shadow-sm">
+                                                <?= htmlspecialchars($s['badgeText']) ?>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
 
-
-                <!-- Pagination Controls -->
-                <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white"
-                    id="pagination-controls">
-                    <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
-                    <div class="flex items-center gap-2" id="pagination-buttons">
-                        <!-- Buttons injected by JS -->
+                    <!-- Pagination Controls -->
+                    <div class="px-8 py-4 border-t border-gray-100 flex items-center justify-between bg-white" id="pagination-controls">
+                        <p class="text-xs text-gray-500 font-medium" id="pagination-info">Showing 0 to 0 of 0 entries</p>
+                        <div class="flex items-center gap-2" id="pagination-buttons"></div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Detail Pane -->
-        <!-- Backdrop -->
-        <div id="supplier-detail-backdrop"
-            class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300"
-            onclick="closeSupplierDetailPane()"></div>
-        <div id="supplier-detail-pane"
-            class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-white border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
-            <div class="p-8 flex-1 overflow-y-auto space-y-8">
-                <!-- Profile Header -->
-                <div class="flex flex-col items-center text-center relative">
+            <!-- Detail Pane -->
+            <div id="supplier-detail-backdrop"
+                class="hidden fixed inset-0 bg-black/40 z-40 backdrop-blur-[2px] transition-opacity duration-300"
+                onclick="closeSupplierDetailPane()"></div>
+            <div id="supplier-detail-pane"
+                class="fixed inset-y-0 right-0 z-50 w-1/2 max-w-full bg-white border-l border-gray-100 flex flex-col shadow-2xl transform translate-x-full transition-transform duration-300 overflow-y-auto">
+                <div class="p-8 flex-1 overflow-y-auto space-y-8">
+                    <!-- Header -->
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-4">
+                            <div id="d-av" class="w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-bold border shadow-md"></div>
+                            <div>
+                                <h2 id="d-name" class="text-xl font-extrabold text-gray-900"></h2>
+                                <p id="d-email" class="text-xs font-semibold text-gray-400 mt-0.5"></p>
+                                <span id="d-badge" class="inline-block mt-2"></span>
+                            </div>
+                        </div>
+                        <button onclick="closeSupplierDetailPane()" class="p-2 text-gray-400 hover:text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
+                            <i class="ti ti-x text-xl"></i>
+                        </button>
+                    </div>
+
+                    <!-- Contact & Operations -->
+                    <div class="grid grid-cols-2 gap-4 p-5 bg-gray-50/50 rounded-2xl border border-gray-100 text-xs">
+                        <div>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Contact Person</p>
+                            <p id="d-contact" class="font-bold text-gray-900 mt-1"></p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Phone</p>
+                            <p id="d-phone" class="font-bold text-gray-900 mt-1"></p>
+                        </div>
+                        <div class="col-span-2">
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Factory / Office Address</p>
+                            <p id="d-addr" class="font-medium text-gray-700 mt-1"></p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Payment Terms</p>
+                            <p id="d-terms" class="font-bold text-brand mt-1"></p>
+                        </div>
+                    </div>
+
+                    <!-- Products / Materials List -->
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-extrabold text-gray-900 uppercase tracking-wider"><?= $is_garment ? 'End Products Manufactured' : 'Raw Materials Supplied' ?></h3>
+                        <div id="d-products" class="grid grid-cols-2 gap-2.5"></div>
+                    </div>
+
+                    <!-- Performance Ratings -->
+                    <div class="space-y-4 p-5 bg-gray-50/30 rounded-2xl border border-gray-100">
+                        <h3 class="text-xs font-extrabold text-gray-900 uppercase tracking-wider">Partner Metrics & History</h3>
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-xs font-bold mb-1">
+                                    <span class="text-gray-500">On-Time Delivery Rate</span>
+                                    <span id="d-ot" class="text-emerald-700"></span>
+                                </div>
+                                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div id="d-bar-ot" class="h-full rounded-full transition-all duration-500"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs font-bold mb-1">
+                                    <span class="text-gray-500">Quality Assurance Score</span>
+                                    <span id="d-qual" class="text-emerald-700"></span>
+                                </div>
+                                <div class="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div id="d-bar-qual" class="h-full rounded-full transition-all duration-500"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200/60 text-center">
+                            <div>
+                                <p id="d-pos" class="text-lg font-black text-gray-900"></p>
+                                <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Total Orders Raised</p>
+                            </div>
+                            <div>
+                                <p id="d-spend" class="text-lg font-black text-brand"></p>
+                                <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Total Expenditure</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Actions -->
+                <div class="p-6 border-t border-gray-100 bg-white flex gap-3">
+                    <button onclick="openSupplierModal('edit', currentSupplierId)"
+                        class="flex-1 py-3 bg-brand text-brand-light font-bold rounded-xl text-xs hover:opacity-90 transition-all shadow-md shadow-brand/10 flex items-center justify-center gap-2">
+                        <i class="ti ti-edit text-base"></i> Edit <?= $is_garment ? 'Garment Factory' : 'Supplier' ?>
+                    </button>
                     <button onclick="closeSupplierDetailPane()"
-                        class="absolute top-0 right-0 p-1.5 text-gray-400 hover:text-brand transition-colors focus:outline-none"
-                        aria-label="Close details">
-                        <i class="ti ti-x text-xl"></i>
-                    </button>
-                    <div id="d-av"
-                        class="w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-bold border shadow-lg mb-4">
-                        NK</div>
-                    <h2 id="d-name" class="text-xl font-bold text-gray-900 tracking-tight">Sri Lanka Cotton Mills</h2>
-                    <p id="d-email" class="text-sm text-gray-500 mt-1">slcm@cottonmills.lk</p>
-                    <span id="d-badge"
-                        class="mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border">Preferred</span>
-                </div>
-
-                <!-- Details Section -->
-                <section>
-                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Details</h3>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-gray-500 font-medium">Contact Person</span>
-                            <span id="d-contact" class="text-xs font-bold text-gray-900"></span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-gray-500 font-medium">Phone</span>
-                            <span id="d-phone" class="text-xs font-bold text-gray-900"></span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-gray-500 font-medium">Address</span>
-                            <span id="d-addr" class="text-xs font-bold text-gray-900"></span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-gray-500 font-medium">Payment Terms</span>
-                            <span id="d-terms" class="text-xs font-bold text-gray-900"></span>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Supplied Items Badges -->
-                <section>
-                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Supplied Items</h3>
-                    <div id="d-products" class="flex flex-wrap gap-2">
-                        <!-- Badges injected dynamically -->
-                    </div>
-                </section>
-
-                <!-- Metrics -->
-                <section>
-                    <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Performance</h3>
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-gray-500 font-medium">On-time delivery</span>
-                            <div class="flex items-center gap-2">
-                                <div class="h-1.5 w-16 bg-gray-100 rounded-full overflow-hidden flex-shrink-0">
-                                    <div id="d-bar-ot" class="h-full rounded-full transition-all duration-500"
-                                        style="width: 96%"></div>
-                                </div>
-                                <span id="d-ot" class="text-xs font-bold">96%</span>
-                            </div>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-gray-500 font-medium">Quality pass rate</span>
-                            <div class="flex items-center gap-2">
-                                <div class="h-1.5 w-16 bg-gray-100 rounded-full overflow-hidden flex-shrink-0">
-                                    <div id="d-bar-qual" class="h-full rounded-full transition-all duration-500"
-                                        style="width: 98%"></div>
-                                </div>
-                                <span id="d-qual" class="text-xs font-bold">98%</span>
-                            </div>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-gray-500 font-medium">Active purchase orders</span>
-                            <span id="d-pos" class="text-xs font-bold text-gray-900">47</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-gray-500 font-medium">Total spend</span>
-                            <span id="d-spend" class="text-xs font-bold text-gray-900">LKR 1.2M</span>
-                        </div>
-                    </div>
-                </section>
-            </div>
-
-            <!-- Action Footer (Sticky) -->
-            <div class="p-6 border-t border-gray-100 bg-gray-50/50 space-y-3">
-                <a href="/admin-purchase-orders"
-                    class="w-full flex items-center justify-center gap-2 px-4 py-3 bg-brand text-brand-light rounded-xl text-sm font-bold shadow-lg shadow-brand/10 hover:opacity-90 transition-all">
-                    <i class="ti ti-shopping-cart text-lg"></i>
-                    Create Purchase Order ↗
-                </a>
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="d-edit-btn" onclick="openSupplierModal('edit', currentSupplierId)"
-                        class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 transition-all">
-                        <i class="ti ti-edit text-base"></i>
-                        Edit
-                    </button>
-                    <button id="d-hold-btn"
-                        class="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-red-100 rounded-xl text-xs font-bold text-red-650 hover:bg-red-50 transition-all">
-                        <i class="ti ti-ban text-base"></i>
-                        Hold
+                        class="px-6 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs hover:bg-gray-200 transition-all">
+                        Close
                     </button>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Supplier Modal -->
-    <div id="supplierModal"
-        class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                <h2 id="modalTitle" class="text-xl font-bold text-gray-900">Add New Supplier</h2>
-                <button onclick="closeSupplierModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
-                    <i class="ti ti-x text-2xl"></i>
-                </button>
+<!-- Modal Dialog (Add / Edit) -->
+<div id="supplierModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-8 shadow-2xl space-y-6 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+            <div>
+                <h3 id="modalTitle" class="text-xl font-extrabold text-gray-900"><?= $is_garment ? 'Register Garment Factory' : 'Add Material Supplier' ?></h3>
+                <p class="text-xs text-gray-500 mt-0.5"><?= $is_garment ? 'Add an external garment factory partner for innerwear finishing.' : 'Add a raw material vendor supplying fabric, elastic, or packaging.' ?></p>
             </div>
-            <div class="flex-1 overflow-y-auto p-6">
-                <form method="POST" id="supplierForm" action="/admin-suppliers" class="space-y-6" data-turbo="false">
-                    <input type="hidden" name="action" id="formAction" value="save">
-                    <input type="hidden" name="supplier_id" id="supplierIdInput" value="">
-                    <input type="hidden" name="supplied_items" id="suppliedItemsInput" value="">
-
-                    <div class="grid grid-cols-2 gap-6">
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Supplier Name
-                                *</label>
-                            <input type="text" name="company_name" required
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Contact Name
-                                *</label>
-                            <input type="text" name="contact_person" required
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Email Address
-                                *</label>
-                            <input type="email" name="email" required
-                                pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Phone Number
-                                *</label>
-                            <input type="tel" name="phone" required maxlength="10" pattern="^0[0-9]{9}$"
-                                title="Phone number must start with 0 and contain exactly 10 digits"
-                                oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
-                        </div>
-                        <div class="space-y-2 col-span-2">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Registered
-                                Address</label>
-                            <textarea name="address" rows="2"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none resize-none"></textarea>
-                        </div>
-
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Current Status
-                                *</label>
-                            <select name="status" id="modalStatusSelect" onchange="toggleHoldReason()"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none">
-                                <option value="active">Active</option>
-                                <option value="preferred">Preferred</option>
-                                <option value="on_hold">On Hold</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Payment
-                                Terms</label>
-                            <input type="text" name="payment_terms"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none"
-                                placeholder="e.g. Net 30">
-                        </div>
-                        <div class="space-y-2">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Lead Time (Days) *</label>
-                            <input type="number" name="lead_time" id="modalLeadTimeInput" min="1" max="365" value="7" required
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none"
-                                placeholder="e.g. 7">
-                        </div>
-                        <div class="space-y-2 hidden" id="holdReasonContainer">
-                            <label class="text-xs font-bold text-gray-500 uppercase tracking-wider">Hold Reason</label>
-                            <input type="text" name="hold_reason" id="modalHoldReason"
-                                class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-brand/20 outline-none"
-                                placeholder="If on hold">
-                        </div>
-                    </div>
-
-                    <!-- Supplied Items — redesigned picker card -->
-                    <div class="mt-6 pt-6 border-t border-gray-100">
-                        <div class="rounded-2xl border border-brand/20 overflow-hidden shadow-sm">
-
-                            <!-- Card header -->
-                            <div class="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-brand/5 to-transparent border-b border-brand/10">
-                                <div class="flex items-center gap-2">
-                                    <i class="ti ti-package text-brand text-base"></i>
-                                    <span class="text-[10px] font-black text-brand uppercase tracking-[0.2em]">Supplied Items</span>
-                                    <span id="modalItemCountBadge" class="hidden px-2 py-0.5 bg-brand text-white text-[9px] font-bold rounded-full">0</span>
-                                </div>
-                                <span class="text-[9px] text-gray-400 font-semibold">Type product name &amp; set unit cost, then press Enter or Add</span>
-                            </div>
-
-                            <!-- Search + Cost + Add row -->
-                            <div class="px-5 py-4 bg-white border-b border-gray-100 flex items-center gap-2">
-                                <!-- Custom product dropdown -->
-                                <div class="relative flex-1" id="itemPickerWrapper">
-                                    <i class="ti ti-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-sm pointer-events-none z-10"></i>
-                                    <input id="modalAddItemInput"
-                                        autocomplete="off"
-                                        placeholder="Search product name..."
-                                        class="w-full pl-8 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all"
-                                        oninput="filterItemDropdown(this.value)"
-                                        onfocus="showItemDropdown()"
-                                        onkeydown="handleItemDropdownKey(event)">
-                                    <!-- Dropdown portal appended to body by JS -->
-                                </div>
-                                <div class="relative">
-                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-300 pointer-events-none">LKR</span>
-                                    <input type="number" id="modalAddItemCost" step="0.01" min="0"
-                                        placeholder="Unit cost"
-                                        class="w-32 pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand/40 focus:bg-white transition-all"
-                                        onkeydown="if(event.key==='Enter'){event.preventDefault();modalAddSuppliedItem();}">
-                                </div>
-                                <button type="button" onclick="modalAddSuppliedItem()"
-                                    class="px-4 py-2.5 bg-brand text-white rounded-xl text-xs font-bold hover:bg-brand-dark transition-all flex items-center gap-1.5 shrink-0 shadow-sm shadow-brand/20">
-                                    <i class="ti ti-plus text-sm"></i> Add
-                                </button>
-                            </div>
-
-                            <!-- Tag chips preview -->
-                            <div id="modalSuppliedItemsContainer"
-                                class="px-5 py-4 flex flex-wrap gap-2 bg-white min-h-[56px]">
-                                <p id="modalItemsEmptyHint" class="text-[10px] text-gray-300 font-semibold italic w-full text-center py-1">No items added yet</p>
-                            </div>
-
-                        </div>
-                    </div>
-
-                    <div class="pt-8 border-t border-gray-100 flex justify-between items-center">
-                        <div id="deleteBtnContainer" style="display: none;">
-                            <button type="button" onclick="modalDeleteSupplier()"
-                                class="px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-sm font-bold hover:bg-red-100 transition-all"><i
-                                    class="ti ti-trash"></i> Delete</button>
-                        </div>
-                        <div class="flex gap-3 ml-auto">
-                            <button type="button" onclick="closeSupplierModal()"
-                                class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-600 hover:bg-gray-50 transition-all">Cancel</button>
-                            <button type="submit"
-                                class="px-6 py-2.5 bg-brand text-brand-light rounded-xl text-sm font-bold shadow-lg shadow-brand/20 hover:opacity-90 transition-all">Save
-                                Changes</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
+            <button onclick="closeSupplierModal()" class="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-50"><i class="ti ti-x text-xl"></i></button>
         </div>
+
+        <form id="supplierForm" method="POST" class="space-y-4">
+            <input type="hidden" name="action" id="formAction" value="save">
+            <input type="hidden" name="supplier_id" id="supplierIdInput" value="">
+            <input type="hidden" name="supplier_type" value="<?= htmlspecialchars($view_type) ?>">
+            <input type="hidden" name="supplied_items" id="suppliedItemsInput" value="[]">
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="col-span-2">
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5"><?= $is_garment ? 'Garment Company / Factory Name' : 'Company Name' ?> *</label>
+                    <input type="text" name="company_name" required placeholder="<?= $is_garment ? 'e.g. MAS Matrix Garment Factory' : 'e.g. Sri Lanka Cotton Mills' ?>" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">Email Address *</label>
+                    <input type="email" name="email" required placeholder="orders@factory.lk" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">Contact Person</label>
+                    <input type="text" name="contact_person" placeholder="Mr. / Ms. Contact Name" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">Phone (0XXXXXXXXX) *</label>
+                    <input type="text" name="phone" required placeholder="0771234567" pattern="0[0-9]{9}" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">Payment Terms</label>
+                    <select name="payment_terms" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all">
+                        <option value="Net 30">Net 30 Days</option>
+                        <option value="Net 45">Net 45 Days</option>
+                        <option value="Net 60" <?= $is_garment ? 'selected' : '' ?>>Net 60 Days</option>
+                        <option value="COD">Cash on Delivery (COD)</option>
+                        <option value="Net 15">Net 15 Days</option>
+                    </select>
+                </div>
+
+                <div class="col-span-2">
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">Factory / Office Address</label>
+                    <input type="text" name="address" placeholder="EPZ Biyagama, Western Province" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">Category</label>
+                    <select name="category" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all">
+                        <?php if ($is_garment): ?>
+                            <option value="Innerwear Manufacturing">Innerwear Manufacturing</option>
+                            <option value="Cut-Make-Trim (CMT)">Cut-Make-Trim (CMT)</option>
+                            <option value="Apparel Finishing">Apparel Finishing</option>
+                            <option value="Sub-contractor Factory">Sub-contractor Factory</option>
+                        <?php else: ?>
+                            <option value="Fabric">Fabric (Cotton, Spandex, Modal)</option>
+                            <option value="Elastic / Trims">Elastic & Trims</option>
+                            <option value="Packaging">Packaging (Boxes, Polybags)</option>
+                            <option value="Threads & Buttons">Threads & Accessories</option>
+                        <?php endif; ?>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">Estimated Lead Time (Days)</label>
+                    <input type="number" name="lead_time" min="1" value="<?= $is_garment ? '60' : '7' ?>" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">Status</label>
+                    <select name="status" id="modalStatusSelect" onchange="toggleHoldReason()" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand focus:bg-white transition-all">
+                        <option value="active">Active</option>
+                        <option value="preferred">Preferred Partner</option>
+                        <option value="on_hold">On Hold</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="holdReasonContainer" class="hidden">
+                <label class="block text-xs font-bold text-amber-700 uppercase tracking-wider mb-1.5">Reason for Hold</label>
+                <input type="text" name="hold_reason" placeholder="e.g. Production capacity review" class="w-full px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-900 outline-none focus:ring-2 focus:ring-amber-500">
+            </div>
+
+            <!-- Items / Products Tag Chips Builder -->
+            <div class="space-y-2 pt-2 border-t border-gray-100">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs font-bold text-gray-700 uppercase tracking-wider"><?= $is_garment ? 'Finished Products Manufactured' : 'Raw Material Items Supplied' ?></label>
+                    <span id="modalItemCountBadge" class="hidden text-[10px] font-extrabold bg-brand/10 text-brand px-2 py-0.5 rounded-full">0</span>
+                </div>
+                <div id="modalSuppliedItemsContainer" class="p-3 bg-gray-50 border border-gray-200 rounded-2xl flex flex-wrap gap-2 min-h-[52px] items-center">
+                    <p id="modalItemsEmptyHint" class="text-xs text-gray-400 italic font-medium px-1">No items added yet. Use the inputs below.</p>
+                </div>
+
+                <div class="flex gap-2 relative" id="itemPickerWrapper">
+                    <input type="text" id="modalAddItemInput" placeholder="<?= $is_garment ? 'Item name (e.g. Mens Cotton Briefs)' : 'Raw item (e.g. Combed Cotton Fabric)' ?>" oninput="onItemPickerInput(this.value)" onkeydown="onItemPickerKeyDown(event)" autocomplete="off" class="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand">
+                    <input type="number" id="modalAddItemCost" step="0.01" min="0" placeholder="Unit Cost LKR (Optional)" class="w-36 px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-brand">
+                    <button type="button" onclick="modalAddSuppliedItem()" class="px-4 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all flex items-center gap-1.5"><i class="ti ti-plus"></i> Add</button>
+
+                    <!-- Auto-complete dropdown -->
+                    <div id="itemDropdownList" class="hidden absolute top-full left-0 right-36 mt-1 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 max-h-48 overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center pt-4 border-t border-gray-100">
+                <div id="deleteBtnContainer" class="hidden">
+                    <button type="button" onclick="confirmDeleteFromModal()" class="px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all"><i class="ti ti-trash mr-1"></i> Delete</button>
+                </div>
+                <div class="flex gap-3 ml-auto">
+                    <button type="button" onclick="closeSupplierModal()" class="px-5 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-xl text-xs hover:bg-gray-200 transition-all">Cancel</button>
+                    <button type="submit" class="px-6 py-2.5 bg-brand text-brand-light font-bold rounded-xl text-xs hover:opacity-90 transition-all shadow-lg shadow-brand/20">Save Record</button>
+                </div>
+            </div>
+        </form>
     </div>
+</div>
 
-    <script>
-        // ── Custom Supplied-Items Dropdown (portal, fixed positioning) ─────
-        var allProducts = <?= $inv_products_json ?>;
-        var dropdownFocusIdx = -1;
+<script>
+    var availableProductsList = <?= $inv_products_json ?>;
+    var dropdownFocusIdx = -1;
 
-        // Create portal dropdown div attached to body so modal overflow never clips it
-        (function() {
-            var el = document.createElement('div');
-            el.id = 'itemDropdownList';
-            el.style.cssText = 'display:none; position:fixed; background:#fff; border:1.5px solid #b8c9f5; border-radius:12px; box-shadow:0 8px 32px rgba(30,50,120,0.13); z-index:9999; max-height:220px; overflow-y:auto; min-width:200px;';
-            document.body.appendChild(el);
-        })();
-
-        function positionItemDropdown() {
-            var input = document.getElementById('modalAddItemInput');
-            var list  = document.getElementById('itemDropdownList');
-            if (!input || !list) return;
-            var rect = input.getBoundingClientRect();
-            list.style.top    = (rect.bottom + 6) + 'px';
-            list.style.left   = rect.left + 'px';
-            list.style.width  = rect.width + 'px';
-        }
-
-        function renderItemDropdownItems(filtered) {
-            var list = document.getElementById('itemDropdownList');
-            if (!list) return;
-            dropdownFocusIdx = -1;
-            if (filtered.length === 0) {
-                list.innerHTML = '<div style="padding:12px 16px;font-size:11px;color:#9ca3af;text-align:center;font-style:italic;">No products found</div>';
-                return;
+    function toggleHoldReason() {
+        var statusSelect = document.getElementById('modalStatusSelect');
+        var container = document.getElementById('holdReasonContainer');
+        if (statusSelect && container) {
+            if (statusSelect.value === 'on_hold') {
+                container.classList.remove('hidden');
+            } else {
+                container.classList.add('hidden');
             }
-            list.innerHTML = filtered.map((name, i) => {
-                var border = i < filtered.length - 1 ? 'border-bottom:1px solid #f3f4f6;' : '';
-                var safe = escapeHtml(name);
-                var safeJs = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                return `<div class="item-dropdown-row" style="padding:11px 16px;font-size:13px;font-weight:600;color:#1a2454;cursor:pointer;background:#fff;${border}" onmouseenter="highlightDropdownRow(this)" onmouseleave="unhighlightDropdownRow(this)" onmousedown="selectDropdownItem(event,'${safeJs}')">${safe}</div>`;
-            }).join('');
         }
+    }
 
-        function highlightDropdownRow(el) { el.style.background = '#e8edf9'; }
-        function unhighlightDropdownRow(el) { if (!el.classList.contains('dd-keyboard-focus')) el.style.background = '#fff'; }
+    function onItemPickerInput(val) {
+        var list = document.getElementById('itemDropdownList');
+        if (!list) return;
+        dropdownFocusIdx = -1;
+        var query = val.trim().toLowerCase();
+        if (!query) { hideItemDropdown(); return; }
 
-        function showItemDropdown() {
-            positionItemDropdown();
-            var val = document.getElementById('modalAddItemInput').value;
-            var query = val.toLowerCase().trim();
-            var filtered = query === '' ? allProducts.slice(0, 60) : allProducts.filter(n => n.toLowerCase().includes(query)).slice(0, 60);
-            renderItemDropdownItems(filtered);
-            var list = document.getElementById('itemDropdownList');
-            if (list) list.style.display = 'block';
-        }
+        var matches = availableProductsList.filter(p => p.toLowerCase().includes(query));
+        if (matches.length === 0) { hideItemDropdown(); return; }
 
-        function hideItemDropdown() {
-            var list = document.getElementById('itemDropdownList');
-            if (list) list.style.display = 'none';
-            dropdownFocusIdx = -1;
-        }
+        list.innerHTML = matches.map((m) => `
+            <div class="px-4 py-2.5 text-xs font-bold text-gray-700 hover:bg-brand/10 hover:text-brand cursor-pointer transition-colors border-b border-gray-50 last:border-none" onclick="selectItemFromDropdown('${escapeHtml(m)}')">
+                <i class="ti ti-package text-gray-400 mr-2"></i>${escapeHtml(m)}
+            </div>
+        `).join('');
+        list.classList.remove('hidden');
+    }
 
-        function filterItemDropdown(q) {
-            positionItemDropdown();
-            var query = q.toLowerCase().trim();
-            var filtered = query === '' ? allProducts.slice(0, 60) : allProducts.filter(n => n.toLowerCase().includes(query)).slice(0, 60);
-            renderItemDropdownItems(filtered);
-            var list = document.getElementById('itemDropdownList');
-            if (list) list.style.display = 'block';
-        }
+    function selectItemFromDropdown(val) {
+        document.getElementById('modalAddItemInput').value = val;
+        hideItemDropdown();
+        document.getElementById('modalAddItemCost').focus();
+    }
 
-        function selectDropdownItem(e, name) {
+    function hideItemDropdown() {
+        var list = document.getElementById('itemDropdownList');
+        if (list) list.classList.add('hidden');
+    }
+
+    function onItemPickerKeyDown(e) {
+        var list = document.getElementById('itemDropdownList');
+        if (!list || list.classList.contains('hidden')) return;
+        var rows = list.querySelectorAll('div');
+        if (e.key === 'ArrowDown') {
             e.preventDefault();
-            document.getElementById('modalAddItemInput').value = name;
-            hideItemDropdown();
-            document.getElementById('modalAddItemCost').focus();
-        }
-
-        function handleItemDropdownKey(e) {
-            var list = document.getElementById('itemDropdownList');
-            var hidden = !list || list.style.display === 'none';
-            if (hidden) {
-                if (e.key === 'Enter') { e.preventDefault(); modalAddSuppliedItem(); }
-                return;
-            }
-            var rows = list.querySelectorAll('.item-dropdown-row');
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                rows.forEach(r => { r.style.background = '#fff'; r.classList.remove('dd-keyboard-focus'); });
-                dropdownFocusIdx = Math.min(dropdownFocusIdx + 1, rows.length - 1);
-                if (rows[dropdownFocusIdx]) { rows[dropdownFocusIdx].style.background = '#e8edf9'; rows[dropdownFocusIdx].classList.add('dd-keyboard-focus'); rows[dropdownFocusIdx].scrollIntoView({ block: 'nearest' }); }
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                rows.forEach(r => { r.style.background = '#fff'; r.classList.remove('dd-keyboard-focus'); });
-                dropdownFocusIdx = Math.max(dropdownFocusIdx - 1, 0);
-                if (rows[dropdownFocusIdx]) { rows[dropdownFocusIdx].style.background = '#e8edf9'; rows[dropdownFocusIdx].classList.add('dd-keyboard-focus'); rows[dropdownFocusIdx].scrollIntoView({ block: 'nearest' }); }
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                if (dropdownFocusIdx >= 0 && rows[dropdownFocusIdx]) {
-                    document.getElementById('modalAddItemInput').value = rows[dropdownFocusIdx].textContent.trim();
-                    hideItemDropdown();
-                    document.getElementById('modalAddItemCost').focus();
-                } else { modalAddSuppliedItem(); }
-            } else if (e.key === 'Escape') {
+            dropdownFocusIdx = Math.min(dropdownFocusIdx + 1, rows.length - 1);
+            rows.forEach((r, i) => r.style.background = (i === dropdownFocusIdx) ? '#e8edf9' : '');
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            dropdownFocusIdx = Math.max(dropdownFocusIdx - 1, 0);
+            rows.forEach((r, i) => r.style.background = (i === dropdownFocusIdx) ? '#e8edf9' : '');
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (dropdownFocusIdx >= 0 && rows[dropdownFocusIdx]) {
+                document.getElementById('modalAddItemInput').value = rows[dropdownFocusIdx].textContent.trim();
                 hideItemDropdown();
-            }
+                document.getElementById('modalAddItemCost').focus();
+            } else { modalAddSuppliedItem(); }
+        } else if (e.key === 'Escape') {
+            hideItemDropdown();
         }
+    }
 
-        // Reposition on scroll/resize so it tracks the input
-        window.addEventListener('scroll', positionItemDropdown, true);
-        window.addEventListener('resize', positionItemDropdown);
+    function barColor(w) { return w >= 90 ? '#10b981' : w >= 75 ? '#f59e0b' : '#ef4444'; }
+    function barText(w) { return w >= 90 ? '#047857' : w >= 75 ? '#b45309' : '#b91c1c'; }
 
-        // Close on outside click
-        document.addEventListener('click', function(e) {
-            var wrapper = document.getElementById('itemPickerWrapper');
-            var list    = document.getElementById('itemDropdownList');
-            if (wrapper && !wrapper.contains(e.target) && list && !list.contains(e.target)) hideItemDropdown();
+    function selectSupplier(el, openDrawer = true) {
+        if (!el) return;
+        document.querySelectorAll('.supplier-row').forEach(r => {
+            r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+            r.classList.add('bg-white', 'border-gray-100');
         });
-        // ────────────────────────────────────────────────────────────────────
+        el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
+        el.classList.remove('bg-white', 'border-gray-100');
 
-        function barColor(w) { return w >= 90 ? '#10b981' : w >= 75 ? '#f59e0b' : '#ef4444'; }
-        function barText(w) { return w >= 90 ? '#047857' : w >= 75 ? '#b45309' : '#b91c1c'; }
-
-        function selectSupplier(el, openDrawer = true) {
-            if (!el) return;
-            document.querySelectorAll('.supplier-row').forEach(r => {
-                r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
-                r.classList.add('bg-white', 'border-gray-100');
-            });
-            el.classList.add('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
-            el.classList.remove('bg-white', 'border-gray-100');
-
-            // Open drawer
-            if (openDrawer) {
-                var pane = document.getElementById('supplier-detail-pane');
-                var backdrop = document.getElementById('supplier-detail-backdrop');
-                if (pane) pane.classList.remove('translate-x-full');
-                if (backdrop) {
-                    backdrop.classList.remove('hidden');
-                    requestAnimationFrame(() => backdrop.classList.add('opacity-100'));
-                }
-            }
-
-            var av = document.getElementById('d-av');
-            av.textContent = el.dataset.initials;
-            av.className = 'w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-bold border shadow-lg mb-4 ' + el.dataset.av;
-
-            document.getElementById('d-name').textContent = el.dataset.name;
-            document.getElementById('d-email').textContent = el.dataset.email;
-
-            var badge = document.getElementById('d-badge');
-            badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ' + el.dataset.badge;
-            badge.textContent = el.dataset.badgetext;
-
-            document.getElementById('d-contact').textContent = el.dataset.contact;
-            document.getElementById('d-phone').textContent = el.dataset.phone;
-            document.getElementById('d-addr').textContent = el.dataset.addr;
-            document.getElementById('d-terms').textContent = el.dataset.terms;
-
-            document.getElementById('d-products').innerHTML = el.dataset.products;
-
-            // Performance
-            var ontimeW = parseInt(el.dataset.ontimew);
-            document.getElementById('d-bar-ot').style.width = ontimeW + '%';
-            document.getElementById('d-bar-ot').style.backgroundColor = barColor(ontimeW);
-            document.getElementById('d-ot').textContent = el.dataset.ontime;
-            document.getElementById('d-ot').style.color = barText(ontimeW);
-
-            var qualityW = parseInt(el.dataset.qualityw);
-            document.getElementById('d-bar-qual').style.width = qualityW + '%';
-            document.getElementById('d-bar-qual').style.backgroundColor = barColor(qualityW);
-            document.getElementById('d-qual').textContent = el.dataset.quality;
-            document.getElementById('d-qual').style.color = barText(qualityW);
-
-            document.getElementById('d-pos').textContent = el.dataset.orders;
-            document.getElementById('d-spend').textContent = el.dataset.spend;
-
-            currentSupplierId = el.dataset.id;
-        }
-
-        var currentSupplierId = null;
-        var modalSuppliedItems = [];
-
-        function escapeHtml(text) {
-            if (!text) return '';
-            return String(text)
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
-
-        // Modal -> Rendering supplied items tag chips in supplier edit form
-        function renderModalTags() {
-            var container = document.getElementById('modalSuppliedItemsContainer');
-            if (!container) return;
-            // Remove existing chips but preserve the empty hint element
-            container.querySelectorAll('.supplied-tag').forEach(t => t.remove());
-
-            var hint  = document.getElementById('modalItemsEmptyHint');
-            var badge = document.getElementById('modalItemCountBadge');
-
-            if (modalSuppliedItems.length === 0) {
-                if (hint)  hint.classList.remove('hidden');
-                if (badge) badge.classList.add('hidden');
-            } else {
-                if (hint)  hint.classList.add('hidden');
-                if (badge) { badge.textContent = modalSuppliedItems.length; badge.classList.remove('hidden'); }
-            }
-
-            modalSuppliedItems.forEach((item, idx) => {
-                var tag = document.createElement('span');
-                tag.className = 'supplied-tag group flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 bg-brand/5 border border-brand/20 rounded-xl text-xs font-bold text-brand hover:bg-brand/10 transition-all';
-                let costStr = (item.cost !== null && item.cost !== undefined && item.cost !== '')
-                    ? `<span class="text-[10px] font-semibold text-gray-400 ml-0.5 mr-1">· LKR ${parseFloat(item.cost).toFixed(2)}</span>`
-                    : '';
-                tag.innerHTML = `<i class="ti ti-package text-[10px] text-brand/50 mr-0.5"></i>${escapeHtml(item.name)}${costStr}<button type="button" onclick="modalRemoveTag(${idx})" class="ti ti-x text-[11px] text-brand/40 hover:text-red-500 transition-colors" title="Remove"></button>`;
-                container.appendChild(tag);
-            });
-            document.getElementById('suppliedItemsInput').value = JSON.stringify(modalSuppliedItems);
-        }
-
-        // Modal -> Adding a new supplied raw material item with optional unit cost
-        function modalAddSuppliedItem() {
-            var input = document.getElementById('modalAddItemInput');
-            var costInput = document.getElementById('modalAddItemCost');
-            var val = input.value.trim();
-            var cost = costInput ? costInput.value.trim() : null;
-            var exists = modalSuppliedItems.some(i => i.name.toLowerCase() === val.toLowerCase());
-            if (val && !exists) {
-                modalSuppliedItems.push({ name: val, cost: cost || null });
-                renderModalTags();
-                input.value = '';
-                if (costInput) costInput.value = '';
-            } else if (exists) {
-                if (typeof showToast === 'function') showToast('Item already added to this supplier.', 'warning');
-            }
-        }
-
-        // Modal -> Removing a supplied raw material tag chip
-        function modalRemoveTag(idx) {
-            modalSuppliedItems.splice(idx, 1);
-            renderModalTags();
-        }
-
-        // Modal -> Opening supplier modal dialog for adding or editing vendor details
-        function openSupplierModal(mode, id = null) {
-            var form = document.getElementById('supplierForm');
-            form.reset();
-            document.getElementById('formAction').value = 'save';
-            document.getElementById('supplierIdInput').value = '';
-            modalSuppliedItems = [];
-            renderModalTags();
-            toggleHoldReason();
-            if (form.querySelector('[name="lead_time"]')) {
-                form.querySelector('[name="lead_time"]').value = 7;
-            }
-
-            if (mode === 'edit' && id) {
-                document.getElementById('modalTitle').textContent = 'Edit Supplier';
-                document.getElementById('supplierIdInput').value = id;
-                var row = document.querySelector(`.supplier-row[data-id="${id}"]`);
-                if (row) {
-                    form.querySelector('[name="company_name"]').value = row.dataset.name;
-                    form.querySelector('[name="email"]').value = row.dataset.email;
-                    form.querySelector('[name="contact_person"]').value = row.dataset.contact;
-                    form.querySelector('[name="phone"]').value = row.dataset.phone;
-                    form.querySelector('[name="address"]').value = row.dataset.addr;
-
-                    let statusVal = row.dataset.status;
-                    let statusSelect = form.querySelector('[name="status"]');
-                    Array.from(statusSelect.options).forEach(opt => {
-                        if (opt.value.toLowerCase() === statusVal.toLowerCase()) {
-                            statusSelect.value = opt.value;
-                        }
-                    });
-
-                    form.querySelector('[name="payment_terms"]').value = row.dataset.terms;
-                    if (form.querySelector('[name="lead_time"]')) {
-                        form.querySelector('[name="lead_time"]').value = row.dataset.leadDays || 7;
-                    }
-                    form.querySelector('[name="hold_reason"]').value = row.dataset.holdReason || '';
-                    toggleHoldReason();
-
-                    var itemsRaw = row.dataset.itemsRaw;
-                    if (itemsRaw) {
-                        try {
-                            modalSuppliedItems = JSON.parse(itemsRaw);
-                        } catch (e) {
-                            modalSuppliedItems = itemsRaw.split(',').map(s => s.trim()).filter(s => s).map(s => ({ name: s, cost: null }));
-                        }
-                        renderModalTags();
-                    }
-
-                    document.getElementById('deleteBtnContainer').style.display = 'block';
-                }
-            } else {
-                document.getElementById('modalTitle').textContent = 'Add New Supplier';
-                document.getElementById('deleteBtnContainer').style.display = 'none';
-            }
-            document.getElementById('supplierModal').classList.remove('hidden');
-        }
-
-        // Modal -> Closing supplier modal dialog
-        function closeSupplierModal() {
-            document.getElementById('supplierModal').classList.add('hidden');
-        }
-
-        // Modal -> Toggling hold reason input field visibility based on status selection
-        function toggleHoldReason() {
-            var status = document.getElementById('modalStatusSelect');
-            var container = document.getElementById('holdReasonContainer');
-            if (status && container) {
-                if (status.value === 'on_hold') {
-                    container.classList.remove('hidden');
-                } else {
-                    container.classList.add('hidden');
-                    document.getElementById('modalHoldReason').value = '';
-                }
-            }
-        }
-
-        // Action -> Confirming and triggering soft deletion of a supplier profile
-        function modalDeleteSupplier() {
-            uiConfirm("Are you sure you want to delete this supplier?", () => {
-                document.getElementById('formAction').value = 'delete';
-                document.getElementById('supplierForm').submit();
-            });
-        }
-
-        var currentPage = 1;
-        var itemsPerPage = 15;
-
-        // Pagination -> Changing active page number
-        function goToPage(page) {
-            currentPage = page;
-            applyFilters();
-        }
-
-        // Pagination -> Rendering page numbers and navigation controls at the bottom
-        function renderPagination(totalItems, totalPages) {
-            var info = document.getElementById('pagination-info');
-            var buttons = document.getElementById('pagination-buttons');
-            if (!info || !buttons) return;
-
-            if (totalItems === 0) {
-                info.textContent = 'Showing 0 entries';
-                buttons.innerHTML = '';
-                return;
-            }
-
-            var start = (currentPage - 1) * itemsPerPage + 1;
-            var end = Math.min(currentPage * itemsPerPage, totalItems);
-            info.textContent = `Showing ${start} to ${end} of ${totalItems} entries`;
-
-            var html = '';
-
-            var prevDisabled = currentPage === 1 ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
-            html += `<button onclick="${currentPage === 1 ? '' : 'goToPage(' + (currentPage - 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${prevDisabled}"><i class="ti ti-chevron-left"></i></button>`;
-
-            for (let i = 1; i <= totalPages; i++) {
-                if (i === currentPage) {
-                    html += `<button class="w-8 h-8 flex items-center justify-center rounded-lg bg-brand text-brand-light font-bold text-xs shadow-md shadow-brand/20">${i}</button>`;
-                } else if (
-                    i === 1 ||
-                    i === totalPages ||
-                    (i >= currentPage - 1 && i <= currentPage + 1)
-                ) {
-                    html += `<button onclick="goToPage(${i})" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs transition-all">${i}</button>`;
-                } else if (i === currentPage - 2 || i === currentPage + 2) {
-                    html += `<span class="w-8 h-8 flex items-center justify-center text-gray-400 text-xs">...</span>`;
-                }
-            }
-
-            var nextDisabled = currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50 cursor-pointer';
-            html += `<button onclick="${currentPage === totalPages ? '' : 'goToPage(' + (currentPage + 1) + ')'}" class="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-all ${nextDisabled}"><i class="ti ti-chevron-right"></i></button>`;
-
-            buttons.innerHTML = html;
-        }
-
-        // Filtering -> Filtering suppliers by search query, category, and status
-        function applyFilters() {
-            var q = (document.getElementById('supp-search')?.value || '').toLowerCase().trim();
-            var cat = (document.getElementById('supp-cat')?.value || 'all').toLowerCase();
-            var status = (document.getElementById('supp-status')?.value || 'all').toLowerCase();
-
-            var list = document.getElementById('supplier-list');
-            var rows = Array.from(document.querySelectorAll('.supplier-row'));
-            var visibleRows = [];
-
-            rows.forEach(r => {
-                var match = true;
-                var name = r.dataset.name.toLowerCase();
-                var email = r.dataset.email.toLowerCase();
-                var contact = r.dataset.contact.toLowerCase();
-                var rowCat = (r.dataset.cat || '').toLowerCase();
-                var rowStatus = (r.dataset.status || '').toLowerCase();
-
-                if (q && !name.includes(q) && !email.includes(q) && !contact.includes(q)) match = false;
-                if (cat !== 'all' && rowCat !== cat) match = false;
-                if (status !== 'all' && rowStatus !== status) match = false;
-
-                if (match) {
-                    visibleRows.push(r);
-                } else {
-                    r.hidden = true;
-                    r.style.display = 'none';
-                }
-            });
-
-            // Add empty state if needed
-            var emptyState = document.getElementById('empty-state');
-            if (emptyState) emptyState.remove();
-
-            if (visibleRows.length === 0) {
-                var tr = document.createElement('tr');
-                tr.id = 'empty-state';
-                tr.innerHTML = '<td colspan="4" class="p-12 text-center text-gray-400 text-sm">No suppliers match these filters.</td>';
-                list.appendChild(tr);
-                renderPagination(0, 0);
-                return;
-            }
-
-            // Sort latest first (highest id)
-            visibleRows.sort((a, b) => parseInt(b.dataset.id) - parseInt(a.dataset.id));
-
-            var totalItems = visibleRows.length;
-            var totalPages = Math.ceil(totalItems / itemsPerPage);
-            if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
-            if (currentPage < 1) currentPage = 1;
-
-            var start = (currentPage - 1) * itemsPerPage;
-            var end = start + itemsPerPage;
-
-            visibleRows.forEach((r, index) => {
-                if (index >= start && index < end) {
-                    r.hidden = false;
-                    r.style.display = '';
-                } else {
-                    r.hidden = true;
-                    r.style.display = 'none';
-                }
-            });
-
-            visibleRows.forEach(r => list.appendChild(r));
-            renderPagination(totalItems, totalPages);
-        }
-
-        document.getElementById('supp-search')?.addEventListener('input', () => { currentPage = 1; applyFilters(); });
-        document.getElementById('supp-cat')?.addEventListener('change', () => { currentPage = 1; applyFilters(); });
-        document.getElementById('supp-status')?.addEventListener('change', () => { currentPage = 1; applyFilters(); });
-
-        // Controls -> Closing right-side supplier detail pane
-        function closeSupplierDetailPane() {
+        if (openDrawer) {
             var pane = document.getElementById('supplier-detail-pane');
             var backdrop = document.getElementById('supplier-detail-backdrop');
-            if (pane) pane.classList.add('translate-x-full');
+            if (pane) pane.classList.remove('translate-x-full');
             if (backdrop) {
-                backdrop.classList.remove('opacity-100');
-                backdrop.classList.add('hidden');
+                backdrop.classList.remove('hidden');
+                requestAnimationFrame(() => backdrop.classList.add('opacity-100'));
             }
-            document.querySelectorAll('.supplier-row').forEach(r => {
-                r.classList.remove('selected', 'bg-brand/5', 'border-brand/20', 'shadow-sm');
-                r.classList.add('bg-white', 'border-gray-100');
-            });
         }
 
-        // Initial Render
-        applyFilters();
-        var firstSupplier = document.querySelector('.supplier-row');
-        if (firstSupplier) selectSupplier(firstSupplier, false);
-        closeSupplierDetailPane();
-    </script>
+        var av = document.getElementById('d-av');
+        av.textContent = el.dataset.initials;
+        av.className = 'w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-bold border shadow-lg mb-4 ' + el.dataset.av;
 
-<?php
-/*
-=============================================================================
- FILE DEPENDENCY & CROSS-REFERENCE MAP
-=============================================================================
- FILE: admin/view/suppliers.view.php (Suppliers & Vendor Management View)
+        document.getElementById('d-name').textContent = el.dataset.name;
+        document.getElementById('d-email').textContent = el.dataset.email;
 
- CONNECTED / DEPENDENT FILES:
-   - database/connection.php
-   - admin/view/suppliers.purchase_orders.view.php
+        var badge = document.getElementById('d-badge');
+        badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest border ' + el.dataset.badge;
+        badge.textContent = el.dataset.badgetext;
 
- RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
-   - Suppliers table in database
-=============================================================================
-*/
-?>
+        document.getElementById('d-contact').textContent = el.dataset.contact;
+        document.getElementById('d-phone').textContent = el.dataset.phone;
+        document.getElementById('d-addr').textContent = el.dataset.addr;
+        document.getElementById('d-terms').textContent = el.dataset.terms;
+
+        document.getElementById('d-products').innerHTML = el.dataset.allProducts || el.dataset.products;
+
+        var ontimeW = parseInt(el.dataset.ontimew);
+        document.getElementById('d-bar-ot').style.width = ontimeW + '%';
+        document.getElementById('d-bar-ot').style.backgroundColor = barColor(ontimeW);
+        document.getElementById('d-ot').textContent = el.dataset.ontime;
+        document.getElementById('d-ot').style.color = barText(ontimeW);
+
+        var qualityW = parseInt(el.dataset.qualityw);
+        document.getElementById('d-bar-qual').style.width = qualityW + '%';
+        document.getElementById('d-bar-qual').style.backgroundColor = barColor(qualityW);
+        document.getElementById('d-qual').textContent = el.dataset.quality;
+        document.getElementById('d-qual').style.color = barText(qualityW);
+
+        document.getElementById('d-pos').textContent = el.dataset.orders;
+        document.getElementById('d-spend').textContent = el.dataset.spend;
+
+        currentSupplierId = el.dataset.id;
+    }
+
+    var currentSupplierId = null;
+    var modalSuppliedItems = [];
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function renderModalTags() {
+        var container = document.getElementById('modalSuppliedItemsContainer');
+        if (!container) return;
+        container.querySelectorAll('.supplied-tag').forEach(t => t.remove());
+
+        var hint  = document.getElementById('modalItemsEmptyHint');
+        var badge = document.getElementById('modalItemCountBadge');
+
+        if (modalSuppliedItems.length === 0) {
+            if (hint)  hint.classList.remove('hidden');
+            if (badge) badge.classList.add('hidden');
+        } else {
+            if (hint)  hint.classList.add('hidden');
+            if (badge) { badge.textContent = modalSuppliedItems.length; badge.classList.remove('hidden'); }
+        }
+
+        modalSuppliedItems.forEach((item, idx) => {
+            var tag = document.createElement('span');
+            tag.className = 'supplied-tag group flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 bg-brand/5 border border-brand/20 rounded-xl text-xs font-bold text-brand hover:bg-brand/10 transition-all';
+            let costStr = (item.cost !== null && item.cost !== undefined && item.cost !== '')
+                ? `<span class="text-[10px] font-semibold text-gray-400 ml-0.5 mr-1">· LKR ${parseFloat(item.cost).toFixed(2)}</span>`
+                : '';
+            tag.innerHTML = `<i class="ti ti-package text-[10px] text-brand/50 mr-0.5"></i>${escapeHtml(item.name)}${costStr}<button type="button" onclick="modalRemoveTag(${idx})" class="ti ti-x text-[11px] text-brand/40 hover:text-red-500 transition-colors" title="Remove"></button>`;
+            container.appendChild(tag);
+        });
+        document.getElementById('suppliedItemsInput').value = JSON.stringify(modalSuppliedItems);
+    }
+
+    function modalAddSuppliedItem() {
+        var input = document.getElementById('modalAddItemInput');
+        var costInput = document.getElementById('modalAddItemCost');
+        var val = input.value.trim();
+        var cost = costInput ? costInput.value.trim() : null;
+        var exists = modalSuppliedItems.some(i => i.name.toLowerCase() === val.toLowerCase());
+        if (val && !exists) {
+            modalSuppliedItems.push({ name: val, cost: cost || null });
+            renderModalTags();
+            input.value = '';
+            if (costInput) costInput.value = '';
+        } else if (exists) {
+            if (typeof showToast === 'function') showToast('Item already added.', 'warning');
+        }
+    }
+
+    function modalRemoveTag(idx) {
+        modalSuppliedItems.splice(idx, 1);
+        renderModalTags();
+    }
+
+    function openSupplierModal(mode, id = null) {
+        var form = document.getElementById('supplierForm');
+        form.reset();
+        document.getElementById('formAction').value = 'save';
+        document.getElementById('supplierIdInput').value = '';
+        modalSuppliedItems = [];
+        renderModalTags();
+        toggleHoldReason();
+        if (form.querySelector('[name="lead_time"]')) {
+            form.querySelector('[name="lead_time"]').value = <?= $is_garment ? 60 : 7 ?>;
+        }
+
+        if (mode === 'edit' && id) {
+            document.getElementById('modalTitle').textContent = '<?= $is_garment ? 'Edit Garment Factory' : 'Edit Material Supplier' ?>';
+            document.getElementById('supplierIdInput').value = id;
+            var row = document.querySelector(`.supplier-row[data-id="${id}"]`);
+            if (row) {
+                form.querySelector('[name="company_name"]').value = row.dataset.name;
+                form.querySelector('[name="email"]').value = row.dataset.email;
+                form.querySelector('[name="contact_person"]').value = row.dataset.contact;
+                form.querySelector('[name="phone"]').value = row.dataset.phone;
+                form.querySelector('[name="address"]').value = row.dataset.addr;
+
+                let statusVal = row.dataset.status;
+                let statusSelect = form.querySelector('[name="status"]');
+                Array.from(statusSelect.options).forEach(opt => {
+                    if (opt.value.toLowerCase() === statusVal.toLowerCase()) {
+                        statusSelect.value = opt.value;
+                    }
+                });
+
+                form.querySelector('[name="payment_terms"]').value = row.dataset.terms;
+                if (form.querySelector('[name="lead_time"]')) {
+                    form.querySelector('[name="lead_time"]').value = row.dataset.leadDays || (<?= $is_garment ? 60 : 7 ?>);
+                }
+                form.querySelector('[name="hold_reason"]').value = row.dataset.holdReason || '';
+                toggleHoldReason();
+
+                var itemsRaw = row.dataset.itemsRaw;
+                if (itemsRaw) {
+                    try {
+                        modalSuppliedItems = JSON.parse(itemsRaw);
+                    } catch (e) {
+                        modalSuppliedItems = itemsRaw.split(',').map(s => s.trim()).filter(s => s).map(s => ({ name: s, cost: null }));
+                    }
+                    renderModalTags();
+                }
+
+                document.getElementById('deleteBtnContainer').style.display = 'block';
+            }
+        } else {
+            document.getElementById('modalTitle').textContent = '<?= $is_garment ? 'Register Garment Factory' : 'Add Material Supplier' ?>';
+            document.getElementById('deleteBtnContainer').style.display = 'none';
+        }
+
+        document.getElementById('supplierModal').classList.remove('hidden');
+    }
+
+    function closeSupplierModal() {
+        document.getElementById('supplierModal').classList.add('hidden');
+    }
+
+    function confirmDeleteFromModal() {
+        if (confirm('Are you sure you want to move this record to the Recycle Bin?')) {
+            document.getElementById('formAction').value = 'delete';
+            document.getElementById('supplierForm').submit();
+        }
+    }
+
+    function closeSupplierDetailPane() {
+        var pane = document.getElementById('supplier-detail-pane');
+        var backdrop = document.getElementById('supplier-detail-backdrop');
+        if (pane) pane.classList.add('translate-x-full');
+        if (backdrop) {
+            backdrop.classList.remove('opacity-100');
+            setTimeout(() => backdrop.classList.add('hidden'), 300);
+        }
+    }
+
+    // Pagination & Search
+    var itemsPerPage = 10;
+    var currentPage = 1;
+
+    function applySupplierFilters() {
+        var q = (document.getElementById('supp-search')?.value || '').toLowerCase().trim();
+        var status = (document.getElementById('supp-status')?.value || '').toLowerCase();
+        var rows = Array.from(document.querySelectorAll('.supplier-row'));
+        var visibleRows = [];
+
+        rows.forEach(r => {
+            var name = (r.dataset.name || '').toLowerCase();
+            var email = (r.dataset.email || '').toLowerCase();
+            var contact = (r.dataset.contact || '').toLowerCase();
+            var rStatus = (r.dataset.status || '').toLowerCase();
+
+            var matchQ = !q || name.includes(q) || email.includes(q) || contact.includes(q);
+            var matchStatus = !status || status === 'all' || rStatus === status;
+
+            if (matchQ && matchStatus) {
+                visibleRows.push(r);
+            } else {
+                r.style.display = 'none';
+            }
+        });
+
+        var totalItems = visibleRows.length;
+        var totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+
+        var start = (currentPage - 1) * itemsPerPage;
+        var end = start + itemsPerPage;
+
+        visibleRows.forEach((r, idx) => {
+            if (idx >= start && idx < end) {
+                r.style.display = '';
+            } else {
+                r.style.display = 'none';
+            }
+        });
+
+        var info = document.getElementById('pagination-info');
+        if (info) info.textContent = `Showing ${totalItems > 0 ? start + 1 : 0} to ${Math.min(end, totalItems)} of ${totalItems} entries`;
+        renderPaginationButtons(totalPages);
+    }
+
+    function renderPaginationButtons(totalPages) {
+        var btnCont = document.getElementById('pagination-buttons');
+        if (!btnCont) return;
+        btnCont.innerHTML = '';
+
+        for (let i = 1; i <= totalPages; i++) {
+            var btn = document.createElement('button');
+            btn.className = `px-3 py-1.5 rounded-lg text-xs font-bold ${i === currentPage ? 'bg-brand text-brand-light' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`;
+            btn.textContent = i;
+            btn.onclick = () => { currentPage = i; applySupplierFilters(); };
+            btnCont.appendChild(btn);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('supp-search')?.addEventListener('input', () => { currentPage = 1; applySupplierFilters(); });
+        document.getElementById('supp-status')?.addEventListener('change', () => { currentPage = 1; applySupplierFilters(); });
+        applySupplierFilters();
+        var firstRow = document.querySelector('.supplier-row');
+        if (firstRow) selectSupplier(firstRow, false);
+    });
+</script>

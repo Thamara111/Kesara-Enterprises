@@ -80,6 +80,7 @@ CREATE TABLE suppliers (
   address VARCHAR(255),
   payment_terms VARCHAR(50),
   category VARCHAR(50),
+  supplier_type ENUM('supplier', 'garment') DEFAULT 'supplier',
   status ENUM('active','preferred','on_hold','inactive') DEFAULT 'active',
   hold_reason VARCHAR(255),
   hold_since DATE,

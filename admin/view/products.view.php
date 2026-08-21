@@ -41,13 +41,23 @@ if (isset($pdo) && $pdo !== null) {
         if (!$checkImages->fetch())
             $pdo->exec("ALTER TABLE products ADD COLUMN images VARCHAR(255) DEFAULT NULL");
 
+        $checkSuppType = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'supplier_type'");
+        if (!$checkSuppType->fetch()) {
+            $pdo->exec("ALTER TABLE suppliers ADD COLUMN supplier_type ENUM('supplier', 'garment') DEFAULT 'supplier'");
+            $pdo->exec("UPDATE suppliers SET supplier_type = 'garment' WHERE category IN ('Innerwear Manufacturing', 'Cut-Make-Trim (CMT)', 'Apparel Finishing') OR id >= 6");
+        }
+
         // Fetching -> Fetch all categories for the filter dropdown
         $cat_stmt = $pdo->query("SELECT * FROM categories ORDER BY name ASC");
         $all_categories = $cat_stmt->fetchAll();
 
-        // Fetching -> Fetch all suppliers for the product form dropdown
-        $supp_stmt = $pdo->query("SELECT id, name FROM suppliers ORDER BY name ASC");
+        // Fetching -> Fetch all garment factories for the product form dropdown (finished end products owned by Kesara, produced by Garments)
+        $supp_stmt = $pdo->query("SELECT id, name FROM suppliers WHERE deleted_at IS NULL AND (supplier_type = 'garment' OR supplier_type IS NULL) ORDER BY name ASC");
         $all_suppliers = $supp_stmt->fetchAll();
+        if (empty($all_suppliers)) {
+            $supp_stmt = $pdo->query("SELECT id, name FROM suppliers WHERE deleted_at IS NULL ORDER BY name ASC");
+            $all_suppliers = $supp_stmt->fetchAll();
+        }
 
         // Fetching -> Fetch all active products, joined with their category names and inventory stock
         $stmt = $pdo->query("SELECT p.id, p.name, p.sku, c.name AS cat, p.moq, p.base_price AS price, p.retail_price, p.retail_moq, p.retail_discount, p.description AS `desc`, p.images, p.colors, p.sizes, p.discount, p.discount_start, p.discount_end, p.gsm, p.waistband,

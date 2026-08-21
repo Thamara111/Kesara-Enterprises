@@ -11,6 +11,19 @@ $error_msg = "";
 
 $po_id = isset($_POST['po_id']) ? (int)$_POST['po_id'] : (isset($_GET['po_id']) ? (int)$_GET['po_id'] : 0);
 
+// Self-Healing DB: Ensure suppliers table has supplier_type column
+if (isset($pdo) && $pdo !== null) {
+    try {
+        $checkType = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'supplier_type'");
+        if (!$checkType->fetch()) {
+            $pdo->exec("ALTER TABLE suppliers ADD COLUMN supplier_type ENUM('supplier', 'garment') DEFAULT 'supplier'");
+            $pdo->exec("UPDATE suppliers SET supplier_type = 'garment' WHERE category IN ('Innerwear Manufacturing', 'Cut-Make-Trim (CMT)', 'Apparel Finishing') OR id >= 6");
+        }
+    } catch (\Exception $e) {
+        // Ignored
+    }
+}
+
 // Processing -> Recording GRN entry, incrementing line item received quantities, and updating inventory stock levels
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_grn' && isset($pdo)) {
     $received_by = trim($_POST['received_by'] ?? '');
@@ -134,7 +147,7 @@ if ($po_id === 0 && isset($pdo) && $pdo !== null) {
 $open_pos_list = [];
 if (isset($pdo) && $pdo !== null) {
     try {
-        $open_stmt = $pdo->query("SELECT po.id, po.status, po.expected_at, s.name AS supplier_name
+        $open_stmt = $pdo->query("SELECT po.id, po.status, po.expected_at, s.name AS supplier_name, s.supplier_type
                                   FROM purchase_orders po
                                   JOIN suppliers s ON po.supplier_id = s.id
                                   WHERE po.status IN ('sent', 'partial', 'overdue')
@@ -282,8 +295,11 @@ $grn_ref = 'GRN-' . $po_year . '-' . str_pad($po_id, 4, '0', STR_PAD_LEFT) . 'B'
                             $op_label = $op_status_labels[$op['status']] ?? ucfirst($op['status']);
                             $op_date = date('d M Y', strtotime($op['expected_at']));
                         ?>
+                        <?php
+                            $op_type_tag = ($op['supplier_type'] ?? '') === 'garment' ? ' [Garment]' : ' [Material Supplier]';
+                        ?>
                         <option value="<?= $op['id'] ?>" <?= $op['id'] == $po_id ? 'selected' : '' ?>>
-                            <?= $op_ref ?> — <?= htmlspecialchars($op['supplier_name']) ?> · Expected <?= $op_date ?> [<?= $op_label ?>]
+                            <?= $op_ref ?> — <?= htmlspecialchars($op['supplier_name']) ?><?= $op_type_tag ?> · Expected <?= $op_date ?> [<?= $op_label ?>]
                         </option>
                     <?php endforeach; ?>
                 </select>

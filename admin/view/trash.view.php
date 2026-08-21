@@ -61,7 +61,7 @@ if (isset($pdo) && $pdo !== null) {
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-brand text-brand" onclick="switchTrashTab('products', this)">Products (<?= count($deleted_products) ?>)</button>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('categories', this)">Categories (<?= count($deleted_categories) ?>)</button>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('orders', this)">Orders (<?= count($deleted_orders) ?>)</button>
-        <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('suppliers', this)">Suppliers (<?= count($deleted_suppliers) ?>)</button>
+        <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('suppliers', this)">Suppliers & Garments (<?= count($deleted_suppliers) ?>)</button>
         <?php if ($role === 'admin'): ?>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('users', this)">Staff (<?= count($deleted_admins) ?>)</button>
         <button class="trash-tab text-sm font-bold pb-2 border-b-2 border-transparent text-gray-400 hover:text-gray-700" onclick="switchTrashTab('customers', this)">Customers (<?= count($suspended_customers) ?>)</button>

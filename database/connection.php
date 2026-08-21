@@ -66,6 +66,17 @@ $db_error = null;
 try {
     // Connecting database -> Creating PDO connection object with MySQL credentials
     $pdo = new PDO($dsn, $user, $pass, $options);
+
+    // Self-Healing Schema: Ensure suppliers table has supplier_type column
+    try {
+        $checkType = $pdo->query("SHOW COLUMNS FROM suppliers LIKE 'supplier_type'");
+        if (!$checkType->fetch()) {
+            $pdo->exec("ALTER TABLE suppliers ADD COLUMN supplier_type ENUM('supplier', 'garment') DEFAULT 'supplier'");
+            $pdo->exec("UPDATE suppliers SET supplier_type = 'garment' WHERE category IN ('Innerwear Manufacturing', 'Cut-Make-Trim (CMT)', 'Apparel Finishing') OR id >= 6");
+        }
+    } catch (\Exception $e) {
+        // Ignored if column exists or permission restricted
+    }
 } catch (\PDOException $e) {
     // Handling errors -> Catching database connection failure
     $db_error = $e->getMessage();
