@@ -47,9 +47,9 @@ if (isset($_SESSION['admin_id'])) {
 
     // Matrix defining which views each administrative role is allowed to access
     $role_access = [
-        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'purchase_orders', 'goods_received', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
+        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'purchase_orders', 'goods_received', 'raw_materials', 'raw_materials_cutting', 'damage_goods', 'goods_return', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
         'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries', 'trash'],
-        'supplier_manager' => ['dashboard', 'suppliers', 'purchase_orders', 'goods_received', 'login', 'inquiries'],
+        'supplier_manager' => ['dashboard', 'suppliers', 'purchase_orders', 'goods_received', 'raw_materials', 'raw_materials_cutting', 'damage_goods', 'goods_return', 'login', 'inquiries'],
         'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries'],
         'example_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries']
     ];
@@ -117,6 +117,26 @@ $view_config = [
     'goods_received' => [
         'title' => 'Goods Received Note | Kesara Enterprises',
         'description' => 'Record and manage goods received notes.',
+        'show_sidebar' => true
+    ],
+    'raw_materials' => [
+        'title' => 'Raw Materials | Kesara Enterprises',
+        'description' => 'Enter and view raw materials inventory.',
+        'show_sidebar' => true
+    ],
+    'raw_materials_cutting' => [
+        'title' => 'Raw Materials Cutting | Kesara Enterprises',
+        'description' => 'Enter and view raw materials cutting details.',
+        'show_sidebar' => true
+    ],
+    'damage_goods' => [
+        'title' => 'Damage Goods | Kesara Enterprises',
+        'description' => 'Record and manage B-grade damage goods.',
+        'show_sidebar' => true
+    ],
+    'goods_return' => [
+        'title' => 'Goods Return | Kesara Enterprises',
+        'description' => 'Record and manage returned goods.',
         'show_sidebar' => true
     ],
     'personnel' => [

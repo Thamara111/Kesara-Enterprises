@@ -177,28 +177,23 @@ if (isset($pdo)) {
                     <i class="ti ti-truck-delivery text-lg"></i>
                     Goods received
                 </a>
+                <a href="/admin-raw-materials" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'raw_materials' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                    <i class="ti ti-box-seam text-lg"></i>
+                    Raw Materials
+                </a>
+                <a href="/admin-raw-materials-cutting" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'raw_materials_cutting' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                    <i class="ti ti-scissors text-lg"></i>
+                    Raw Materials Cutting
+                </a>
+                <a href="/admin-damage-goods" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'damage_goods' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                    <i class="ti ti-alert-triangle text-lg"></i>
+                    Damage Goods
+                </a>
+                <a href="/admin-goods-return" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'goods_return' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                    <i class="ti ti-arrow-back-up text-lg"></i>
+                    Goods Return
+                </a>
             </div>
-        </div>
-        <?php endif; ?>
-
-        <?php if ($has_delivery): ?>
-        <div class="h-px bg-white/5 my-4"></div>
-
-        <!-- Delivery Section -->
-        <div class="space-y-1 mb-4">
-            <p class="px-5 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Delivery</p>
-            <a href="/admin-personnel" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'personnel' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
-                <i class="ti ti-motorbike text-xl"></i>
-                Personnel
-            </a>
-            <a href="/admin-assignments" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'assignments' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
-                <i class="ti ti-map-pin text-xl"></i>
-                Assignments
-            </a>
-            <a href="/admin-tracking" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'tracking' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
-                <i class="ti ti-radar text-xl"></i>
-                Live Tracking
-            </a>
         </div>
         <?php endif; ?>
     </nav>

@@ -59,7 +59,7 @@ if (isset($pdo) && $pdo !== null) {
         */
         
         // Fetching -> Fetch all active orders along with the associated customer's details (newest first)
-        $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, o.payment_receipt, o.cancellation_reason, u.business_name AS company, u.first_name, u.last_name, u.email, u.address 
+        $stmt = $pdo->query("SELECT o.id, o.status, o.total_amount AS total, o.created_at, COALESCE(o.payment_method, 'cash') AS payment_method, o.payment_receipt, o.cancellation_reason, u.business_name AS company, u.first_name, u.last_name, u.email, u.address 
                              FROM orders o 
                              JOIN users u ON o.user_id = u.id 
                              WHERE o.deleted_at IS NULL 
@@ -71,24 +71,18 @@ if (isset($pdo) && $pdo !== null) {
             // Generate zero-padded KE order ID format
             $order_id_formatted = 'KE-2025-' . str_pad($ord['id'], 5, '0', STR_PAD_LEFT);
 
-            $status_lower = strtolower($ord['status']);
-            $badgeText = strtoupper($ord['status']);
+            $status_lower = strtolower(trim($ord['status'] ?? ''));
 
             // Assign CSS classes for status badges based on order state
-            if ($status_lower === 'pending') {
-                $badgeClass = 'bg-amber-50 text-amber-600 border-amber-100';
-                $badgeText = 'VERIFICATION QUEUE';
-            } elseif ($status_lower === 'processing') {
-                $badgeClass = 'bg-blue-50 text-blue-600 border-blue-100';
-            } elseif ($status_lower === 'assigned') {
-                $badgeClass = 'bg-purple-50 text-purple-600 border-purple-100';
-                $badgeText = 'ASSIGNED';
-            } elseif ($status_lower === 'shipped') {
-                $badgeClass = 'bg-indigo-50 text-indigo-600 border-indigo-100';
-            } elseif ($status_lower === 'delivered') {
-                $badgeClass = 'bg-green-50 text-green-600 border-green-100';
+            if ($status_lower === 'dispatched' || $status_lower === 'shipped' || $status_lower === 'processing' || $status_lower === 'delivered') {
+                $badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                $badgeText = 'DISPATCHED';
+            } elseif ($status_lower === 'cancelled') {
+                $badgeClass = 'bg-red-50 text-red-700 border-red-200';
+                $badgeText = 'CANCELLED';
             } else {
-                $badgeClass = 'bg-red-50 text-red-600 border-red-100';
+                $badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+                $badgeText = 'QUOTATION PENDING';
             }
 
             // Fetching -> Fetch order items, quantities, and prices for this order
@@ -294,13 +288,10 @@ if (isset($pdo) && $pdo !== null) {
                     data-status="pending">Verification Queue</button>
                 <button
                     class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
-                    data-status="processing">Processing</button>
+                    data-status="pending">Quotations (Pending)</button>
                 <button
                     class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
-                    data-status="shipped">Shipped</button>
-                <button
-                    class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
-                    data-status="delivered">Delivered</button>
+                    data-status="dispatched">Dispatched</button>
                 <button
                     class="status-tab chip px-4 py-2 rounded-xl text-xs font-bold transition-all bg-white text-gray-500 border border-gray-200 hover:bg-gray-50"
                     data-status="cancelled">Cancelled</button>
@@ -386,7 +377,7 @@ if (isset($pdo) && $pdo !== null) {
                                     </td>
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 whitespace-nowrap">
                                         <span
-                                            class="px-2.5 py-1 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars(str_replace('PENDING PAYMENT', 'VERIFICATION QUEUE', $o['badgeText'])) ?></span>
+                                            class="order-badge px-2.5 py-1 rounded-full text-[9px] font-bold border uppercase tracking-wider <?= $o['badge'] ?>"><?= htmlspecialchars($o['badgeText']) ?></span>
                                     </td>
                                     <td
                                         class="p-4 border-y border-gray-100 group-hover:border-brand/30 whitespace-nowrap text-xs text-gray-500 font-medium">
@@ -903,6 +894,17 @@ if (isset($pdo) && $pdo !== null) {
         return initials.substring(0, 2);
     }
 
+    function closeOrderDetailPane() {
+        var pane = document.getElementById('order-detail-pane');
+        var backdrop = document.getElementById('order-detail-backdrop');
+        if (pane) pane.classList.add('translate-x-full');
+        if (backdrop) {
+            backdrop.classList.remove('opacity-100');
+            backdrop.classList.add('hidden');
+        }
+        document.querySelectorAll('.order-card').forEach(c => c.classList.remove('selected'));
+    }
+
     function selectOrder(el, openDrawer = true) {
         if (!el) return;
 
@@ -920,48 +922,60 @@ if (isset($pdo) && $pdo !== null) {
             }
         }
 
-        document.getElementById('d-id').textContent = el.dataset.formattedId;
-        document.getElementById('d-company').textContent = el.dataset.company;
+        var dId = document.getElementById('d-id');
+        if (dId) dId.textContent = el.dataset.formattedId || '—';
+        var dCompany = document.getElementById('d-company');
+        if (dCompany) dCompany.textContent = el.dataset.company || '—';
 
         var badge = document.getElementById('d-badge');
-        badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ' + el.dataset.badge;
-        badge.textContent = el.dataset.badgetext;
+        if (badge) {
+            badge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider ' + (el.dataset.badge || '');
+            badge.textContent = el.dataset.badgetext || '';
+            badge.classList.remove('hidden');
+        }
 
         var initialsEl = document.getElementById('d-initials');
         if (initialsEl) {
             initialsEl.textContent = getInitials(el.dataset.clientname);
         }
-        document.getElementById('d-client').textContent = el.dataset.clientname;
-        document.getElementById('d-email').textContent = el.dataset.clientemail;
+        var dClient = document.getElementById('d-client');
+        if (dClient) dClient.textContent = el.dataset.clientname || '—';
+        var dEmail = document.getElementById('d-email');
+        if (dEmail) dEmail.textContent = el.dataset.clientemail || '—';
 
-        document.getElementById('d-total').textContent = 'LKR '        // Displaying -> Render Payment Receipt preview or PDF download link
+        var dTotal = document.getElementById('d-total');
+        if (dTotal) dTotal.textContent = 'LKR ' + (el.dataset.total ? parseFloat(el.dataset.total).toLocaleString(undefined, {minimumFractionDigits: 2}) : '0.00');
+
+        // Displaying -> Render Payment Receipt preview
         var receiptPath = el.dataset.paymentReceipt;
         var receiptContainer = document.getElementById('d-receipt-container');
         var receiptBtn = document.getElementById('d-receipt-btn');
         var receiptPreview = document.getElementById('d-receipt-preview');
 
-        if (receiptPath && receiptPath.trim() !== '') {
+        if (receiptContainer && receiptPath && receiptPath.trim() !== '') {
             receiptContainer.classList.remove('hidden');
             var fullReceiptPath = receiptPath.startsWith('/') ? receiptPath : '/' + receiptPath;
-            receiptBtn.dataset.receiptPath = fullReceiptPath;
+            if (receiptBtn) receiptBtn.dataset.receiptPath = fullReceiptPath;
 
             var ext = receiptPath.split('.').pop().toLowerCase();
-            if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
-                receiptPreview.innerHTML = `<img src="${fullReceiptPath}" alt="Payment Receipt" class="max-h-40 object-contain rounded-lg hover:scale-105 transition-transform cursor-zoom-in" onclick="openReceiptModal()">`;
-            } else {
-                receiptPreview.innerHTML = `<div class="p-4 text-center text-xs font-medium text-gray-400 flex flex-col items-center gap-2 w-full cursor-pointer" onclick="openReceiptModal()">
-                <i class="ti ti-file-type-pdf text-3xl text-red-500"></i>
-                <span>PDF Document - Click to preview</span>
-            </div>`;
+            if (receiptPreview) {
+                if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) {
+                    receiptPreview.innerHTML = `<img src="${fullReceiptPath}" alt="Payment Receipt" class="max-h-40 object-contain rounded-lg hover:scale-105 transition-transform cursor-zoom-in" onclick="openReceiptModal()">`;
+                } else {
+                    receiptPreview.innerHTML = `<div class="p-4 text-center text-xs font-medium text-gray-400 flex flex-col items-center gap-2 w-full cursor-pointer" onclick="openReceiptModal()">
+                    <i class="ti ti-file-type-pdf text-3xl text-red-500"></i>
+                    <span>PDF Document - Click to preview</span>
+                </div>`;
+                }
             }
-        } else {
+        } else if (receiptContainer) {
             receiptContainer.classList.add('hidden');
         }
 
         // Displaying -> Render Cancellation Reason if order was cancelled
         var cancelContainer = document.getElementById('d-cancellation-reason-container');
         var cancelReasonEl = document.getElementById('d-cancellation-reason');
-        if (el.dataset.status.toLowerCase() === 'cancelled' && el.dataset.cancellationReason && el.dataset.cancellationReason.trim() !== '') {
+        if (el.dataset.status && el.dataset.status.toLowerCase() === 'cancelled' && el.dataset.cancellationReason && el.dataset.cancellationReason.trim() !== '') {
             if (cancelContainer) cancelContainer.classList.remove('hidden');
             if (cancelReasonEl) cancelReasonEl.textContent = el.dataset.cancellationReason;
         } else if (cancelContainer) {
@@ -1053,48 +1067,31 @@ if (isset($pdo) && $pdo !== null) {
 
         // Actions Footer -> Rendering action buttons based on current order status
         var actionContainer = document.getElementById('d-actions');
-        var status_lower = el.dataset.status.toLowerCase();
+        var status_lower = (el.dataset.status || '').toLowerCase();
         var oid = el.dataset.id;
 
-        if (status_lower === 'pending') {
+        if (status_lower === 'pending' || status_lower === 'quotation') {
             actionContainer.innerHTML = `
             <div class="grid grid-cols-2 gap-4">
-                <button onclick="updateStatus(${oid}, 'processing', this)" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest flex items-center justify-center gap-2"><span>Approve & Process</span></button>
-                <button onclick="updateStatus(${oid}, 'cancelled', this)" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2"><span>Cancel Order</span></button>
-            </div>
-        `;
-        } else if (status_lower === 'processing') {
-            var compEsc = (el.dataset.company || '').replace(/'/g, "\\'");
-            var addrEsc = (el.dataset.address || '').replace(/'/g, "\\'");
-            actionContainer.innerHTML = `
-            <div class="grid grid-cols-2 gap-4">
-                <button onclick="openAssignModalFromOrders(${oid}, '${compEsc}', '${addrEsc}', '${el.dataset.formattedId}', this)" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                    <i class="ti ti-truck-delivery text-base"></i> <span>Assign Driver</span>
+                <button onclick="issueProduct(${oid}, this)" class="bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/10 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+                    <i class="ti ti-box text-base"></i><span>Issue Product</span>
                 </button>
-                <button onclick="updateStatus(${oid}, 'cancelled', this)" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2"><span>Cancel Order</span></button>
+                <button onclick="openCancelOrderModal(${oid}, this)" class="bg-white border border-gray-200 text-red-600 font-bold py-4 rounded-2xl hover:bg-red-50 hover:border-red-200 transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2"><span>Cancel Order</span></button>
             </div>
         `;
-        } else if (status_lower === 'assigned') {
+        } else if (status_lower === 'dispatched' || status_lower === 'shipped') {
             actionContainer.innerHTML = `
-            <div class="p-3 bg-purple-50 border border-purple-100 rounded-2xl text-center">
-                <p class="text-xs text-purple-700 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
-                    <i class="ti ti-truck-delivery text-base"></i> Driver Assigned — Shipping Controlled via Driver Portal
+            <div class="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
+                <p class="text-xs text-emerald-800 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="ti ti-circle-check text-base"></i> Product Issued &amp; Ready for Customer Pickup (Dispatched)
                 </p>
             </div>
         `;
-        } else if (status_lower === 'shipped') {
+        } else if (status_lower === 'cancelled') {
             actionContainer.innerHTML = `
-            <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-2xl text-center">
-                <p class="text-xs text-indigo-700 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
-                    <i class="ti ti-truck text-base"></i> Cargo In Transit — Delivery Managed by Driver
-                </p>
-            </div>
-        `;
-        } else if (status_lower === 'delivered') {
-            actionContainer.innerHTML = `
-            <div class="p-3 bg-green-50 border border-green-100 rounded-2xl text-center">
-                <p class="text-xs text-green-700 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
-                    <i class="ti ti-circle-check text-base"></i> Order Delivered
+            <div class="p-3 bg-red-50 border border-red-100 rounded-2xl text-center">
+                <p class="text-xs text-red-600 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                    <i class="ti ti-x text-base"></i> Order Cancelled
                 </p>
             </div>
         `;
@@ -1107,6 +1104,67 @@ if (isset($pdo) && $pdo !== null) {
             </div>
         `;
         }
+    }
+
+    function issueProduct(id, btnElement) {
+        if (!id) return;
+        if (btnElement) {
+            btnElement.disabled = true;
+            btnElement.innerHTML = `<i class="ti ti-loader animate-spin text-base"></i> Issuing...`;
+        }
+
+        fetch('api/orders.php?action=issue_product', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showToast('Product issued from stock! Status set to Dispatched.', 'success');
+                var card = document.querySelector(`.order-card[data-id="${id}"]`);
+                if (card) {
+                    card.dataset.status = 'dispatched';
+                    card.dataset.badge = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                    card.dataset.badgetext = 'DISPATCHED';
+                    var badgeEl = card.querySelector('.order-badge');
+                    if (badgeEl) {
+                        badgeEl.className = 'px-2.5 py-1 rounded-full text-[9px] font-bold border uppercase tracking-wider bg-emerald-50 text-emerald-700 border-emerald-200';
+                        badgeEl.textContent = 'DISPATCHED';
+                    }
+                    selectOrder(card, false);
+                }
+                var dBadge = document.getElementById('d-badge');
+                if (dBadge) {
+                    dBadge.className = 'px-3 py-1 rounded-full text-[10px] font-bold border uppercase tracking-wider bg-emerald-50 text-emerald-700 border-emerald-200';
+                    dBadge.textContent = 'DISPATCHED';
+                }
+                var actionContainer = document.getElementById('d-actions');
+                if (actionContainer) {
+                    actionContainer.innerHTML = `
+                        <div class="p-3 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
+                            <p class="text-xs text-emerald-800 font-bold uppercase tracking-wider flex items-center justify-center gap-2">
+                                <i class="ti ti-circle-check text-base"></i> Product Issued &amp; Ready for Customer Pickup (Dispatched)
+                            </p>
+                        </div>
+                    `;
+                }
+            } else {
+                showToast('Error issuing product: ' + (data.message || 'Unknown error'), 'error');
+                if (btnElement) {
+                    btnElement.disabled = false;
+                    btnElement.innerHTML = `<i class="ti ti-box text-base"></i><span>Issue Product</span>`;
+                }
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showToast('Network error issuing product.', 'error');
+            if (btnElement) {
+                btnElement.disabled = false;
+                btnElement.innerHTML = `<i class="ti ti-box text-base"></i><span>Issue Product</span>`;
+            }
+        });
     }
 
     // Filtering & Pagination -> Global filter state variables
@@ -1631,20 +1689,7 @@ if (isset($pdo) && $pdo !== null) {
         }
     }
     applyFilters();
-</script>�────────────────
-    var urlParams = new URLSearchParams(window.location.search);
-    var tabParam = urlParams.get('tab');
-    if (tabParam) {
-        var targetTab = document.querySelector(`.status-tab[data-status="${tabParam}"]`);
-        if (targetTab) {
-            document.querySelectorAll('.status-tab').forEach(b => b.classList.remove('on'));
-            targetTab.classList.add('on');
-            activeStatus = tabParam;
-        }
-    }
-    applyFilters();
-    // Pane starts hidden on all screen sizes — opens only when a row is clicked
-</script>
+</script>   
 
 <?php
 /*

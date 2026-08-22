@@ -7,10 +7,8 @@ require_once __DIR__ . "/database/connection.php";
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-// Security check -> Setting cache-control headers to prevent stale rendering of buyer-restricted content
-header("Cache-Control: no-cache, no-store, must-revalidate");
-header("Pragma: no-cache");
-header("Expires: 0");
+header("Location: /cart");
+exit;
 
 $is_logged_in = isset($_SESSION['user_id']);
 $buyer_approved = false;

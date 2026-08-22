@@ -121,6 +121,7 @@ if (isset($pdo) && $pdo !== null) {
                 'supplier' => $assigned_supplier ?: '',
                 'moq' => (int) $pr['moq'],
                 'price' => (float) $pr['price'],
+                'total_stock' => $total_stock,
                 'status' => $status,
                 'badge' => $badge,
                 'desc' => $pr['desc'] ?? '',
@@ -178,15 +179,15 @@ if (empty($all_suppliers)) {
                 <div class="relative flex-1 group">
                     <i
                         class="ti ti-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors"></i>
-                    <input type="text" id="prod-search" placeholder="Search SKU or Name..."
-                        class="w-full pl-11 pr-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm transition-all">
+                    <input id="prod-search" type="text" placeholder="Search SKU or Name..." oninput="applyFilters()"
+                        class="pl-11 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-brand/35 transition-all w-64">
                 </div>
-                <select id="prod-cat-filter"
-                    class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-sm font-medium transition-all cursor-pointer">
-                    <option value="">All Categories</option>
-                    <?php foreach ($all_categories as $cat): ?>
-                        <option value="<?= htmlspecialchars($cat['name']) ?>">
-                            <?= htmlspecialchars($cat['name']) ?>
+
+                <select id="prod-cat-filter" onchange="applyFilters()"
+                    class="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-semibold text-gray-800 outline-none focus:border-brand/35 transition-all cursor-pointer">
+                    <option value="all">All Categories</option>
+                    <?php foreach ($all_categories as $c): ?>
+                        <option value="<?= htmlspecialchars(strtolower($c['name'])) ?>"><?= htmlspecialchars($c['name']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -206,13 +207,14 @@ if (empty($all_suppliers)) {
                             <th class="px-4 py-3 w-20 text-center">MOQ</th>
                             <th class="px-4 py-3 w-24">Base</th>
                             <th class="px-4 py-3 w-24">Status</th>
+                            <th class="px-4 py-3 w-28 text-center">Total Stock</th>
                             <th class="px-4 py-3 text-right rounded-r-xl w-24">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="prod-list">
                         <?php if (empty($admin_products)): ?>
                             <tr id="empty-state">
-                                <td colspan="6">
+                                <td colspan="7">
                                     <div class="flex flex-col items-center justify-center py-24 text-center gap-4">
                                         <div
                                             class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-300">
@@ -277,6 +279,10 @@ if (empty($all_suppliers)) {
                                     <td class="p-4 border-y border-gray-100 group-hover:border-brand/30">
                                         <span
                                             class="px-2.5 py-1 <?= $p['badge'] ?> text-[9px] font-bold rounded-full border uppercase tracking-tighter text-center truncate"><?= htmlspecialchars($p['status']) ?></span>
+                                    </td>
+
+                                    <td class="p-4 border-y border-gray-100 group-hover:border-brand/30 text-center">
+                                        <span class="text-xs font-black text-gray-900"><?= number_format((int)$p['total_stock']) ?> pcs</span>
                                     </td>
 
                                     <td

@@ -698,28 +698,9 @@ require_once __DIR__ . "/layouts/header.php";
 
     // Initialize nested quantities: selectedQuantities[color][size]
     let selectedQuantities = {};
-    colorsArray.forEach(c => {
-        selectedQuantities[c] = {};
-        sizeOptions.forEach(s => {
-            selectedQuantities[c][s] = 0;
-        });
+    sizeOptions.forEach(s => {
+        selectedQuantities[s] = 0;
     });
-
-    function checkGlobalVariantStock() {
-        let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === (selectedColor || '').trim().toLowerCase() && (v.size || '').trim().toLowerCase() === (selectedSize || '').trim().toLowerCase());
-        let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
-
-        const minusBtn = document.getElementById('global-qty-minus');
-        const plusBtn = document.getElementById('global-qty-plus');
-
-        if (qtyAvailable <= 0) {
-            if (minusBtn) minusBtn.disabled = true;
-            if (plusBtn) plusBtn.disabled = true;
-        } else {
-            if (minusBtn) minusBtn.disabled = false;
-            if (plusBtn) plusBtn.disabled = false;
-        }
-    }
 
     function getTier(q) {
         return tiers.find(t => q >= t.min && q <= t.max) || tiers[0];
@@ -741,7 +722,6 @@ require_once __DIR__ . "/layouts/header.php";
             document.getElementById('unit-price').textContent = 'LKR ' + activePrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
             document.getElementById('subtotal').textContent = 'LKR ' + (qty * activePrice).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
-            // Update size price display inside list
             document.querySelectorAll('.size-price-display').forEach(el => {
                 el.textContent = activePrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
             });
@@ -759,7 +739,6 @@ require_once __DIR__ . "/layouts/header.php";
             warn.classList.remove('flex');
         }
 
-        // Highlighting current pricing tier row based on selected quantity
         for (let i = 1; i <= tiers.length; i++) {
             const el = document.getElementById('tier-' + i);
             if (el) {
@@ -786,57 +765,48 @@ require_once __DIR__ . "/layouts/header.php";
     }
 
     function changeQty(delta) {
-        if (selectedSize && selectedColor) {
-            let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === (selectedColor || '').trim().toLowerCase() && (v.size || '').trim().toLowerCase() === (selectedSize || '').trim().toLowerCase());
-            let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
-            if (qtyAvailable <= 0) return;
+        if (sizeOptions.length > 0) {
+            let firstAvailableSize = sizeOptions.find(s => {
+                let sizeTotalStock = 0;
+                inventoryVariations.filter(v => (v.size || '').trim().toLowerCase() === s.trim().toLowerCase()).forEach(v => sizeTotalStock += parseInt(v.quantity) || 0);
+                return sizeTotalStock > 0;
+            }) || sizeOptions[0];
 
-            const currentVal = (selectedQuantities[selectedColor] && selectedQuantities[selectedColor][selectedSize]) || 0;
-            const newVal = Math.min(qtyAvailable, Math.max(0, currentVal + delta));
-            selectedQuantities[selectedColor][selectedSize] = newVal;
+            changeSizeQty(firstAvailableSize, delta);
+        }
+    }
 
-            const input = document.getElementById('size-qty-' + selectedSize);
-            if (input) {
-                input.value = newVal;
-                updateSizeInputStyles(selectedSize, newVal);
-            }
+    function getSizeStock(size) {
+        let total = 0;
+        inventoryVariations.filter(v => (v.size || '').trim().toLowerCase() === size.trim().toLowerCase()).forEach(v => {
+            total += parseInt(v.quantity) || 0;
+        });
+        return total > 0 ? total : 9999;
+    }
 
+    function changeSizeQty(size, delta) {
+        let maxAvailable = getSizeStock(size);
+        const input = document.getElementById('size-qty-' + size);
+        if (input) {
+            let val = selectedQuantities[size] || 0;
+            val = Math.min(maxAvailable, Math.max(0, val + delta));
+            input.value = val;
+            selectedQuantities[size] = val;
+            updateSizeInputStyles(size, val);
             recalculateTotalQty();
         }
     }
 
-    function changeSizeQty(size, delta) {
-        if (selectedColor) {
-            let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === (selectedColor || '').trim().toLowerCase() && (v.size || '').trim().toLowerCase() === size.trim().toLowerCase());
-            let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
-            if (qtyAvailable <= 0) return;
-
-            const input = document.getElementById('size-qty-' + size);
-            if (input) {
-                let val = (selectedQuantities[selectedColor] && selectedQuantities[selectedColor][size]) || 0;
-                val = Math.min(qtyAvailable, Math.max(0, val + delta));
-                input.value = val;
-                selectedQuantities[selectedColor][size] = val;
-                updateSizeInputStyles(size, val);
-                recalculateTotalQty();
-            }
-        }
-    }
-
     function onSizeQtyChange(size) {
-        if (selectedColor) {
-            let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === (selectedColor || '').trim().toLowerCase() && (v.size || '').trim().toLowerCase() === size.trim().toLowerCase());
-            let qtyAvailable = variant ? parseInt(variant.quantity) : 0;
-
-            const input = document.getElementById('size-qty-' + size);
-            if (input) {
-                let val = parseInt(input.value) || 0;
-                val = Math.min(qtyAvailable, Math.max(0, val));
-                input.value = val;
-                selectedQuantities[selectedColor][size] = val;
-                updateSizeInputStyles(size, val);
-                recalculateTotalQty();
-            }
+        let maxAvailable = getSizeStock(size);
+        const input = document.getElementById('size-qty-' + size);
+        if (input) {
+            let val = parseInt(input.value) || 0;
+            val = Math.min(maxAvailable, Math.max(0, val));
+            input.value = val;
+            selectedQuantities[size] = val;
+            updateSizeInputStyles(size, val);
+            recalculateTotalQty();
         }
     }
 
@@ -857,64 +827,15 @@ require_once __DIR__ . "/layouts/header.php";
 
     function recalculateTotalQty() {
         let total = 0;
-        for (let c in selectedQuantities) {
-            for (let s in selectedQuantities[c]) {
-                total += selectedQuantities[c][s] || 0;
-            }
+        for (let s in selectedQuantities) {
+            total += selectedQuantities[s] || 0;
         }
         qty = total;
         updateUI();
-        updateColorBadges();
     }
-
-    function updateColorBadges() {
-        for (let c in selectedQuantities) {
-            let colorTotal = 0;
-            for (let s in selectedQuantities[c]) {
-                colorTotal += selectedQuantities[c][s] || 0;
-            }
-            const badge = document.getElementById('color-qty-badge-' + c);
-            if (badge) {
-                if (colorTotal > 0) {
-                    badge.textContent = 'x' + colorTotal;
-                    badge.classList.remove('hidden');
-                } else {
-                    badge.classList.add('hidden');
-                }
-            }
-        }
-    }
-
-    let selectedColor = '<?= htmlspecialchars($default_colour) ?>';
-    let selectedSize = '<?= htmlspecialchars($default_size) ?>';
-
-    // Pre-calculate per-color total stock
-    const colorTotalStock = {};
-    colorsArray.forEach(c => colorTotalStock[c] = 0);
-    inventoryVariations.forEach(v => {
-        const cMatch = colorsArray.find(c => c.trim().toLowerCase() === (v.colour || '').trim().toLowerCase());
-        if (cMatch) {
-            colorTotalStock[cMatch] += parseInt(v.quantity) || 0;
-        }
-    });
-
-    // Initially disable completely out of stock colors
-    colorsArray.forEach((c, idx) => {
-        if ((colorTotalStock[c] || 0) <= 0) {
-            const btn = document.getElementById('color-btn-' + idx);
-            if (btn) {
-                btn.disabled = true;
-                btn.classList.add('opacity-30', 'cursor-not-allowed');
-            }
-        }
-    });
 
     function selectColor(idx, color) {
-        if ((colorTotalStock[color] || 0) <= 0) return; // Prevent selection if out of stock
-
-        selectedColor = color;
-        document.getElementById('selected-color-name').textContent = color;
-
+        // Visual highlight only - wholesale customers do not order by color combinations
         document.querySelectorAll('.color-select-btn').forEach(btn => {
             btn.classList.remove('ring-2', 'ring-brand', 'ring-offset-2');
             btn.classList.add('hover:ring-2', 'hover:ring-gray-300');
@@ -924,81 +845,11 @@ require_once __DIR__ . "/layouts/header.php";
             btn.classList.add('ring-2', 'ring-brand', 'ring-offset-2');
             btn.classList.remove('hover:ring-2', 'hover:ring-gray-300');
         }
-
-        // Load saved quantities for the newly selected color into the size fields
-        // And disable sizes that are out of stock
-        sizeOptions.forEach(size => {
-            const sizeVal = (selectedQuantities[color] && selectedQuantities[color][size]) || 0;
-            const input = document.getElementById('size-qty-' + size);
-            const minusBtn = document.getElementById('size-minus-' + size);
-            const plusBtn = document.getElementById('size-plus-' + size);
-            const outBadge = document.getElementById('size-out-badge-' + size);
-            const priceWrapper = document.getElementById('size-price-wrapper-' + size);
-            const stockBadge = document.getElementById('size-stock-badge-' + size);
-            const stockVal = document.getElementById('size-stock-val-' + size);
-
-            let variant = inventoryVariations.find(v => (v.colour || '').trim().toLowerCase() === color.trim().toLowerCase() && (v.size || '').trim().toLowerCase() === size.trim().toLowerCase());
-            const cardEl = document.getElementById('size-row-card-' + size);
-
-            if (!variant) {
-                if (cardEl) cardEl.classList.add('hidden');
-                if (selectedQuantities[color]) selectedQuantities[color][size] = 0;
-                return;
-            }
-
-            if (cardEl) cardEl.classList.remove('hidden');
-
-            let qtyAvailable = parseInt(variant.quantity) || 0;
-
-            if (qtyAvailable <= 0) {
-                if (input) {
-                    input.disabled = true;
-                    input.value = 0;
-                    input.classList.add('opacity-50', 'cursor-not-allowed');
-                }
-                if (minusBtn) { minusBtn.disabled = true; minusBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
-                if (plusBtn) { plusBtn.disabled = true; plusBtn.classList.add('opacity-50', 'cursor-not-allowed'); }
-                if (outBadge) { outBadge.classList.remove('hidden'); }
-                if (priceWrapper) { priceWrapper.classList.add('hidden'); }
-                if (stockBadge) { stockBadge.classList.add('hidden'); }
-                // Reset selected quantity
-                if (selectedQuantities[color]) selectedQuantities[color][size] = 0;
-            } else {
-                if (input) {
-                    input.disabled = false;
-                    input.value = sizeVal;
-                    input.classList.remove('opacity-50', 'cursor-not-allowed');
-                    updateSizeInputStyles(size, sizeVal);
-                }
-                if (minusBtn) { minusBtn.disabled = false; minusBtn.classList.remove('opacity-50', 'cursor-not-allowed'); }
-                if (plusBtn) { plusBtn.disabled = false; plusBtn.classList.remove('opacity-50', 'cursor-not-allowed'); }
-                if (outBadge) { outBadge.classList.add('hidden'); }
-                if (priceWrapper) { priceWrapper.classList.remove('hidden'); }
-                if (stockBadge) { stockBadge.classList.remove('hidden'); }
-                if (stockVal) { stockVal.textContent = qtyAvailable.toLocaleString(); }
-            }
-        });
-
-        checkGlobalVariantStock();
-        recalculateTotalQty();
-    }
-
-    // Initial setup to select default color and initialize variant stock
-    function initVariantStock() {
-        let defIdx = colorsArray.indexOf(defaultColor);
-        if (defIdx !== -1) {
-            selectColor(defIdx, defaultColor);
-        }
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initVariantStock);
-    } else {
-        initVariantStock();
+        const label = document.getElementById('selected-color-name');
+        if (label) label.textContent = color;
     }
 
     function selectSize(idx, size) {
-        selectedSize = size;
         document.querySelectorAll('.size-row-el').forEach(row => {
             row.classList.remove('bg-brand-light/10');
         });
@@ -1007,10 +858,8 @@ require_once __DIR__ . "/layouts/header.php";
         if (activeRow) {
             activeRow.classList.add('bg-brand-light/10');
         }
-        checkGlobalVariantStock();
     }
 
-    // Adding selected color, size, and quantity matrix items into local storage cart
     function addToCart() {
         if (qty < moq) {
             uiAlert("Minimum Order Quantity is " + moq + " units in total across all selections.");
@@ -1024,29 +873,25 @@ require_once __DIR__ . "/layouts/header.php";
         }
 
         let addedCount = 0;
-        for (let c in selectedQuantities) {
-            for (let s in selectedQuantities[c]) {
-                const sizeQty = selectedQuantities[c][s] || 0;
-                if (sizeQty > 0) {
-                    let existing = cart.find(i => i.id === productId && i.color === c && i.size === s);
-                    if (existing) {
-                        existing.qty += sizeQty;
-                    } else {
-                        cart.push({ id: productId, qty: sizeQty, color: c, size: s });
-                    }
-                    addedCount++;
+        for (let s in selectedQuantities) {
+            const sizeQty = selectedQuantities[s] || 0;
+            if (sizeQty > 0) {
+                let existing = cart.find(i => i.id === productId && i.size === s);
+                if (existing) {
+                    existing.qty += sizeQty;
+                } else {
+                    cart.push({ id: productId, qty: sizeQty, color: 'Standard', size: s });
                 }
+                addedCount++;
             }
         }
 
         if (addedCount === 0) {
-            uiAlert("Please select a quantity for at least one color and size combination.");
+            uiAlert("Please select a quantity for at least one size.");
             return;
         }
 
         localStorage.setItem('kesara_cart', JSON.stringify(cart));
-
-        // Redirect to cart
         window.location.href = '/cart';
     }
 

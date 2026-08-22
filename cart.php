@@ -65,11 +65,6 @@ require_once __DIR__ . "/layouts/header.php";
                     </div>
                 </div>
 
-                <!-- Delivery Note -->
-                <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
-                    <h2 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Delivery Note (Optional)</h2>
-                    <textarea rows="3" placeholder="e.g. Please deliver to warehouse entrance. Contact Nimal on 077 xxx xxxx." class="w-full px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-brand/10 focus:border-brand transition-all resize-none"></textarea>
-                </div>
             </div>
 
             <!-- RIGHT: SUMMARY -->
@@ -95,9 +90,26 @@ require_once __DIR__ . "/layouts/header.php";
                             </div>
                             <span id="vat-val" class="text-gray-900 font-bold">—</span>
                         </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-400 font-medium tracking-wide">Delivery</span>
-                            <span class="text-gray-300 font-medium tracking-wide uppercase text-[10px]">At Checkout</span>
+                    </div>
+
+                    <!-- PAYMENT METHOD SELECTION -->
+                    <div class="mb-8 bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                        <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-3">Select Payment Method</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-brand transition-all">
+                                <input type="radio" name="cart_payment_method" value="cash" checked class="w-4 h-4 text-brand focus:ring-brand">
+                                <div>
+                                    <span class="text-xs font-bold text-gray-900 block">Cash</span>
+                                    <span class="text-[9px] text-gray-400">On Pickup</span>
+                                </div>
+                            </label>
+                            <label class="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-brand transition-all">
+                                <input type="radio" name="cart_payment_method" value="credit" class="w-4 h-4 text-brand focus:ring-brand">
+                                <div>
+                                    <span class="text-xs font-bold text-gray-900 block">Credit</span>
+                                    <span class="text-[9px] text-gray-400">Account Term</span>
+                                </div>
+                            </label>
                         </div>
                     </div>
 
@@ -106,7 +118,7 @@ require_once __DIR__ . "/layouts/header.php";
                             <span class="text-xs font-bold text-brand uppercase tracking-widest">Estimated Total</span>
                             <span id="total-val" class="text-2xl font-extrabold text-brand">—</span>
                         </div>
-                        <p class="text-[10px] font-medium text-brand/60 leading-tight">Final total including delivery will be confirmed on the next step.</p>
+                        <p class="text-[10px] font-medium text-brand/60 leading-tight">Quotation will be added directly to the Kesara Enterprises system.</p>
                     </div>
 
                     <div id="moq-alerts" class="mb-8">
@@ -114,12 +126,9 @@ require_once __DIR__ . "/layouts/header.php";
                     </div>
 
                     <div class="space-y-4">
-                        <button id="checkout-btn" onclick="submitOrder()" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center">
-                            Proceed to Checkout
-                        </button>
-                        <button onclick="downloadQuote()" class="w-full bg-white text-gray-900 border border-gray-200 font-bold py-4 rounded-2xl hover:bg-gray-50 hover:border-brand hover:text-brand transition-all transform hover:-translate-y-px active:scale-95 flex items-center justify-center gap-2">
+                        <button id="gen-quote-btn" onclick="generateQuotation()" class="w-full bg-brand text-brand-light font-bold py-4 rounded-2xl hover:bg-brand-dark transition-all transform hover:-translate-y-px shadow-lg shadow-brand/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2">
                             <i class="ti ti-file-text text-xl"></i>
-                            Download as Quote
+                            Generate Quotation
                         </button>
                     </div>
 
@@ -369,7 +378,7 @@ function render() {
 
   // Checking status -> Updating MOQ warning alerts and checkout button state
   const alerts = document.getElementById('moq-alerts');
-  const checkoutBtn = document.getElementById('checkout-btn');
+  const genQuoteBtn = document.getElementById('gen-quote-btn');
   
   if (belowMoqCount > 0) {
     alerts.innerHTML = `
@@ -381,11 +390,11 @@ function render() {
         </div>
       </div>
     `;
-    checkoutBtn.disabled = true;
+    if (genQuoteBtn) genQuoteBtn.disabled = true;
   } else {
     alerts.innerHTML = '';
     const hasSelected = cartItems.some(i => i.selected);
-    checkoutBtn.disabled = !hasSelected;
+    if (genQuoteBtn) genQuoteBtn.disabled = !hasSelected;
   }
 }
 
@@ -422,12 +431,12 @@ function removeItem(index) {
 
 function clearCart() {
   const modal = document.getElementById('clear-cart-modal');
-  modal.classList.remove('hidden');
+  if (modal) modal.classList.remove('hidden');
 }
 
 function closeClearCartModal() {
   const modal = document.getElementById('clear-cart-modal');
-  modal.classList.add('hidden');
+  if (modal) modal.classList.add('hidden');
 }
 
 function confirmClearCart() {
@@ -438,107 +447,157 @@ function confirmClearCart() {
 }
 
 let isSubmitting = false;
-function submitOrder() {
+async function generateQuotation() {
   if (isSubmitting) return;
-  const checkoutBtn = document.getElementById('checkout-btn');
   const selectedItems = cartItems.filter(i => i.selected);
   if (selectedItems.length === 0) {
-      showToast('Please select at least one item', 'error');
+      if (window.uiAlert) window.uiAlert("Please select items to generate a quotation.");
+      else alert("Please select items to generate a quotation.");
       return;
   }
-  
+
+  const payMethodRadio = document.querySelector('input[name="cart_payment_method"]:checked');
+  const paymentMethod = payMethodRadio ? payMethodRadio.value : 'cash';
+
+  const btn = document.getElementById('gen-quote-btn');
+  if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<i class="ti ti-loader animate-spin text-xl"></i> Generating Quotation...`;
+  }
   isSubmitting = true;
-  checkoutBtn.disabled = true;
-  checkoutBtn.textContent = 'Redirecting to Checkout...';
 
-  setTimeout(() => {
-      window.location.href = '/checkout';
-  }, 500);
-}
+  const payloadItems = selectedItems.map(item => ({
+      product_id: item.id,
+      quantity: item.qty,
+      unit_price: getPrice(item),
+      color: item.color || 'Standard',
+      size: item.size || 'M'
+  }));
 
-function downloadQuote() {
-  const selectedItems = cartItems.filter(i => i.selected);
-  if (selectedItems.length === 0) {
-      uiAlert("Please select items to download a quote.");
-      return;
-  }
-  
-  let total = 0;
-  let itemsHtml = selectedItems.map(item => {
-      let price = getPrice(item);
-      let subtotal = item.qty * price;
-      total += subtotal;
-      return `
-          <tr>
-              <td style="padding: 10px; border-bottom: 1px solid #ddd;">
-                  <strong>${item.name}</strong><br>
-                  <small>${item.meta}</small>
-              </td>
-              <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${item.qty}</td>
-              <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">LKR ${price.toFixed(2)}</td>
-              <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">LKR ${subtotal.toFixed(2)}</td>
-          </tr>
-      `;
-  }).join('');
+  try {
+      const res = await fetch('api/orders.php', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+              payment_method: paymentMethod,
+              items: payloadItems
+          })
+      });
+      const data = await res.json();
 
-  let printWindow = window.open('', '_blank');
-  printWindow.document.write(`
-      <html>
-      <head>
-          <title>Wholesale Price Quote - Kesara Enterprises</title>
-          <style>
-              body { font-family: sans-serif; color: #333; padding: 40px; }
-              .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0F6E56; padding-bottom: 20px; margin-bottom: 30px; }
-              .logo { font-size: 24px; font-weight: bold; color: #0F6E56; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th { background-color: #f5f5f5; padding: 10px; text-align: left; }
-              .totals { margin-top: 30px; text-align: right; font-size: 18px; }
-              .footer { margin-top: 50px; font-size: 11px; color: #777; text-align: center; border-top: 1px solid #ddd; padding-top: 20px; }
-          </style>
-      </head>
-      <body>
-          <div class="header">
-              <div>
-                  <div class="logo">Kesara Enterprises</div>
-                  <div>Wholesale Underwear Supplier Sri Lanka</div>
-                  <div>Colombo, Sri Lanka</div>
-              </div>
-              <div style="text-align: right;">
-                  <h2>PRICE QUOTE</h2>
-                  <div>Date: ${new Date().toLocaleDateString()}</div>
-                  <div>Reference: QT-${Date.now().toString().slice(-6)}</div>
-              </div>
-          </div>
-          <p>Thank you for requesting a wholesale access quote. Below are the details for your estimated order:</p>
-          <table>
-              <thead>
+      if (data.status === 'success') {
+          const orderRef = data.order_ref || `KE-2025-${Date.now().toString().slice(-5)}`;
+          let total = 0;
+          let itemsHtml = selectedItems.map(item => {
+              let price = getPrice(item);
+              let subtotal = item.qty * price;
+              total += subtotal;
+              return `
                   <tr>
-                      <th>Product Details</th>
-                      <th style="text-align: center;">Quantity</th>
-                      <th style="text-align: right;">Unit Price</th>
-                      <th style="text-align: right;">Subtotal</th>
+                      <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                          <strong>${item.name}</strong><br>
+                          <small>${item.meta}</small>
+                      </td>
+                      <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: center;">${item.qty}</td>
+                      <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">LKR ${price.toFixed(2)}</td>
+                      <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">LKR ${subtotal.toFixed(2)}</td>
                   </tr>
-              </thead>
-              <tbody>
-                  ${itemsHtml}
-              </tbody>
-          </table>
-          <div class="totals">
-              <strong>Estimated Total: LKR ${total.toFixed(2)}</strong>
-          </div>
-          <div class="footer">
-              <p>This is an estimated price quote. Final tax invoice and delivery charges will be calculated during order processing.</p>
-              <p>© ${new Date().getFullYear()} Kesara Enterprises. All rights reserved.</p>
-          </div>
-          <script>
-              window.onload = function() {
-                  window.print();
-              }
-          <\/script>
-      </body>
-      </html>
-  `);
-  printWindow.document.close();
+              `;
+          }).join('');
+
+          let vat = Math.round(total * 0.18);
+          let grandTotal = total + vat;
+
+          let printWindow = window.open('', '_blank');
+          if (printWindow) {
+              printWindow.document.write(`
+                  <!DOCTYPE html>
+                  <html>
+                  <head>
+                      <title>Wholesale Quotation - Kesara Enterprises</title>
+                      <style>
+                          body { font-family: system-ui, -apple-system, sans-serif; color: #1e293b; padding: 40px; }
+                          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0F6E56; padding-bottom: 20px; margin-bottom: 30px; }
+                          .logo { font-size: 24px; font-weight: bold; color: #0F6E56; }
+                          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                          th { background-color: #f8fafc; padding: 12px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; font-size: 12px; uppercase; }
+                          .totals { margin-top: 30px; text-align: right; font-size: 16px; }
+                          .contact-box { margin-top: 35px; padding: 16px; background-color: #e6f4f1; border: 1px solid #a3e0d3; border-radius: 12px; text-align: center; color: #0F6E56; font-weight: bold; font-size: 15px; }
+                          .footer { margin-top: 40px; font-size: 11px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+                      </style>
+                  </head>
+                  <body>
+                      <div class="header">
+                          <div>
+                              <div class="logo">Kesara Enterprises</div>
+                              <div>Wholesale Underwear Supplier Sri Lanka</div>
+                              <div>Colombo, Sri Lanka</div>
+                          </div>
+                          <div style="text-align: right;">
+                              <h2>CUSTOMER QUOTATION</h2>
+                              <div><strong>Quotation Ref:</strong> ${orderRef}</div>
+                              <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
+                              <div><strong>Payment Method:</strong> ${paymentMethod.toUpperCase()}</div>
+                          </div>
+                      </div>
+                      <p>Thank you for placing your quotation request. Your order has been submitted to the Kesara Enterprises system for review.</p>
+                      <table>
+                          <thead>
+                              <tr>
+                                  <th>Product Details</th>
+                                  <th style="text-align: center;">Quantity</th>
+                                  <th style="text-align: right;">Unit Price</th>
+                                  <th style="text-align: right;">Subtotal</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              ${itemsHtml}
+                          </tbody>
+                      </table>
+                      <div class="totals">
+                          <div>Subtotal: LKR ${total.toLocaleString(undefined, {minimumFractionDigits:2})}</div>
+                          <div>VAT (18%): LKR ${vat.toLocaleString(undefined, {minimumFractionDigits:2})}</div>
+                          <div style="font-size: 20px; font-weight: bold; color: #0F6E56; margin-top: 8px;">Estimated Total: LKR ${grandTotal.toLocaleString(undefined, {minimumFractionDigits:2})}</div>
+                      </div>
+
+                      <div class="contact-box">
+                          Contact Kesara Enterprises for more details: +94 77 123 4567 / 011 234 5678
+                      </div>
+
+                      <div class="footer">
+                          <p>© ${new Date().getFullYear()} Kesara Enterprises. All rights reserved.</p>
+                      </div>
+                      <script>
+                          window.onload = function() {
+                              window.print();
+                          }
+                      <\/script>
+                  </body>
+                  </html>
+              `);
+              printWindow.document.close();
+          }
+
+          // Clear cart after quotation generation
+          cartItems = cartItems.filter(i => !i.selected);
+          saveCartToStorage();
+          render();
+          if (window.showToast) window.showToast('Quotation generated and saved to system!', 'success');
+      } else {
+          if (window.uiAlert) window.uiAlert("Error generating quotation: " + (data.message || 'Unknown error'));
+          else alert("Error generating quotation: " + (data.message || 'Unknown error'));
+      }
+  } catch (e) {
+      console.error(e);
+      if (window.uiAlert) window.uiAlert("Network error generating quotation.");
+      else alert("Network error generating quotation.");
+  } finally {
+      isSubmitting = false;
+      if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="ti ti-file-text text-xl"></i> Generate Quotation`;
+      }
+  }
 }
 
 // Application init -> Rendering initial shopping cart UI

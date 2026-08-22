@@ -10,54 +10,73 @@
 $success_msg = "";
 $error_msg = "";
 
-// Self-Healing DB: Ensure supplier_items has unit_cost column
+// Self-Healing DB: Ensure columns exist on PO and PO items tables
 if (isset($pdo) && $pdo !== null) {
     try {
-        $checkUnitCost = $pdo->query("SHOW COLUMNS FROM supplier_items LIKE 'unit_cost'");
-        if (!$checkUnitCost->fetch()) {
-            $pdo->exec("ALTER TABLE supplier_items ADD COLUMN unit_cost DECIMAL(10,2) DEFAULT NULL");
-        }
+        $chk1 = $pdo->query("SHOW COLUMNS FROM supplier_items LIKE 'unit_cost'");
+        if (!$chk1->fetch()) $pdo->exec("ALTER TABLE supplier_items ADD COLUMN unit_cost DECIMAL(10,2) DEFAULT NULL");
+
+        $chk2 = $pdo->query("SHOW COLUMNS FROM purchase_orders LIKE 'cut_number'");
+        if (!$chk2->fetch()) $pdo->exec("ALTER TABLE purchase_orders ADD COLUMN cut_number VARCHAR(100) DEFAULT NULL AFTER supplier_id");
+
+        $chk3 = $pdo->query("SHOW COLUMNS FROM purchase_orders LIKE 'is_on_hold'");
+        if (!$chk3->fetch()) $pdo->exec("ALTER TABLE purchase_orders ADD COLUMN is_on_hold TINYINT DEFAULT 0 AFTER status");
+
+        $chk4 = $pdo->query("SHOW COLUMNS FROM purchase_order_items LIKE 'fabric_color'");
+        if (!$chk4->fetch()) $pdo->exec("ALTER TABLE purchase_order_items ADD COLUMN fabric_color VARCHAR(50) DEFAULT 'Standard'");
+
+        $chk5 = $pdo->query("SHOW COLUMNS FROM purchase_order_items LIKE 'size'");
+        if (!$chk5->fetch()) $pdo->exec("ALTER TABLE purchase_order_items ADD COLUMN size VARCHAR(20) DEFAULT 'M'");
     } catch (\Exception $e) {
         // Ignored
     }
 }
 
-// Processing -> Handling POST actions for raising new purchase orders, resending, and cancelling POs
+// Processing -> Handling POST actions for raising new purchase orders, hold toggle, resending, and cancelling POs
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
     $po_id = (int) ($_POST['po_id'] ?? 0);
 
-    if ($action === 'raise_po' && isset($pdo)) {
+    if ($action === 'toggle_hold_po' && $po_id > 0 && isset($pdo)) {
+        try {
+            $stmt = $pdo->prepare("UPDATE purchase_orders SET is_on_hold = IF(is_on_hold = 1, 0, 1) WHERE id = ?");
+            $stmt->execute([$po_id]);
+            $success_msg = "Purchase Order hold status updated successfully.";
+        } catch (\Exception $e) {
+            $error_msg = "Error updating hold status: " . $e->getMessage();
+        }
+    } elseif ($action === 'raise_po' && isset($pdo)) {
         $supplier_id = (int) $_POST['supplier_id'];
+        $cut_number = trim($_POST['cut_number'] ?? '');
         $expected_at = $_POST['expected_at'];
         $item_names = $_POST['item_names'] ?? [];
+        $item_colors = $_POST['item_colors'] ?? [];
+        $item_sizes = $_POST['item_sizes'] ?? [];
         $item_qtys = $_POST['item_qtys'] ?? [];
         $item_costs = $_POST['item_costs'] ?? [];
 
         $total = 0;
         for ($i = 0; $i < count($item_names); $i++) {
-            $total += (int) $item_qtys[$i] * (float) $item_costs[$i];
+            $total += (int) ($item_qtys[$i] ?? 0) * (float) ($item_costs[$i] ?? 0);
         }
 
         try {
-            // Fetching Data -> Getting supplier contact email, payment terms, and recipient details
             $supp_stmt = $pdo->prepare("SELECT name, email, contact_person, payment_terms FROM suppliers WHERE id = ?");
             $supp_stmt->execute([$supplier_id]);
             $supp = $supp_stmt->fetch();
 
             $pdo->beginTransaction();
 
-            $stmt = $pdo->prepare("INSERT INTO purchase_orders (supplier_id, status, ordered_at, expected_at, total) VALUES (?, 'sent', NOW(), ?, ?)");
-            $stmt->execute([$supplier_id, $expected_at, $total]);
+            $stmt = $pdo->prepare("INSERT INTO purchase_orders (supplier_id, cut_number, status, ordered_at, expected_at, total) VALUES (?, ?, 'sent', NOW(), ?, ?)");
+            $stmt->execute([$supplier_id, $cut_number, $expected_at, $total]);
             $new_po_id = $pdo->lastInsertId();
             $po_ref = 'PO-2025-' . str_pad($new_po_id, 4, '0', STR_PAD_LEFT);
 
-            $item_stmt = $pdo->prepare("INSERT INTO purchase_order_items (po_id, product_id, item_name, qty_ordered, qty_received, unit_cost) VALUES (?, ?, ?, ?, 0, ?)");
+            $item_stmt = $pdo->prepare("INSERT INTO purchase_order_items (po_id, product_id, item_name, fabric_color, size, qty_ordered, qty_received, unit_cost) VALUES (?, ?, ?, ?, ?, ?, 0, ?)");
             $item_rows_html = '';
             $item_total = 0;
             for ($i = 0; $i < count($item_names); $i++) {
-                if (empty($item_names[$i]))
-                    continue;
+                if (empty($item_names[$i])) continue;
 
                 $raw_val = $item_names[$i];
                 $prod_id = null;
@@ -68,14 +87,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $i_name = $parts[3];
                 }
 
-                $qty = (int) $item_qtys[$i];
-                $cost = (float) $item_costs[$i];
-                $item_stmt->execute([$new_po_id, $prod_id, $i_name, $qty, $cost]);
+                $f_color = trim($item_colors[$i] ?? 'Standard');
+                $f_size = trim($item_sizes[$i] ?? 'M');
+                $qty = (int) ($item_qtys[$i] ?? 0);
+                $cost = (float) ($item_costs[$i] ?? 0);
+
+                $item_stmt->execute([$new_po_id, $prod_id, $i_name, $f_color, $f_size, $qty, $cost]);
                 $line_total = $qty * $cost;
                 $item_total += $line_total;
                 $item_rows_html .= '
                     <tr>
-                        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#1f2937;">' . htmlspecialchars($i_name) . '</td>
+                        <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#1f2937;">' . htmlspecialchars($i_name) . ' (' . htmlspecialchars($f_color) . ' / ' . htmlspecialchars($f_size) . ')</td>
                         <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:center;">' . $qty . '</td>
                         <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;text-align:right;">LKR ' . number_format($cost, 2) . '</td>
                         <td style="padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px;font-weight:700;color:#0F6E56;text-align:right;">LKR ' . number_format($line_total, 2) . '</td>
@@ -295,7 +317,7 @@ if (isset($pdo) && $pdo !== null) {
         } catch (\Exception $e) {
         }
 
-        $stmt = $pdo->query("SELECT po.id, po.status, po.ordered_at, po.expected_at, po.received_at, po.total, 
+        $stmt = $pdo->query("SELECT po.id, po.cut_number, po.is_on_hold, po.status, po.ordered_at, po.expected_at, po.received_at, po.total, 
                                     s.name AS supplier_name, s.contact_person, s.payment_terms
                              FROM purchase_orders po
                              JOIN suppliers s ON po.supplier_id = s.id
@@ -308,14 +330,31 @@ if (isset($pdo) && $pdo !== null) {
             $po_id_formatted = 'PO-' . $po_year . '-' . str_pad($po['id'], 4, '0', STR_PAD_LEFT);
             $ordered_date = !empty($po['ordered_at']) ? date('d M Y', strtotime($po['ordered_at'])) : 'N/A';
             $expected_date = !empty($po['expected_at']) ? date('d M Y', strtotime($po['expected_at'])) : 'N/A';
+            $received_date = !empty($po['received_at']) ? date('d M Y', strtotime($po['received_at'])) : 'Pending';
 
+            $received_person = 'N/A';
+            try {
+                $gr_stmt = $pdo->prepare("SELECT received_by FROM goods_received_notes WHERE po_id = ? ORDER BY id DESC LIMIT 1");
+                $gr_stmt->execute([$po['id']]);
+                $gr_row = $gr_stmt->fetch();
+                if ($gr_row && !empty($gr_row['received_by'])) {
+                    $received_person = $gr_row['received_by'];
+                }
+            } catch (\Exception $e) {}
+
+            $is_on_hold = (int) ($po['is_on_hold'] ?? 0);
             $status = strtolower($po['status']);
             $badge = 'bg-gray-50 border-gray-100 text-gray-700';
             $badgeText = ucfirst($status);
             $alertType = 'info';
             $expectedColorClass = 'text-gray-900';
 
-            if ($status === 'overdue') {
+            if ($is_on_hold === 1) {
+                $badge = 'bg-purple-50 border-purple-100 text-purple-700';
+                $badgeText = 'On Hold';
+                $alertType = 'warn';
+                $expectedColorClass = 'text-purple-700';
+            } elseif ($status === 'overdue') {
                 $badge = 'bg-red-50 border-red-100 text-red-700';
                 $badgeText = 'Overdue';
                 $alertType = 'overdue';
@@ -341,7 +380,7 @@ if (isset($pdo) && $pdo !== null) {
             }
 
             // Fetch items
-            $item_stmt = $pdo->prepare("SELECT product_id, item_name, qty_ordered, qty_received, unit_cost FROM purchase_order_items WHERE po_id = ?");
+            $item_stmt = $pdo->prepare("SELECT product_id, item_name, COALESCE(fabric_color, 'Standard') AS fabric_color, COALESCE(size, 'M') AS size, qty_ordered, qty_received, unit_cost FROM purchase_order_items WHERE po_id = ?");
             $item_stmt->execute([$po['id']]);
             $items_db = $item_stmt->fetchAll();
 
@@ -349,7 +388,8 @@ if (isset($pdo) && $pdo !== null) {
             foreach ($items_db as $it) {
                 $qty_ordered = (int) $it['qty_ordered'];
                 $qty_received = (int) $it['qty_received'];
-                $val = 'LKR ' . number_format($qty_ordered * (float) $it['unit_cost'], 2);
+                $unit_cost = (float) $it['unit_cost'];
+                $line_total = $qty_ordered * $unit_cost;
 
                 $pct = 'Pending';
                 if ($qty_ordered > 0 && $qty_received > 0) {
@@ -358,32 +398,22 @@ if (isset($pdo) && $pdo !== null) {
 
                 $items[] = [
                     'name' => $it['item_name'],
-                    'desc' => $qty_ordered . ' ordered · ' . $qty_received . ' received',
-                    'val' => $val,
+                    'color' => $it['fabric_color'],
+                    'size' => $it['size'],
+                    'qty' => $qty_ordered,
+                    'qty_received' => $qty_received,
+                    'unit_cost' => $unit_cost,
+                    'total' => $line_total,
                     'pct' => $pct
                 ];
-            }
-
-            $timeline = [
-                ['t' => 'Purchase Order Created', 'd' => $ordered_date, 's' => 'done'],
-                ['t' => 'PO Dispatched to Supplier', 'd' => $ordered_date, 's' => 'done']
-            ];
-
-            if ($status === 'received') {
-                $timeline[] = ['t' => 'Goods Fully Received', 'd' => $po['received_at'] ? date('d M Y', strtotime($po['received_at'])) : $expected_date, 's' => 'done'];
-            } elseif ($status === 'partial') {
-                $timeline[] = ['t' => 'Partial Delivery Received', 'd' => date('d M Y'), 's' => 'now'];
-                $timeline[] = ['t' => 'Awaiting Remaining Goods', 'd' => 'Expected soon', 's' => 'pend'];
-            } elseif ($status === 'overdue') {
-                $timeline[] = ['t' => 'Delivery Overdue', 'd' => 'Missed ' . $expected_date, 's' => 'warn'];
-            } else {
-                $timeline[] = ['t' => 'Awaiting Delivery', 'd' => 'Expected ' . $expected_date, 's' => 'now'];
             }
 
             $total_formatted = 'LKR ' . number_format((float) $po['total'], 2);
 
             $alertText = "This purchase order was sent on " . $ordered_date . ". Expected delivery date is " . $expected_date . ".";
-            if ($status === 'overdue') {
+            if ($is_on_hold === 1) {
+                $alertText = "HOLD: This purchase order has been placed on hold by admin.";
+            } elseif ($status === 'overdue') {
                 $alertText = "CRITICAL: Shipment is overdue. Expected delivery date was " . $expected_date . ". Contact supplier immediately.";
             } elseif ($status === 'partial') {
                 $alertText = "Warning: Received partial delivery. Remaining items expected soon.";
@@ -394,6 +424,8 @@ if (isset($pdo) && $pdo !== null) {
             $admin_pos[] = [
                 'id' => $po['id'],
                 'num' => $po_id_formatted,
+                'cut_number' => $po['cut_number'] ?: 'N/A',
+                'is_on_hold' => $is_on_hold,
                 'date' => $ordered_date,
                 'status' => $status,
                 'badge' => $badge,
@@ -402,12 +434,13 @@ if (isset($pdo) && $pdo !== null) {
                 'contact' => $po['contact_person'] ?? 'Primary contact',
                 'payment' => $po['payment_terms'] ?? 'Net 30',
                 'expected' => $expected_date,
+                'received_date' => $received_date,
+                'received_person' => $received_person,
                 'expectedColor' => $expectedColorClass,
                 'total' => $total_formatted,
                 'alert' => $alertType,
                 'alertText' => $alertText,
-                'items' => json_encode($items),
-                'timeline' => json_encode($timeline)
+                'items' => json_encode($items)
             ];
         }
     } catch (\Exception $e) {
@@ -584,7 +617,10 @@ if (isset($pdo) && $pdo !== null) {
                                     data-alert="<?= htmlspecialchars($po['alert']) ?>"
                                     data-alert-text="<?= htmlspecialchars($po['alertText']) ?>"
                                     data-items="<?= htmlspecialchars($po['items']) ?>"
-                                    data-timeline="<?= htmlspecialchars($po['timeline']) ?>"
+                                    data-cut-number="<?= htmlspecialchars($po['cut_number']) ?>"
+                                    data-is-on-hold="<?= htmlspecialchars($po['is_on_hold']) ?>"
+                                    data-received-date="<?= htmlspecialchars($po['received_date']) ?>"
+                                    data-received-person="<?= htmlspecialchars($po['received_person']) ?>"
                                     data-status="<?= htmlspecialchars(strtolower($po['badgeText'])) ?>">
                                     <td class="p-4 border-y border-l border-gray-100 rounded-l-2xl group-hover:border-brand/30">
                                         <p class="font-bold text-sm text-gray-900 group-hover:text-brand transition-colors">
@@ -643,7 +679,12 @@ if (isset($pdo) && $pdo !== null) {
             <!-- PO Title Details -->
             <div>
                 <span id="d-po-date" class="text-xs text-gray-400 font-medium"></span>
-                <h2 id="d-po-num" class="text-xl font-bold text-gray-900 tracking-tight mt-1"></h2>
+                <div class="flex items-center justify-between mt-1">
+                    <h2 id="d-po-num" class="text-xl font-bold text-gray-900 tracking-tight"></h2>
+                    <button onclick="toggleHoldPO()" id="d-hold-btn" class="px-3.5 py-1.5 bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold hover:bg-amber-200 transition-all flex items-center gap-1.5">
+                        <i class="ti ti-player-pause text-sm"></i> <span id="d-hold-btn-text">Hold</span>
+                    </button>
+                </div>
                 <div class="flex gap-2 items-center">
                     <span id="d-badge"
                         class="mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest"></span>
@@ -656,6 +697,33 @@ if (isset($pdo) && $pdo !== null) {
                 <i class="ti ti-info-circle text-lg flex-shrink-0" aria-hidden="true"></i>
                 <span id="d-alert-text" class="leading-relaxed font-medium"></span>
             </div>
+
+            <!-- Info Section -->
+            <section class="space-y-3 bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-2">Info</h3>
+                <div class="space-y-2 text-xs">
+                    <div class="flex justify-between border-b border-gray-200/60 pb-1.5">
+                        <span class="text-gray-500 font-medium">Purchase Order Created:</span>
+                        <span id="d-info-created" class="font-bold text-gray-900">—</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-200/60 pb-1.5">
+                        <span class="text-gray-500 font-medium">PO Dispatched to Supplier:</span>
+                        <span id="d-info-dispatched" class="font-bold text-gray-900">—</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-200/60 pb-1.5">
+                        <span class="text-gray-500 font-medium">Goods Fully Received:</span>
+                        <span id="d-info-received" class="font-bold text-gray-900">—</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-200/60 pb-1.5">
+                        <span class="text-gray-500 font-medium">Cut Number:</span>
+                        <span id="d-info-cut" class="font-bold text-brand">—</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 font-medium">Received Person:</span>
+                        <span id="d-info-received-person" class="font-bold text-gray-900">—</span>
+                    </div>
+                </div>
+            </section>
 
             <!-- Supplier Contact Details -->
             <section class="space-y-4">
@@ -682,23 +750,33 @@ if (isset($pdo) && $pdo !== null) {
 
             <div class="h-px bg-gray-100"></div>
 
-            <!-- Line Items Section -->
+            <!-- Line Items Table Section -->
             <section>
                 <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Line Items</h3>
-                <div id="d-items" class="space-y-4"></div>
-                <div class="pt-4 mt-4 flex justify-between items-center border-t border-gray-100">
-                    <span class="text-xs font-bold text-gray-400 uppercase tracking-widest">Total Value</span>
-                    <span id="d-total" class="text-lg font-black text-brand tracking-tight"></span>
-                </div>
-            </section>
-
-            <div class="h-px bg-gray-100"></div>
-
-            <!-- Status Timeline Section -->
-            <section>
-                <h3 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-4">Status Timeline</h3>
-                <div id="d-timeline"
-                    class="space-y-6 pt-4 relative before:absolute before:left-[5.5px] before:top-2 before:bottom-2 before:w-px before:bg-gray-100">
+                <div class="overflow-x-auto border border-gray-200 rounded-2xl bg-white">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead class="bg-gray-50 text-[10px] uppercase font-bold text-gray-500 border-b border-gray-200">
+                            <tr>
+                                <th class="py-3 px-3">Fabric Color</th>
+                                <th class="py-3 px-2 text-center">S</th>
+                                <th class="py-3 px-2 text-center">M</th>
+                                <th class="py-3 px-2 text-center">L</th>
+                                <th class="py-3 px-2 text-center">XL</th>
+                                <th class="py-3 px-2 text-center">XXL</th>
+                                <th class="py-3 px-3 text-center">Qty</th>
+                                <th class="py-3 px-3 text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="d-items-table-body" class="divide-y divide-gray-100">
+                            <!-- Injected dynamically by JS -->
+                        </tbody>
+                        <tfoot class="bg-gray-50 font-bold border-t border-gray-200">
+                            <tr>
+                                <td colspan="7" class="py-3 px-3 text-right text-gray-600">Grand Total:</td>
+                                <td id="d-grand-total" class="py-3 px-3 text-right text-brand font-black text-sm">LKR 0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
                 </div>
             </section>
         </div>
@@ -740,19 +818,16 @@ if (isset($pdo) && $pdo !== null) {
 <!-- Raise PO Modal -->
 <div id="raisePOModal"
     class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 items-center justify-center p-4 hidden">
-    <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-2xl w-full">
+    <div class="bg-white p-8 rounded-3xl border border-gray-100 shadow-2xl max-w-3xl w-full">
         <h2 class="text-xl font-bold text-gray-900 mb-6">Raise New Purchase Order</h2>
 
         <form method="POST" data-turbo="false">
             <input type="hidden" name="action" value="raise_po">
 
-            <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="grid grid-cols-3 gap-4 mb-6">
                 <div class="space-y-1.5">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select
-                        Supplier</label>
-                    <select name="supplier_id" id="poSupplierSelect" onchange="updatePOItemsForSupplier(this.value)"
-                        required
-                        class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all cursor-pointer">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Select Supplier</label>
+                    <select name="supplier_id" id="poSupplierSelect" onchange="updatePOItemsForSupplier(this.value)" required class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all cursor-pointer">
                         <option value="">Select a Supplier...</option>
                         <?php foreach ($suppliers_list as $supp): ?>
                             <option value="<?= $supp['id'] ?>"><?= htmlspecialchars($supp['name']) ?></option>
@@ -760,10 +835,12 @@ if (isset($pdo) && $pdo !== null) {
                     </select>
                 </div>
                 <div class="space-y-1.5">
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expected Delivery
-                        Date</label>
-                    <input type="date" name="expected_at" min="<?= date('Y-m-d') ?>" required
-                        class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cut Number</label>
+                    <input type="text" name="cut_number" placeholder="e.g. CUT-2025-001" required class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Expected Delivery Date</label>
+                    <input type="date" name="expected_at" min="<?= date('Y-m-d') ?>" required class="w-full px-4 py-3 bg-gray-50 border border-gray-250 rounded-2xl text-sm font-semibold text-gray-800 outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all">
                 </div>
             </div>
 
@@ -771,43 +848,31 @@ if (isset($pdo) && $pdo !== null) {
                 <div class="flex justify-between items-center mb-3">
                     <label class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Purchase Items</label>
                     <button type="button" onclick="addPOItemRow()"
-                        class="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-xl text-[10px] font-bold text-brand hover:bg-brand/10 transition-all">+
-                        Add Item</button>
+                        class="px-3 py-1.5 bg-brand/5 border border-brand/20 rounded-xl text-[10px] font-bold text-brand hover:bg-brand/10 transition-all">+ Add Item</button>
                 </div>
 
                 <div class="max-h-60 overflow-y-auto border border-gray-200 rounded-xl bg-white">
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-gray-50 sticky top-0 z-10 border-b border-gray-200">
                             <tr>
-                                <th class="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Item
-                                    Name / Description</th>
-                                <th
-                                    class="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center w-24">
-                                    Quantity</th>
-                                <th class="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-36">
-                                    Unit Cost (LKR)</th>
-                                <th class="py-3 px-3 w-14"></th>
+                                <th class="py-3 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Item Name</th>
+                                <th class="py-3 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Fabric Color</th>
+                                <th class="py-3 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Size</th>
+                                <th class="py-3 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center w-20">Qty</th>
+                                <th class="py-3 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-24">Unit Cost</th>
+                                <th class="py-3 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-24">Total Cost</th>
+                                <th class="py-3 px-2 w-10"></th>
                             </tr>
                         </thead>
                         <tbody id="poItemsContainer" class="divide-y divide-gray-100">
                             <tr class="hover:bg-gray-50/50 transition-colors">
-                                <td class="p-2">
-                                    <select name="item_names[]" required onchange="updateRowCost(this)"
-                                        class="po-item-select w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer">
-                                        <option value="">Select an Item...</option>
-                                    </select>
-                                </td>
-                                <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1"
-                                        required
-                                        class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold">
-                                </td>
-                                <td class="p-2"><input type="number" name="item_costs[]" placeholder="Cost" step="0.01"
-                                        required
-                                        class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold">
-                                </td>
-                                <td class="p-2 text-center"><button type="button" onclick="removePOItemRow(this)"
-                                        class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><i
-                                            class="ti ti-trash text-base"></i></button></td>
+                                <td class="p-2"><select name="item_names[]" required onchange="updateRowCost(this)" class="po-item-select w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer"><option value="">Select an Item...</option></select></td>
+                                <td class="p-2"><input type="text" name="item_colors[]" placeholder="Color" value="White" required class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 transition-all font-semibold"></td>
+                                <td class="p-2"><select name="item_sizes[]" required class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 transition-all font-semibold cursor-pointer"><option value="S">S</option><option value="M" selected>M</option><option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option></select></td>
+                                <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1" required oninput="calcRowTotal(this)" class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 transition-all font-bold"></td>
+                                <td class="p-2"><input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required oninput="calcRowTotal(this)" class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 transition-all font-semibold"></td>
+                                <td class="p-2"><input type="text" readonly placeholder="0.00" class="po-row-total w-full px-2 py-1.5 bg-gray-50 border border-transparent rounded-lg text-xs font-extrabold text-brand outline-none"></td>
+                                <td class="p-2 text-center"><button type="button" onclick="removePOItemRow(this)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><i class="ti ti-trash text-base"></i></button></td>
                             </tr>
                         </tbody>
                     </table>
@@ -915,9 +980,20 @@ if (isset($pdo) && $pdo !== null) {
         document.getElementById('d-po-num').textContent = el.dataset.num;
         document.getElementById('d-po-date').textContent = el.dataset.date;
 
+        var isOnHold = el.dataset.isOnHold === '1';
+        var holdBtnText = document.getElementById('d-hold-btn-text');
+        if (holdBtnText) holdBtnText.textContent = isOnHold ? 'Resume PO' : 'Hold';
+
         var badge = document.getElementById('d-badge');
         badge.className = 'mt-3 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest ' + el.dataset.badge;
         badge.textContent = el.dataset.badgeText;
+
+        // Update Info Section
+        document.getElementById('d-info-created').textContent = el.dataset.date || '—';
+        document.getElementById('d-info-dispatched').textContent = el.dataset.date || '—';
+        document.getElementById('d-info-received').textContent = (status_lower === 'received' ? el.dataset.receivedDate : 'Awaiting Delivery');
+        document.getElementById('d-info-cut').textContent = el.dataset.cutNumber || 'N/A';
+        document.getElementById('d-info-received-person').textContent = el.dataset.receivedPerson || 'N/A';
 
         document.getElementById('d-supp').textContent = el.dataset.supp;
         document.getElementById('d-contact').textContent = el.dataset.contact;
@@ -928,8 +1004,6 @@ if (isset($pdo) && $pdo !== null) {
         var expected = document.getElementById('d-expected');
         expected.textContent = el.dataset.expected;
         expected.className = 'text-xs font-bold ' + el.dataset.expectedColor;
-
-        document.getElementById('d-total').textContent = el.dataset.total;
 
         var alertStyles = {
             overdue: { bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-700', icon: 'ti-alert-triangle' },
@@ -944,34 +1018,30 @@ if (isset($pdo) && $pdo !== null) {
         al.querySelector('i').className = `ti ${style.icon} text-lg flex-shrink-0`;
         document.getElementById('d-alert-text').textContent = el.dataset.alertText;
 
-        // Render items
+        // Render line items in table
         var items = [];
         try { items = JSON.parse(el.dataset.items || '[]'); } catch (e) { }
-        document.getElementById('d-items').innerHTML = items.map(item => `
-    <div class="flex justify-between items-start gap-4 py-2 border-b border-gray-100 last:border-b-0">
-        <div class="flex-1 min-w-0">
-            <p class="text-xs font-bold text-gray-900">${item.name}</p>
-            <p class="text-[11px] text-gray-500 mt-0.5">${item.desc}</p>
-        </div>
-        <div class="text-right flex-shrink-0">
-            <p class="text-xs font-bold text-gray-900">${item.val}</p>
-            <span class="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full border ${getItemBadgeClass(item.pct)}">${item.pct}</span>
-        </div>
-    </div>
-  `).join('');
+        var grandTotal = 0;
 
-        // Render timeline
-        var timeline = [];
-        try { timeline = JSON.parse(el.dataset.timeline || '[]'); } catch (e) { }
-        document.getElementById('d-timeline').innerHTML = timeline.map(t => `
-    <div class="relative flex gap-4">
-        <div class="w-3 h-3 rounded-full ${getTimelineDotClass(t.s)} shrink-0 mt-1 ring-4 z-10"></div>
-        <div>
-            <p class="text-xs ${getTimelineTextClass(t.s)}">${t.t}</p>
-            ${t.d ? `<p class="text-[10px] text-gray-500 mt-0.5">${t.d}</p>` : ''}
-        </div>
-    </div>
-  `).join('');
+        document.getElementById('d-items-table-body').innerHTML = items.map(item => {
+            var rowTotal = item.total || (item.qty * (item.unit_cost || 0));
+            grandTotal += rowTotal;
+            var sz = (item.size || 'M').toUpperCase();
+            return `
+                <tr class="hover:bg-gray-50/60 transition-colors">
+                    <td class="py-3 px-3 font-semibold text-gray-900">${item.color || 'Standard'}</td>
+                    <td class="py-3 px-2 text-center text-gray-600 font-semibold">${sz === 'S' ? item.qty : 0}</td>
+                    <td class="py-3 px-2 text-center text-gray-600 font-semibold">${sz === 'M' ? item.qty : 0}</td>
+                    <td class="py-3 px-2 text-center text-gray-600 font-semibold">${sz === 'L' ? item.qty : 0}</td>
+                    <td class="py-3 px-2 text-center text-gray-600 font-semibold">${sz === 'XL' ? item.qty : 0}</td>
+                    <td class="py-3 px-2 text-center text-gray-600 font-semibold">${sz === 'XXL' ? item.qty : 0}</td>
+                    <td class="py-3 px-3 text-center font-bold text-gray-900">${item.qty}</td>
+                    <td class="py-3 px-3 text-right font-extrabold text-brand">LKR ${rowTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                </tr>
+            `;
+        }).join('');
+
+        document.getElementById('d-grand-total').textContent = 'LKR ' + grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
         // Toggle Cancel button visibility
         var cancelBtn = document.getElementById('d-cancel-btn');
@@ -979,6 +1049,14 @@ if (isset($pdo) && $pdo !== null) {
             cancelBtn.classList.add('hidden');
         } else {
             cancelBtn.classList.remove('hidden');
+        }
+    }
+
+    function toggleHoldPO() {
+        if (currentSelectedPOId > 0) {
+            document.getElementById('actionInput').value = 'toggle_hold_po';
+            document.getElementById('poIdInput').value = currentSelectedPOId;
+            document.getElementById('actionForm').submit();
         }
     }
 
@@ -1145,14 +1223,30 @@ if (isset($pdo) && $pdo !== null) {
         var row = document.createElement('tr');
         row.className = 'hover:bg-gray-50/50 transition-colors';
         row.innerHTML = `
-        <td class="p-2"><select name="item_names[]" required onchange="updateRowCost(this)" class="po-item-select w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer">
+        <td class="p-2"><select name="item_names[]" required onchange="updateRowCost(this)" class="po-item-select w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold cursor-pointer">
             ${document.getElementById('inv-options-template').innerHTML}
         </select></td>
-        <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-bold"></td>
-        <td class="p-2"><input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required class="w-full px-3 py-2 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 focus:ring-2 focus:ring-brand/10 transition-all font-semibold"></td>
-        <td class="p-2 text-center"><button type="button" onclick="removePOItemRow(this)" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><i class="ti ti-trash text-base"></i></button></td>
+        <td class="p-2"><input type="text" name="item_colors[]" placeholder="Color" value="White" required class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 transition-all font-semibold"></td>
+        <td class="p-2"><select name="item_sizes[]" required class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 transition-all font-semibold cursor-pointer"><option value="S">S</option><option value="M" selected>M</option><option value="L">L</option><option value="XL">XL</option><option value="XXL">XXL</option></select></td>
+        <td class="p-2"><input type="number" name="item_qtys[]" placeholder="Qty" min="1" required oninput="calcRowTotal(this)" class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs text-center outline-none focus:bg-white focus:border-brand/35 transition-all font-bold"></td>
+        <td class="p-2"><input type="number" name="item_costs[]" placeholder="Cost" step="0.01" required oninput="calcRowTotal(this)" class="w-full px-2 py-1.5 bg-transparent border border-transparent hover:border-gray-200 rounded-lg text-xs outline-none focus:bg-white focus:border-brand/35 transition-all font-semibold"></td>
+        <td class="p-2"><input type="text" readonly placeholder="0.00" class="po-row-total w-full px-2 py-1.5 bg-gray-50 border border-transparent rounded-lg text-xs font-extrabold text-brand outline-none"></td>
+        <td class="p-2 text-center"><button type="button" onclick="removePOItemRow(this)" class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><i class="ti ti-trash text-base"></i></button></td>
     `;
         container.appendChild(row);
+    }
+
+    function calcRowTotal(inputEl) {
+        var row = inputEl.closest('tr');
+        var qtyInput = row.querySelector('input[name="item_qtys[]"]');
+        var costInput = row.querySelector('input[name="item_costs[]"]');
+        var totalInput = row.querySelector('.po-row-total');
+
+        var qty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+        var cost = parseFloat(costInput ? costInput.value : 0) || 0;
+        if (totalInput) {
+            totalInput.value = (qty * cost).toFixed(2);
+        }
     }
 
     // Form Handler -> Removing a line item row in the purchase order creation form
@@ -1176,6 +1270,7 @@ if (isset($pdo) && $pdo !== null) {
         var costInput = row.querySelector('input[name="item_costs[]"]');
         if (costInput && cost !== undefined && cost !== null && cost !== "") {
             costInput.value = parseFloat(cost).toFixed(2);
+            calcRowTotal(costInput);
         }
     }
 

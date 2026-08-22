@@ -46,6 +46,91 @@ if ($method === 'POST') {
         }
     }
 
+    // Issue Product action -> Admin issues stock for a quotation order and updates status to dispatched
+    if ($action === 'issue_product') {
+        $order_id = (int)($input['id'] ?? 0);
+        $user_id = $_SESSION['admin_id'] ?? $_SESSION['user_id'] ?? 1;
+
+        if ($order_id <= 0) {
+            http_response_code(400);
+            echo json_encode(["status" => "error", "message" => "Invalid order ID"]);
+            exit;
+        }
+
+        if (isset($pdo) && $pdo !== null) {
+            try {
+                $pdo->beginTransaction();
+
+                // Fetch order items
+                $items_stmt = $pdo->prepare("SELECT product_id, quantity, color, size FROM order_items WHERE order_id = ?");
+                $items_stmt->execute([$order_id]);
+                $order_items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                $stmt_inv_check = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? AND size = ? AND colour = ? LIMIT 1");
+                $stmt_inv_fallback = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? LIMIT 1");
+                $stmt_inv_dec   = $pdo->prepare("UPDATE inventory SET quantity = GREATEST(0, quantity - ?) WHERE id = ?");
+                $stmt_up_status = $pdo->prepare("
+                    UPDATE products 
+                    SET status = CASE 
+                        WHEN (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = products.id) = 0 THEN 'Out of Stock'
+                        WHEN (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = products.id) <= 50 THEN 'Low Stock'
+                        ELSE 'In Stock'
+                    END
+                    WHERE id = ?
+                ");
+
+                $affected_products = [];
+                foreach ($order_items as $item) {
+                    $pid   = (int)$item['product_id'];
+                    $qty   = (int)$item['quantity'];
+                    $color = trim($item['color'] ?? '');
+                    $size  = trim($item['size'] ?? '');
+                    $inv_id = null;
+
+                    if (!empty($size) && !empty($color)) {
+                        $stmt_inv_check->execute([$pid, $size, $color]);
+                        $inv_row = $stmt_inv_check->fetch();
+                        if ($inv_row) $inv_id = $inv_row['id'];
+                    }
+
+                    if (!$inv_id) {
+                        $stmt_inv_fallback->execute([$pid]);
+                        $inv_row = $stmt_inv_fallback->fetch();
+                        if ($inv_row) $inv_id = $inv_row['id'];
+                    }
+
+                    if ($inv_id) {
+                        $stmt_inv_dec->execute([$qty, $inv_id]);
+                        $affected_products[$pid] = true;
+                    }
+                }
+
+                foreach (array_keys($affected_products) as $aff_pid) {
+                    $stmt_up_status->execute([$aff_pid]);
+                }
+
+                // Update order status to dispatched
+                $stmt = $pdo->prepare("UPDATE orders SET status = 'dispatched' WHERE id = ?");
+                $stmt->execute([$order_id]);
+
+                $log_stmt = $pdo->prepare("INSERT INTO order_status_log (order_id, status, note, changed_by) VALUES (?, 'dispatched', 'Product issued from stock and ready for collection.', ?)");
+                $log_stmt->execute([$order_id, $user_id]);
+
+                $pdo->commit();
+                http_response_code(200);
+                echo json_encode(["status" => "success", "message" => "Product issued and order marked as dispatched."]);
+            } catch (\Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                http_response_code(500);
+                echo json_encode(["status" => "error", "message" => "DB error: " . $e->getMessage()]);
+            }
+        } else {
+            http_response_code(200);
+            echo json_encode(["status" => "success", "message" => "Product issued (Demo Mode)"]);
+        }
+        exit;
+    }
+
     // Updating status -> Updating status of an existing order
     if ($action === 'update_status') {
         $order_id = (int)($input['id'] ?? 0);
@@ -147,9 +232,7 @@ if ($method === 'POST') {
                         $note = $custom_note;
                     } else {
                         $note = "Status updated to " . ucfirst($status) . ".";
-                        if ($status === 'processing') $note = "Payment accepted — order is now processing.";
-                        if ($status === 'shipped')    $note = "Order dispatched and marked as shipped.";
-                        if ($status === 'delivered')  $note = "Delivery confirmed successfully.";
+                        if ($status === 'dispatched') $note = "Order issued and ready for customer pickup.";
                         if ($status === 'cancelled')  $note = "Order has been cancelled.";
                     }
                     
@@ -166,22 +249,10 @@ if ($method === 'POST') {
                         $order_ref = "KE-2025-" . str_pad($order_id, 5, '0', STR_PAD_LEFT);
                         if ($status === 'cancelled') {
                             $subject = "Order Cancellation Notice: " . $order_ref;
-                            $body = "
-                            <p>Dear <strong>" . htmlspecialchars($user_data['first_name']) . "</strong>,</p>
-                            <p>We regret to inform you that your order (<strong>" . $order_ref . "</strong>) has been <strong style='color: #dc2626;'>Cancelled</strong>.</p>
-                            <div style='background-color: #fef2f2; border: 1px solid #fee2e2; border-left: 4px solid #dc2626; border-radius: 12px; padding: 16px; margin: 16px 0;'>
-                                <p style='margin: 0 0 6px 0; font-size: 11px; font-weight: bold; color: #991b1b; text-transform: uppercase; letter-spacing: 0.05em;'>Cancellation Reason / Note:</p>
-                                <p style='margin: 0; font-size: 14px; color: #7f1d1d; line-height: 1.5; font-weight: 500;'>" . nl2br(htmlspecialchars($note)) . "</p>
-                            </div>
-                            <p style='color: #6b7280; font-size: 13px;'>If you have any questions regarding this cancellation, please feel free to reach out to our support team.</p>
-                            ";
+                            $body = "<p>Dear <strong>" . htmlspecialchars($user_data['first_name']) . "</strong>,</p><p>Your order (" . $order_ref . ") was cancelled.</p>";
                         } else {
                             $subject = "Order Status Update: " . ucfirst($status);
-                            $body = "
-                            <p>Dear <strong>" . htmlspecialchars($user_data['first_name']) . "</strong>,</p>
-                            <p>Your order (<strong>" . $order_ref . "</strong>) status has been updated to: <strong style='color: #0F6E56;'>" . ucfirst($status) . "</strong>.</p>
-                            " . (!empty($note) ? "<div style='background-color: #f3f4f6; border-left: 4px solid #0F6E56; padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-size: 13px; color: #374151;'><strong>Note:</strong> " . htmlspecialchars($note) . "</div>" : "") . "
-                            ";
+                            $body = "<p>Dear <strong>" . htmlspecialchars($user_data['first_name']) . "</strong>,</p><p>Your order (" . $order_ref . ") status updated to: " . ucfirst($status) . ".</p>";
                         }
                         \App\Mailer::send($user_data['email'], $subject, $body);
                     }
@@ -220,40 +291,18 @@ if ($method === 'POST') {
         exit;
     }
 
-    // Setting status -> Setting initial order status based on payment method (pending for bank, processing for card)
-    $payment_method = $input['payment_method'] ?? 'bank';
+    $payment_method = strtolower($input['payment_method'] ?? 'cash');
+    if (!in_array($payment_method, ['cash', 'credit'])) {
+        $payment_method = 'cash';
+    }
     $order_status = 'pending';
-    if ($payment_method === 'card') {
-        $order_status = 'processing';
-    }
-
-    // Uploading file -> Saving payment receipt image file to uploads directory
-    $receipt_path = null;
-    if (isset($_FILES['receipt_file']) && $_FILES['receipt_file']['error'] === UPLOAD_ERR_OK) {
-        $upload_dir = __DIR__ . '/../uploads/receipts/';
-        if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
-        }
-        // Formatting data -> Generating secure random filename for uploaded receipt
-        $ext = strtolower(pathinfo($_FILES['receipt_file']['name'], PATHINFO_EXTENSION));
-        $filename = time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-        $target_file = $upload_dir . $filename;
-        
-        // Uploading file -> Moving uploaded receipt file to destination folder
-        if (move_uploaded_file($_FILES['receipt_file']['tmp_name'], $target_file)) {
-            $receipt_path = '/uploads/receipts/' . $filename;
-        }
-    }
 
     if (isset($pdo) && $pdo !== null) {
         try {
-            // Getting data -> Loading server-side order validation helper functions
             require_once __DIR__ . '/model_validation.php';
 
-            // Checking data -> Validating minimum order quantities (MOQ) and server-side tier pricing
             $validation = validateOrderItems($pdo, $items);
             if (!empty($validation['errors'])) {
-                // Checking data -> Returning validation error if MOQ or pricing checks fail
                 http_response_code(400);
                 echo json_encode([
                     "status" => "error", 
@@ -262,145 +311,54 @@ if ($method === 'POST') {
                 exit;
             }
 
-            // Getting data -> Extracting verified total amount and item list
             $total_amount = $validation['calculated_total'];
             $validated_items = $validation['validated_items'];
 
-            /*
-            // TASK 06: Wholesale Credit Limit - STEP 3: Backend Credit Limit Enforcer
-            $user_stmt = $pdo->prepare("SELECT credit_limit FROM users WHERE id = ?");
-            $user_stmt->execute([$user_id]);
-            $user_data = $user_stmt->fetch();
-            $credit_limit = (float)($user_data['credit_limit'] ?? 0.00);
-
-            if ($credit_limit > 0 && $total_amount > $credit_limit) {
-                http_response_code(400);
-                echo json_encode([
-                    "status" => "error", 
-                    "message" => "Order total (LKR " . number_format($total_amount, 2) . ") exceeds your approved Wholesale Credit Limit (LKR " . number_format($credit_limit, 2) . ")."
-                ]);
-                exit;
-            }
-            */
-
-            // Getting data -> Ensuring color and size columns exist in order_items table
             $checkOrderColor = $pdo->query("SHOW COLUMNS FROM order_items LIKE 'color'");
             if (!$checkOrderColor->fetch()) {
                 $pdo->exec("ALTER TABLE order_items ADD COLUMN color VARCHAR(50) DEFAULT NULL");
                 $pdo->exec("ALTER TABLE order_items ADD COLUMN size VARCHAR(50) DEFAULT NULL");
             }
 
-            // Getting data -> Ensuring payment_receipt column exists in orders table
-            $checkReceipt = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_receipt'");
-            if (!$checkReceipt->fetch()) {
-                $pdo->exec("ALTER TABLE orders ADD COLUMN payment_receipt VARCHAR(255) DEFAULT NULL");
+            $checkPayMethod = $pdo->query("SHOW COLUMNS FROM orders LIKE 'payment_method'");
+            if (!$checkPayMethod->fetch()) {
+                $pdo->exec("ALTER TABLE orders ADD COLUMN payment_method VARCHAR(50) DEFAULT 'cash'");
             }
 
-            /*
-            // TASK 08: Estimated Delivery Date - STEP 1: Self-Healing DB
-            $checkEstDate = $pdo->query("SHOW COLUMNS FROM orders LIKE 'estimated_delivery_date'");
-            if (!$checkEstDate->fetch()) {
-                $pdo->exec("ALTER TABLE orders ADD COLUMN estimated_delivery_date DATE DEFAULT NULL AFTER cancellation_reason");
-            }
-
-            // TASK 08: Estimated Delivery Date - STEP 2: Calculate & Store Estimated Delivery Date
-            $estimated_delivery_date = date('Y-m-d', strtotime('+3 weekdays'));
-            $stmt = $pdo->prepare("INSERT INTO orders (user_id, status, total_amount, payment_receipt, estimated_delivery_date) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$user_id, $order_status, $total_amount, $receipt_path, $estimated_delivery_date]);
-            */
-
-            // Database transaction -> Starting transaction to save new order and deduct inventory stock
             $pdo->beginTransaction();
 
-            // Saving data -> Creating new order record in orders table
-            $stmt = $pdo->prepare("INSERT INTO orders (user_id, status, total_amount, payment_receipt) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$user_id, $order_status, $total_amount, $receipt_path]);
+            $stmt = $pdo->prepare("INSERT INTO orders (user_id, status, total_amount, payment_method) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$user_id, $order_status, $total_amount, $payment_method]);
             $order_id = $pdo->lastInsertId();
 
-            // Preparing queries -> Preparing statements to insert order items and update stock
-            $stmt_item      = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, color, size) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt_inv_check = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? AND size = ? AND colour = ? LIMIT 1");
-            $stmt_inv_dec   = $pdo->prepare("UPDATE inventory SET quantity = quantity - ? WHERE id = ?");
-            $stmt_up_status = $pdo->prepare("
-                UPDATE products 
-                SET status = CASE 
-                    WHEN (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = products.id) = 0 THEN 'Out of Stock'
-                    WHEN (SELECT COALESCE(SUM(quantity), 0) FROM inventory WHERE product_id = products.id) <= 50 THEN 'Low Stock'
-                    ELSE 'In Stock'
-                END
-                WHERE id = ?
-            ");
+            $stmt_item = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, unit_price, color, size) VALUES (?, ?, ?, ?, ?, ?)");
 
-            // Saving data -> Inserting each item line into order_items table
             foreach ($validated_items as $item) {
                 $pid   = $item['product_id'];
                 $qty   = $item['quantity'];
                 $price = $item['unit_price'];
-                $color = trim($item['color']);
-                $size  = trim($item['size']);
+                $color = trim($item['color'] ?? 'Standard');
+                $size  = trim($item['size'] ?? 'M');
 
-                // Saving data -> Saving item line details to database
                 $stmt_item->execute([$order_id, $pid, $qty, $price, $color, $size]);
-
-                // Deducting stock -> Reducing stock quantity for ordered item
-                $inv_id = null;
-                
-                // Getting data -> Looking up exact inventory item matching size and color
-                if (!empty($size) && !empty($color)) {
-                    $stmt_inv_check->execute([$pid, $size, $color]);
-                    $inv_row = $stmt_inv_check->fetch();
-                    if ($inv_row) {
-                        $inv_id = $inv_row['id'];
-                    }
-                }
-                
-                // Fallback -> Grabbing generic inventory item if exact color and size match does not exist
-                if (!$inv_id) {
-                    $stmt_inv_any = $pdo->prepare("SELECT id FROM inventory WHERE product_id = ? LIMIT 1");
-                    $stmt_inv_any->execute([$pid]);
-                    $inv_row_any = $stmt_inv_any->fetch();
-                    if ($inv_row_any) {
-                        $inv_id = $inv_row_any['id'];
-                    }
-                }
-                
-                // Deducting stock -> Decreasing inventory stock by ordered quantity
-                if ($inv_id) {
-                    $stmt_inv_dec->execute([$qty, $inv_id]);
-                    // Updating status -> Updating overall product availability status (In Stock, Low Stock, Out of Stock)
-                    $stmt_up_status->execute([$pid]);
-                }
             }
 
-            // Saving log -> Recording initial order placement status log entry
-            $note = $payment_method === 'card' ? 'Order placed and paid via Credit Card.' : 'Order placed with bank transfer receipt.';
+            $note = 'Quotation created with payment method: ' . strtoupper($payment_method) . '. Awaiting product issuance.';
             $log_stmt = $pdo->prepare("INSERT INTO order_status_log (order_id, status, note, changed_by) VALUES (?, ?, ?, ?)");
             $log_stmt->execute([$order_id, $order_status, $note, $user_id]);
 
-            // Sending email -> Sending order confirmation email with reference and total to customer
-            require_once __DIR__ . "/../src/Mailer.php";
-            $user_stmt = $pdo->prepare("SELECT email, first_name FROM users WHERE id = ?");
-            $user_stmt->execute([$user_id]);
-            $user_data = $user_stmt->fetch();
-            if ($user_data && $user_data['email']) {
-                $order_ref = "KE-2025-" . str_pad($order_id, 5, '0', STR_PAD_LEFT);
-                $subject = "Order Confirmation: " . $order_ref;
-                $body = "
-                <p>Dear <strong>" . htmlspecialchars($user_data['first_name']) . "</strong>,</p>
-                <p>Thank you for your order! Your wholesale order has been received and is currently marked as <strong style='color: #0F6E56;'>" . ucfirst($order_status) . "</strong>.</p>
-                <div style='background-color: #f9fafb; border: 1px solid #f3f4f6; border-radius: 12px; padding: 16px; margin: 16px 0;'>
-                    <p style='margin: 0 0 8px 0; font-size: 13px;'><strong>Order Reference:</strong> <span style='color: #0F6E56; font-weight: bold;'>" . $order_ref . "</span></p>
-                    <p style='margin: 0; font-size: 13px;'><strong>Total Amount:</strong> <span style='color: #111827; font-weight: bold;'>LKR " . number_format($total_amount, 2) . "</span></p>
-                </div>
-                <p style='color: #6b7280; font-size: 13px;'>We will process your order shortly. You can track your order status anytime from your account dashboard.</p>
-                ";
-                \App\Mailer::send($user_data['email'], $subject, $body);
-            }
-
             $pdo->commit();
 
+            $order_ref = "KE-2025-" . str_pad($order_id, 5, '0', STR_PAD_LEFT);
             http_response_code(201);
-            echo json_encode(["status" => "success", "message" => "Order placed successfully.", "order_id" => $order_id]);
+            echo json_encode([
+                "status" => "success",
+                "message" => "Quotation generated successfully.",
+                "order_id" => $order_id,
+                "order_ref" => $order_ref,
+                "payment_method" => strtoupper($payment_method),
+                "total_amount" => $total_amount
+            ]);
         } catch (\Exception $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -409,8 +367,17 @@ if ($method === 'POST') {
             echo json_encode(["status" => "error", "message" => "Database error: " . $e->getMessage()]);
         }
     } else {
+        $mock_id = rand(100, 999);
+        $order_ref = "KE-2025-" . str_pad($mock_id, 5, '0', STR_PAD_LEFT);
         http_response_code(201);
-        echo json_encode(["status" => "success", "message" => "Order placed successfully (Demo Mode).", "order_id" => rand(100, 999)]);
+        echo json_encode([
+            "status" => "success", 
+            "message" => "Quotation generated successfully (Demo Mode).", 
+            "order_id" => $mock_id,
+            "order_ref" => $order_ref,
+            "payment_method" => strtoupper($payment_method),
+            "total_amount" => 1000.00
+        ]);
     }
     exit;
 }

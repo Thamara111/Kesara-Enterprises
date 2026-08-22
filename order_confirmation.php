@@ -3,9 +3,8 @@
  * Order Confirmation & Dispatch Tracking Page
  * Displays order summary, item breakdown, live GPS delivery map tracking, status timeline, and VAT invoice PDF generation.
  */
-require_once __DIR__ . "/database/connection.php";
-
-$order_id = $_GET['id'] ?? ($_GET['order_id'] ?? 1);
+header("Location: /cart");
+exit;
 
 $order = null;
 $order_items = [];
