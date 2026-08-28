@@ -104,6 +104,10 @@ if (isset($pdo)) {
                     </span>
                 <?php endif; ?>
             </a>
+            <a href="/admin-invoices" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'invoices' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <i class="ti ti-receipt text-xl"></i>
+                Invoices
+            </a>
             <a href="/admin-products" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'products' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                 <i class="ti ti-shirt text-xl"></i>
                 Products

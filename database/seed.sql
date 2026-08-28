@@ -78,10 +78,10 @@ INSERT INTO admins (id, username, password, email, role) VALUES
 -- 5. SEED USERS (Wholesale Buyers)
 -- ============================================================================
 INSERT INTO users (id, first_name, last_name, email, phone, password, business_name, br_number, business_type, address, status) VALUES
-(1, 'Kamal', 'Perera', 'kamal@abc.lk', '+94 77 123 4567', '$2y$10$Uv0V3xJ1E6yJ6bWq9oO8eFvP2T6vF8lV1n8F2E4sHjO7I6iO5WmW', 'ABC Garments (Pvt) Ltd', 'PV 12345', 'Retailer', 'No. 12, Main Street, Colombo 03', 'approved'),
-(2, 'John', 'Doe', 'john@seylan.lk', '+94 77 987 6543', '$2y$10$Uv0V3xJ1E6yJ6bWq9oO8eFvP2T6vF8lV1n8F2E4sHjO7I6iO5WmW', 'Seylan Stores', 'PV 67890', 'Distributor', 'No. 45, Galle Road, Colombo 04', 'approved'),
-(3, 'Nimali', 'Fonseka', 'nimali@fashion.lk', '+94 77 555 4444', '$2y$10$Uv0V3xJ1E6yJ6bWq9oO8eFvP2T6vF8lV1n8F2E4sHjO7I6iO5WmW', 'Fashion Hub', 'PV 11223', 'Supermarket', 'No. 102, Kandy Road, Kurunegala', 'approved'),
-(4, 'Aruni', 'Jayasinghe', 'aruni@arunishop.lk', '+94 71 222 3333', '$2y$10$Uv0V3xJ1E6yJ6bWq9oO8eFvP2T6vF8lV1n8F2E4sHjO7I6iO5WmW', 'Aruni Boutique', 'BR 44332', 'Retailer', 'No. 88, Beach Road, Galle', 'pending');
+(1, 'Kamal', 'Perera', 'kamal@abc.lk', '+94 77 123 4567', '$2y$12$hBjHSnlNz.YcqdBoTDT20OJYtLarQIl2zdgUrgX56OjQrDlZoxkWq', 'ABC Garments (Pvt) Ltd', 'PV 12345', 'Retailer', 'No. 12, Main Street, Colombo 03', 'approved'), -- password is 'password123'
+(2, 'John', 'Doe', 'john@seylan.lk', '+94 77 987 6543', '$2y$12$hBjHSnlNz.YcqdBoTDT20OJYtLarQIl2zdgUrgX56OjQrDlZoxkWq', 'Seylan Stores', 'PV 67890', 'Distributor', 'No. 45, Galle Road, Colombo 04', 'approved'), -- password is 'password123'
+(3, 'Nimali', 'Fonseka', 'nimali@fashion.lk', '+94 77 555 4444', '$2y$12$hBjHSnlNz.YcqdBoTDT20OJYtLarQIl2zdgUrgX56OjQrDlZoxkWq', 'Fashion Hub', 'PV 11223', 'Supermarket', 'No. 102, Kandy Road, Kurunegala', 'approved'), -- password is 'password123'
+(4, 'Aruni', 'Jayasinghe', 'aruni@arunishop.lk', '+94 71 222 3333', '$2y$12$hBjHSnlNz.YcqdBoTDT20OJYtLarQIl2zdgUrgX56OjQrDlZoxkWq', 'Aruni Boutique', 'BR 44332', 'Retailer', 'No. 88, Beach Road, Galle', 'pending'); -- password is 'password123'
 
 -- ============================================================================
 -- 6. SEED SUPPLIERS

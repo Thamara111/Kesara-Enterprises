@@ -47,8 +47,8 @@ if (isset($_SESSION['admin_id'])) {
 
     // Matrix defining which views each administrative role is allowed to access
     $role_access = [
-        'admin' => ['dashboard', 'orders', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'purchase_orders', 'goods_received', 'raw_materials', 'raw_materials_cutting', 'damage_goods', 'goods_return', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
-        'finance_manager' => ['dashboard', 'orders', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries', 'trash'],
+        'admin' => ['dashboard', 'orders', 'invoices', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'purchase_orders', 'goods_received', 'raw_materials', 'raw_materials_cutting', 'damage_goods', 'goods_return', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
+        'finance_manager' => ['dashboard', 'orders', 'invoices', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries', 'trash'],
         'supplier_manager' => ['dashboard', 'suppliers', 'purchase_orders', 'goods_received', 'raw_materials', 'raw_materials_cutting', 'damage_goods', 'goods_return', 'login', 'inquiries'],
         'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries'],
         'example_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries']
@@ -72,6 +72,11 @@ $view_config = [
     'orders' => [
         'title' => 'Order Management | Kesara Enterprises',
         'description' => 'Manage wholesale orders and fulfillment status.',
+        'show_sidebar' => true
+    ],
+    'invoices' => [
+        'title' => 'Invoice Management & Creation | Kesara Enterprises',
+        'description' => 'Create, view, and manage wholesale invoices with live customer and stock suggestions.',
         'show_sidebar' => true
     ],
     'products' => [
