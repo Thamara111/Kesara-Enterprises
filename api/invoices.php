@@ -80,6 +80,12 @@ try {
         FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+    // Ensure customer_order_number column exists in invoices
+    $checkOrderNum = $pdo->query("SHOW COLUMNS FROM invoices LIKE 'customer_order_number'");
+    if (!$checkOrderNum->fetch()) {
+        $pdo->exec("ALTER TABLE invoices ADD COLUMN customer_order_number VARCHAR(100) NULL AFTER br_number");
+    }
+
     // Ensure size column exists in invoice_items if table already existed without it
     $checkSize = $pdo->query("SHOW COLUMNS FROM invoice_items LIKE 'size'");
     if (!$checkSize->fetch()) {
@@ -231,6 +237,7 @@ switch ($action) {
             $customer_phone = trim($inputData['customer_phone'] ?? '');
             $customer_address = trim($inputData['customer_address'] ?? '');
             $br_number = trim($inputData['br_number'] ?? '');
+            $customer_order_number = trim($inputData['customer_order_number'] ?? '');
 
             $invoice_number = trim($inputData['invoice_number'] ?? '');
             if (empty($invoice_number)) {
@@ -263,13 +270,13 @@ switch ($action) {
 
             $stmt = $pdo->prepare("INSERT INTO invoices (
                 invoice_number, user_id, customer_name, business_name, customer_email, customer_phone, 
-                customer_address, br_number, subtotal, tax_amount, discount_amount, total_amount, 
+                customer_address, br_number, customer_order_number, subtotal, tax_amount, discount_amount, total_amount, 
                 payment_policy, customer_signature, kesara_signature, status, invoice_date, due_date, created_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
             $stmt->execute([
                 $invoice_number, $user_id, $customer_name, $business_name, $customer_email, $customer_phone,
-                $customer_address, $br_number, $subtotal, $tax_amount, $discount_amount, $total_amount,
+                $customer_address, $br_number, $customer_order_number, $subtotal, $tax_amount, $discount_amount, $total_amount,
                 $payment_policy, $customer_signature, $kesara_signature, $status, $invoice_date, $due_date, $created_by
             ]);
 
@@ -322,9 +329,9 @@ switch ($action) {
             $params = [];
 
             if ($search !== '') {
-                $where[] = "(i.invoice_number LIKE ? OR i.customer_name LIKE ? OR i.business_name LIKE ? OR i.customer_email LIKE ?)";
+                $where[] = "(i.invoice_number LIKE ? OR i.customer_name LIKE ? OR i.business_name LIKE ? OR i.customer_email LIKE ? OR i.customer_order_number LIKE ?)";
                 $searchTerm = "%{$search}%";
-                $params = array_fill(0, 4, $searchTerm);
+                $params = array_fill(0, 5, $searchTerm);
             }
 
             if (!empty($statusFilter) && $statusFilter !== 'all') {

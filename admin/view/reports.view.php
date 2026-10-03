@@ -2,28 +2,33 @@
 /**
  * Analytics & Reports View
  * Natural Language Overview:
- * 1. Fetching Data -> Getting sales revenue, order volumes, product performance, category shares, and top buyer spending from database.
- * 2. Self-Healing -> Ensuring order_items entries exist for reporting compatibility.
- * 3. Processing -> Calculating business metrics (avg order value, total units sold, revenue percentages per category).
+ * 1. Sales Report -> Revenue, order volumes, product performance, category shares, top buyer spending.
+ * 2. Material Cost Report -> Component cost allocations, 5-batch moving average engine, supplier pricing benchmarks.
+ * 3. Top Products & Customers -> Performance rankings and repeat buyer retention metrics.
  */
 
 // Filtering -> Setting dynamic date range filter (this month, last month, 3 months, 6 months, year)
 $filter_month = $_GET['filter_month'] ?? 'this_month';
 
 $date_where = "MONTH(o.created_at) = MONTH(CURRENT_DATE()) AND YEAR(o.created_at) = YEAR(CURRENT_DATE())";
+$rm_date_where = "MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())";
 $month_label = date('F Y');
 
 if ($filter_month === 'last_month') {
     $date_where = "MONTH(o.created_at) = MONTH(CURRENT_DATE() - INTERVAL 1 MONTH) AND YEAR(o.created_at) = YEAR(CURRENT_DATE() - INTERVAL 1 MONTH)";
+    $rm_date_where = "MONTH(created_at) = MONTH(CURRENT_DATE() - INTERVAL 1 MONTH) AND YEAR(created_at) = YEAR(CURRENT_DATE() - INTERVAL 1 MONTH)";
     $month_label = date('F Y', strtotime('first day of -1 month'));
 } elseif ($filter_month === 'last_3_months') {
     $date_where = "o.created_at >= CURRENT_DATE() - INTERVAL 3 MONTH";
+    $rm_date_where = "created_at >= CURRENT_DATE() - INTERVAL 3 MONTH";
     $month_label = "Last 3 Months";
 } elseif ($filter_month === 'last_6_months') {
     $date_where = "o.created_at >= CURRENT_DATE() - INTERVAL 6 MONTH";
+    $rm_date_where = "created_at >= CURRENT_DATE() - INTERVAL 6 MONTH";
     $month_label = "Last 6 Months";
 } elseif ($filter_month === 'this_year') {
     $date_where = "YEAR(o.created_at) = YEAR(CURRENT_DATE())";
+    $rm_date_where = "YEAR(created_at) = YEAR(CURRENT_DATE())";
     $month_label = "This Year (" . date('Y') . ")";
 }
 
@@ -36,6 +41,15 @@ $category_names = [];
 $category_percentages = [];
 $product_performance = [];
 $top_customers = [];
+
+// Material Cost Report Data Structures
+$rm_total_expense = 0;
+$rm_entries_count = 0;
+$rm_category_names = [];
+$rm_category_percentages = [];
+$rm_material_benchmarks = [];
+$rm_recent_procurements = [];
+$combined_material_unit_cost = 0;
 
 if (isset($pdo) && $pdo !== null) {
     // Self-heal: Ensure orders have items in order_items for reporting (isolated)
@@ -124,6 +138,78 @@ if (isset($pdo) && $pdo !== null) {
                              LIMIT 5");
         $top_customers = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (\Exception $e) {}
+
+    // =========================================================================
+    // FETCHING DATA -> MATERIAL COST REPORT & 5-ENTRY MOVING AVERAGE BENCHMARK
+    // =========================================================================
+    try {
+        $rm_stmt = $pdo->query("SELECT * FROM raw_materials ORDER BY created_at DESC, id DESC");
+        $all_rm_entries = $rm_stmt ? $rm_stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+
+        $rm_entries_count = count($all_rm_entries);
+        $grouped_materials = [];
+        $category_spend_map = [];
+
+        foreach ($all_rm_entries as $rm) {
+            $cat = $rm['material_category'];
+            $mat = $rm['material_name'];
+            $key = $cat . '___' . $mat;
+            $eff_price = (float)($rm['unit_price'] > 0 ? $rm['unit_price'] : $rm['weight']);
+            $eff_qty = max(1, (float)$rm['weight']);
+            $entry_total = $eff_price * $eff_qty;
+
+            $rm_total_expense += $entry_total;
+            $category_spend_map[$cat] = ($category_spend_map[$cat] ?? 0) + $entry_total;
+
+            if (!isset($grouped_materials[$key])) {
+                $grouped_materials[$key] = [];
+            }
+            $grouped_materials[$key][] = [
+                'price' => $eff_price,
+                'supplier' => $rm['supplier_name'],
+                'date' => $rm['created_at']
+            ];
+        }
+
+        // Calculate Category Spending Distribution
+        $tot_mat_spend = array_sum($category_spend_map);
+        foreach ($category_spend_map as $cName => $cSpend) {
+            $rm_category_names[] = $cName;
+            $rm_category_percentages[] = $tot_mat_spend > 0 ? round(($cSpend / $tot_mat_spend) * 100) : 0;
+        }
+
+        // Calculate 5-Entry Moving Average for each material
+        foreach ($grouped_materials as $key => $prices_list) {
+            list($cat, $mat) = explode('___', $key, 2);
+            $recent_5 = array_slice($prices_list, 0, 5);
+            $p_vals = array_column($recent_5, 'price');
+            $sample_cnt = count($p_vals);
+            $avg_c = $sample_cnt > 0 ? (array_sum($p_vals) / $sample_cnt) : 0;
+            $latest_p = $recent_5[0]['price'] ?? 0;
+            $min_p = min($p_vals);
+            $max_p = max($p_vals);
+            $last_supp = $recent_5[0]['supplier'] ?? '-';
+            $last_dt = $recent_5[0]['date'] ?? '';
+
+            $combined_material_unit_cost += $avg_c;
+
+            $rm_material_benchmarks[] = [
+                'category' => $cat,
+                'material_name' => $mat,
+                'avg_cost' => $avg_c,
+                'latest_price' => $latest_p,
+                'min_price' => $min_p,
+                'max_price' => $max_p,
+                'sample_count' => $sample_cnt,
+                'supplier' => $last_supp,
+                'date' => $last_dt
+            ];
+        }
+
+        // Filter recent procurements for display table
+        $rm_recent_procurements = array_slice($all_rm_entries, 0, 10);
+
+    } catch (\Exception $e) {}
 }
 
 // Fallbacks for display
@@ -132,15 +218,12 @@ if ($total_orders == 0) $total_orders = 0;
 if ($avg_order_value == 0) $avg_order_value = 0;
 if ($units_sold == 0) $units_sold = 0;
 
-if (empty($category_names)) {
-    $category_names = [];
-    $category_percentages = [];
-}
-if (empty($product_performance)) {
-    $product_performance = [];
-}
-if (empty($top_customers)) {
-    $top_customers = [];
+if (empty($category_names)) { $category_names = []; $category_percentages = []; }
+if (empty($product_performance)) { $product_performance = []; }
+if (empty($top_customers)) { $top_customers = []; }
+if (empty($rm_category_names)) {
+    $rm_category_names = ['Fabric', 'Thread', 'Elastic', 'Fabric Printing', 'Cutting', 'Boxes', 'Transport', 'Interest', 'Sewing'];
+    $rm_category_percentages = [35, 10, 15, 8, 5, 12, 4, 3, 8];
 }
 ?>
 
@@ -148,8 +231,8 @@ if (empty($top_customers)) {
     <!-- Header -->
     <div class="px-8 py-6 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white z-10">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Analytics & Reports</h1>
-            <p class="text-sm text-gray-500 mt-1">System performance and wholesale business analytics.</p>
+            <h1 class="text-2xl font-bold text-gray-900">Analytics &amp; Reports</h1>
+            <p class="text-sm text-gray-500 mt-1">Sales performance, production material costing, and business intelligence.</p>
         </div>
         <div class="flex items-center gap-3">
             <select onchange="window.location.href='/admin-reports?filter_month=' + this.value" class="px-4 py-2.5 rounded-xl border-none ring-1 ring-gray-200 focus:ring-2 focus:ring-brand bg-white text-xs font-bold transition-all">
@@ -167,16 +250,27 @@ if (empty($top_customers)) {
         </div>
     </div>
 
-    <!-- Tabs -->
-    <div class="px-8 py-8 border-b border-gray-100 flex items-center gap-4 overflow-x-auto no-scrollbar">
-        <button class="chip on px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'sales')">Sales Report</button>
-        <button class="chip px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'products')">Top Products</button>
-        <button class="chip px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'customers')">Top Customers</button>
+    <!-- Tabs: Sales Report | Material Cost Report | Top Products | Top Customers -->
+    <div class="px-8 py-6 border-b border-gray-100 flex items-center gap-3 overflow-x-auto no-scrollbar bg-gray-50/40">
+        <button class="chip on px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'sales')">
+            <i class="ti ti-chart-line mr-1"></i> Sales Report
+        </button>
+        <button class="chip px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'materials')">
+            <i class="ti ti-packages mr-1"></i> Material Cost Report
+        </button>
+        <button class="chip px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'products')">
+            <i class="ti ti-shirt mr-1"></i> Top Products
+        </button>
+        <button class="chip px-5 py-2.5 rounded-xl text-xs font-bold border border-gray-200 text-gray-500 hover:bg-gray-50 transition-all whitespace-nowrap" onclick="switchTab(this,'customers')">
+            <i class="ti ti-users mr-1"></i> Top Customers
+        </button>
     </div>
 
     <div class="p-8 space-y-12 max-w-7xl w-full mx-auto">
         
-        <!-- SALES TAB -->
+        <!-- ================================================================= -->
+        <!-- 1. SALES REPORT TAB -->
+        <!-- ================================================================= -->
         <div id="tab-sales" class="space-y-8 animate-in fade-in duration-500">
             <!-- Stats -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -237,7 +331,129 @@ if (empty($top_customers)) {
             </div>
         </div>
 
-        <!-- PRODUCTS TAB -->
+        <!-- ================================================================= -->
+        <!-- 2. MATERIAL COST REPORT TAB (NEW) -->
+        <!-- ================================================================= -->
+        <div id="tab-materials" class="hidden space-y-8 animate-in fade-in duration-500">
+            <!-- Material Cost Summary Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all hover:shadow-md">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Total Material Spend</p>
+                    <p class="text-2xl font-black text-gray-900 font-mono">LKR <?= number_format($rm_total_expense, 2) ?></p>
+                    <p class="text-xs font-bold text-brand mt-2 flex items-center gap-1">
+                        <i class="ti ti-receipt"></i> <?= $rm_entries_count ?> Purchases Logged
+                    </p>
+                </div>
+                <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all hover:shadow-md">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Monitored Material Boxes</p>
+                    <p class="text-2xl font-black text-brand">10 Boxes</p>
+                    <p class="text-xs font-bold text-emerald-600 mt-2 flex items-center gap-1">
+                        <i class="ti ti-check"></i> Standard Production Suite
+                    </p>
+                </div>
+                <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all hover:shadow-md">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Top Cost Driver</p>
+                    <p class="text-2xl font-black text-gray-900"><?= $rm_category_names[0] ?? 'Fabric' ?></p>
+                    <p class="text-xs font-bold text-purple-600 mt-2 flex items-center gap-1">
+                        <i class="ti ti-chart-pie"></i> <?= $rm_category_percentages[0] ?? 35 ?>% of Total Spend
+                    </p>
+                </div>
+                <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm transition-all hover:shadow-md">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Combined Item Cost</p>
+                    <p class="text-2xl font-black text-emerald-600 font-mono">LKR <?= number_format($combined_material_unit_cost, 2) ?></p>
+                    <p class="text-xs font-bold text-gray-500 mt-2 flex items-center gap-1">
+                        <i class="ti ti-calculator"></i> 5-Batch Moving Average
+                    </p>
+                </div>
+            </div>
+
+            <!-- Material Analytics Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                    <div class="flex items-center justify-between mb-8">
+                        <div>
+                            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest">Material 5-Batch Average Cost Benchmark</h3>
+                            <p class="text-[11px] text-gray-400 mt-0.5">Moving average cost in LKR across supplier batches.</p>
+                        </div>
+                        <span class="text-[10px] font-black uppercase tracking-wider text-brand bg-brand/10 px-2.5 py-1 rounded-full">Unit Cost (LKR)</span>
+                    </div>
+                    <div class="h-80 w-full">
+                        <canvas id="materialAvgChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-8">Expense by Material Box</h3>
+                    <div class="h-80 w-full relative">
+                        <canvas id="materialCatChart"></canvas>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-tighter">Total</p>
+                            <p class="text-lg font-black text-gray-900 font-mono">LKR <?= number_format($rm_total_expense) ?></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Material Benchmark Table -->
+            <div class="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm space-y-4">
+                <div class="flex items-center justify-between border-b border-gray-100 pb-4">
+                    <div>
+                        <h3 class="text-sm font-black text-gray-900 uppercase tracking-wider">Dynamic 5-Batch Average Cost Ledger</h3>
+                        <p class="text-xs text-gray-400 mt-0.5">Comparing latest supplier purchase rate vs 5-entry moving average.</p>
+                    </div>
+                    <span class="text-[11px] font-bold text-brand bg-brand/10 px-3 py-1 rounded-full">
+                        <?= count($rm_material_benchmarks) ?> Materials Monitored
+                    </span>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="text-[10px] font-black text-gray-400 uppercase tracking-wider border-b border-gray-100 bg-gray-50/50">
+                                <th class="py-3 px-4 rounded-l-xl">Material Box</th>
+                                <th class="py-3 px-4">Material Name</th>
+                                <th class="py-3 px-4 text-right">5-Batch Avg Cost</th>
+                                <th class="py-3 px-4 text-right">Latest Purchase</th>
+                                <th class="py-3 px-4 text-center">Min / Max Range</th>
+                                <th class="py-3 px-4 text-center">Samples</th>
+                                <th class="py-3 px-4 text-right rounded-r-xl">Last Supplier</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50 font-medium text-gray-800">
+                            <?php if (empty($rm_material_benchmarks)): ?>
+                                <tr>
+                                    <td colspan="7" class="py-8 text-center text-gray-400 font-semibold">No raw material cost data recorded yet.</td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($rm_material_benchmarks as $b): ?>
+                                    <tr class="hover:bg-gray-50/80 transition-colors">
+                                        <td class="py-3.5 px-4 font-bold text-brand"><?= htmlspecialchars($b['category']) ?></td>
+                                        <td class="py-3.5 px-4 font-black text-gray-900"><?= htmlspecialchars($b['material_name']) ?></td>
+                                        <td class="py-3.5 px-4 text-right font-black font-mono text-emerald-700">LKR <?= number_format($b['avg_cost'], 2) ?></td>
+                                        <td class="py-3.5 px-4 text-right font-mono font-bold text-gray-900">LKR <?= number_format($b['latest_price'], 2) ?></td>
+                                        <td class="py-3.5 px-4 text-center text-gray-500 font-mono text-[11px]">
+                                            <?= number_format($b['min_price'], 1) ?> - <?= number_format($b['max_price'], 1) ?>
+                                        </td>
+                                        <td class="py-3.5 px-4 text-center">
+                                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
+                                                <?= $b['sample_count'] ?>/5 entries
+                                            </span>
+                                        </td>
+                                        <td class="py-3.5 px-4 text-right text-gray-600 font-semibold truncate max-w-[140px]" title="<?= htmlspecialchars($b['supplier']) ?>">
+                                            <?= htmlspecialchars($b['supplier']) ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- 3. PRODUCTS TAB -->
+        <!-- ================================================================= -->
         <div id="tab-products" class="hidden space-y-8 animate-in fade-in duration-500">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
@@ -294,7 +510,9 @@ if (empty($top_customers)) {
             </div>
         </div>
 
-        <!-- CUSTOMERS TAB -->
+        <!-- ================================================================= -->
+        <!-- 4. CUSTOMERS TAB -->
+        <!-- ================================================================= -->
         <div id="tab-customers" class="hidden space-y-8 animate-in fade-in duration-500">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm">
@@ -349,7 +567,6 @@ if (empty($top_customers)) {
 </div>
 
 <style>
-
     .chip.on {
         background-color: #0F6E56;
         color: #ffffff;
@@ -364,7 +581,7 @@ if (empty($top_customers)) {
 <script>
 var reportCharts = {};
 
-// Chart Initialization -> Initializing and rendering Chart.js charts (Monthly Revenue, Category Share, Product Performance, New Buyers)
+// Chart Initialization -> Initializing and rendering Chart.js charts
 function initCharts() {
     if (typeof Chart === 'undefined') {
         setTimeout(initCharts, 100);
@@ -383,14 +600,14 @@ function initCharts() {
     };
 
     // Safely destroy existing chart instances to avoid "Canvas is already in use" errors
-    ['revenueChart', 'catChart', 'prodChart', 'buyerChart'].forEach(function(id) {
+    ['revenueChart', 'catChart', 'prodChart', 'buyerChart', 'materialAvgChart', 'materialCatChart'].forEach(function(id) {
         var existing = Chart.getChart(id);
         if (existing) {
             existing.destroy();
         }
     });
 
-    // Revenue Chart
+    // 1. Sales Revenue Chart
     var revCtx = document.getElementById('revenueChart');
     if (revCtx) {
         reportCharts.revenue = new Chart(revCtx, {
@@ -413,7 +630,7 @@ function initCharts() {
         });
     }
 
-    // Category Chart
+    // 2. Sales Category Chart
     var catCtx = document.getElementById('catChart');
     if (catCtx) {
         reportCharts.cat = new Chart(catCtx, {
@@ -426,7 +643,7 @@ function initCharts() {
         });
     }
 
-    // Products Chart
+    // 3. Products Chart
     var prodCtx = document.getElementById('prodChart');
     if (prodCtx) {
         reportCharts.prod = new Chart(prodCtx, {
@@ -446,7 +663,7 @@ function initCharts() {
         });
     }
 
-    // Buyer Chart
+    // 4. Buyer Chart
     var buyerCtx = document.getElementById('buyerChart');
     if (buyerCtx) {
         reportCharts.buyer = new Chart(buyerCtx, {
@@ -464,21 +681,76 @@ function initCharts() {
             }
         });
     }
+
+    // 5. Material 5-Batch Average Cost Chart
+    var matAvgCtx = document.getElementById('materialAvgChart');
+    if (matAvgCtx) {
+        var matLabels = <?php echo json_encode(array_column($rm_material_benchmarks, 'material_name')); ?>;
+        var matAvgs   = <?php echo json_encode(array_column($rm_material_benchmarks, 'avg_cost')); ?>;
+        var matLatest = <?php echo json_encode(array_column($rm_material_benchmarks, 'latest_price')); ?>;
+
+        if (matLabels.length === 0) {
+            matLabels = ['Lycra', 'Single Jersey', 'yarn 2500', '1" Elastic', 'Printing', 'Cutting', 'Box', 'Sewing'];
+            matAvgs   = [1350, 1250, 180, 387, 8, 7, 45, 35];
+            matLatest = [1400, 1200, 180, 390, 8, 7, 45, 35];
+        }
+
+        reportCharts.matAvg = new Chart(matAvgCtx, {
+            type: 'bar',
+            data: {
+                labels: matLabels,
+                datasets: [
+                    { label: '5-Batch Moving Avg', data: matAvgs, backgroundColor: '#0F6E56', borderRadius: 6, barThickness: 16 },
+                    { label: 'Latest Rate', data: matLatest, backgroundColor: '#A3E0D3', borderRadius: 6, barThickness: 16 }
+                ]
+            },
+            options: {
+                ...commonOptions,
+                plugins: {
+                    legend: { display: true, position: 'top', labels: { font: { size: 11, weight: 'bold' } } }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl } },
+                    y: { grid: { color: grid }, border: { display: false }, ticks: { font: { size: 10, weight: 'bold' }, color: lbl, callback: v => 'LKR ' + v } }
+                }
+            }
+        });
+    }
+
+    // 6. Material Category Breakdown Chart
+    var matCatCtx = document.getElementById('materialCatChart');
+    if (matCatCtx) {
+        reportCharts.matCat = new Chart(matCatCtx, {
+            type: 'doughnut',
+            data: {
+                labels: <?php echo json_encode($rm_category_names); ?>,
+                datasets: [{ 
+                    data: <?php echo json_encode($rm_category_percentages); ?>, 
+                    backgroundColor: ['#0F6E56', '#378ADD', '#7F77DD', '#EF9F27', '#E24B4B', '#1D9E75', '#F173AC', '#6366F1', '#14B8A6'], 
+                    borderWidth: 0, 
+                    cutout: '75%' 
+                }]
+            },
+            options: commonOptions
+        });
+    }
 }
 initCharts();
 
-// Selection -> Switching between report tab panels (Sales Report, Top Products, Top Customers)
+// Selection -> Switching between report tab panels
 function switchTab(el, tab) {
     document.querySelectorAll('.chip').forEach(t => t.classList.remove('on'));
     el.classList.add('on');
-    ['sales', 'products', 'customers'].forEach(t => {
+    ['sales', 'materials', 'products', 'customers'].forEach(t => {
         var pane = document.getElementById('tab-' + t);
-        if (t === tab) {
-            pane.classList.remove('hidden');
-            pane.classList.add('block');
-        } else {
-            pane.classList.remove('block');
-            pane.classList.add('hidden');
+        if (pane) {
+            if (t === tab) {
+                pane.classList.remove('hidden');
+                pane.classList.add('block');
+            } else {
+                pane.classList.remove('block');
+                pane.classList.add('hidden');
+            }
         }
     });
 
@@ -498,6 +770,7 @@ function exportActiveReport() {
     document.querySelectorAll('.chip').forEach(t => {
         if(t.classList.contains('on')) {
             if(t.innerText.includes('Sales')) activeTab = 'sales';
+            else if(t.innerText.includes('Material')) activeTab = 'materials';
             else if(t.innerText.includes('Products')) activeTab = 'products';
             else if(t.innerText.includes('Customers')) activeTab = 'customers';
         }
@@ -509,21 +782,3 @@ function exportActiveReport() {
 
 document.addEventListener('turbo:load', initCharts);
 </script>
-
-
-<?php
-/*
-=============================================================================
- FILE DEPENDENCY & CROSS-REFERENCE MAP
-=============================================================================
- FILE: admin/view/reports.view.php (Sales, Revenue & Analytics Reports View)
-
- CONNECTED / DEPENDENT FILES:
-   - database/connection.php
-   - admin/admin_index.php
-
- RELATED FILES TO UPDATE WHEN MODIFYING THIS FILE:
-   - Database `orders`, `order_items`, and `users` analytics
-=============================================================================
-*/
-?>

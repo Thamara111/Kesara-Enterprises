@@ -534,10 +534,15 @@ async function generateQuotation() {
                               <div>Colombo, Sri Lanka</div>
                           </div>
                           <div style="text-align: right;">
-                              <h2>CUSTOMER QUOTATION</h2>
+                              <h2 style="margin: 0 0 8px 0; color: #0F6E56;">CUSTOMER QUOTATION</h2>
                               <div><strong>Quotation Ref:</strong> ${orderRef}</div>
                               <div><strong>Date:</strong> ${new Date().toLocaleDateString()}</div>
-                              <div><strong>Payment Method:</strong> ${paymentMethod.toUpperCase()}</div>
+                              <div style="margin-top: 6px;">
+                                  <strong>Payment Method:</strong> 
+                                  <span style="display: inline-block; padding: 3px 10px; border-radius: 6px; font-weight: bold; font-size: 12px; background: ${paymentMethod === 'credit' ? '#e0f2fe' : '#dcfce7'}; color: ${paymentMethod === 'credit' ? '#0369a1' : '#15803d'}; border: 1px solid ${paymentMethod === 'credit' ? '#7dd3fc' : '#86efac'};">
+                                      ${paymentMethod === 'credit' ? 'CREDIT (30 Days Account Term)' : 'CASH (Cash on Delivery / Pickup)'}
+                                  </span>
+                              </div>
                           </div>
                       </div>
                       <p>Thank you for placing your quotation request. Your order has been submitted to the Kesara Enterprises system for review.</p>
@@ -558,6 +563,15 @@ async function generateQuotation() {
                           <div>Subtotal: LKR ${total.toLocaleString(undefined, {minimumFractionDigits:2})}</div>
                           <div>VAT (18%): LKR ${vat.toLocaleString(undefined, {minimumFractionDigits:2})}</div>
                           <div style="font-size: 20px; font-weight: bold; color: #0F6E56; margin-top: 8px;">Estimated Total: LKR ${grandTotal.toLocaleString(undefined, {minimumFractionDigits:2})}</div>
+                      </div>
+
+                      <div style="margin-top: 25px; padding: 14px 18px; background-color: ${paymentMethod === 'credit' ? '#f0f9ff' : '#f0fdf4'}; border: 1px solid ${paymentMethod === 'credit' ? '#bae6fd' : '#bbf7d0'}; border-radius: 12px; text-align: left;">
+                          <div style="font-weight: bold; color: ${paymentMethod === 'credit' ? '#0369a1' : '#15803d'}; font-size: 13px;">
+                              Selected Payment Option: ${paymentMethod === 'credit' ? 'Wholesale Credit Account Term (30 Days Credit)' : 'Cash Payment (Cash on Pickup / Delivery)'}
+                          </div>
+                          <div style="font-size: 11px; color: #64748b; margin-top: 2px;">
+                              ${paymentMethod === 'credit' ? 'This order will be processed under wholesale credit terms following standard verification.' : 'Payment is due upon order collection or physical delivery handover.'}
+                          </div>
                       </div>
 
                       <div class="contact-box">

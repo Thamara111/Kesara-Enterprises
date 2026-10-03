@@ -47,9 +47,9 @@ if (isset($_SESSION['admin_id'])) {
 
     // Matrix defining which views each administrative role is allowed to access
     $role_access = [
-        'admin' => ['dashboard', 'orders', 'invoices', 'products', 'categories', 'customers', 'users', 'inventory', 'reports', 'suppliers', 'purchase_orders', 'goods_received', 'raw_materials', 'raw_materials_cutting', 'damage_goods', 'goods_return', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
-        'finance_manager' => ['dashboard', 'orders', 'invoices', 'products', 'categories', 'inventory', 'reports', 'login', 'inquiries', 'trash'],
-        'supplier_manager' => ['dashboard', 'suppliers', 'purchase_orders', 'goods_received', 'raw_materials', 'raw_materials_cutting', 'damage_goods', 'goods_return', 'login', 'inquiries'],
+        'admin' => ['dashboard', 'orders', 'invoices', 'products', 'categories', 'customers', 'users', 'inventory', 'b_grade_stock', 'reports', 'suppliers', 'purchase_orders', 'goods_received', 'raw_materials', 'raw_materials_cutting', 'damage_goods', 'goods_return', 'personnel', 'assignments', 'tracking', 'login', 'trash', 'inquiries', 'whatsapp', 'audit_trail'],
+        'finance_manager' => ['dashboard', 'orders', 'invoices', 'products', 'categories', 'inventory', 'b_grade_stock', 'reports', 'login', 'inquiries', 'trash'],
+        'supplier_manager' => ['dashboard', 'suppliers', 'purchase_orders', 'goods_received', 'raw_materials', 'raw_materials_cutting', 'damage_goods', 'b_grade_stock', 'goods_return', 'login', 'inquiries'],
         'delivery_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries'],
         'example_manager' => ['dashboard', 'personnel', 'assignments', 'tracking', 'login', 'inquiries']
     ];
@@ -99,6 +99,11 @@ $view_config = [
         'description' => 'Manage stock levels and warehouse replenishment.',
         'show_sidebar' => true
     ],
+    'b_grade_stock' => [
+        'title' => 'B-Grade Stock Management | Kesara Enterprises',
+        'description' => 'Track and manage secondary/B-grade product inventory.',
+        'show_sidebar' => true
+    ],
     'customers' => [
         'title' => 'Customer Management | Kesara Enterprises',
         'description' => 'Manage wholesale buyer accounts and verification.',
@@ -135,13 +140,13 @@ $view_config = [
         'show_sidebar' => true
     ],
     'damage_goods' => [
-        'title' => 'Damage Goods | Kesara Enterprises',
-        'description' => 'Record and manage B-grade damage goods.',
+        'title' => 'Damage Goods & B-Grade Logs | Kesara Enterprises',
+        'description' => 'Record and manage damaged goods and B-grade inspection logs.',
         'show_sidebar' => true
     ],
     'goods_return' => [
-        'title' => 'Goods Return | Kesara Enterprises',
-        'description' => 'Record and manage returned goods.',
+        'title' => 'Sales Goods Return | Kesara Enterprises',
+        'description' => 'Record and manage sales customer and dealer goods returns.',
         'show_sidebar' => true
     ],
     'personnel' => [

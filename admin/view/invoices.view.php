@@ -61,6 +61,12 @@ if (isset($pdo) && $pdo !== null) {
             FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        // Ensure customer_order_number column exists
+        $checkOrderNum = $pdo->query("SHOW COLUMNS FROM invoices LIKE 'customer_order_number'");
+        if (!$checkOrderNum->fetch()) {
+            $pdo->exec("ALTER TABLE invoices ADD COLUMN customer_order_number VARCHAR(100) NULL AFTER br_number");
+        }
+
         // Ensure size column exists
         $checkSize = $pdo->query("SHOW COLUMNS FROM invoice_items LIKE 'size'");
         if (!$checkSize->fetch()) {
@@ -359,7 +365,7 @@ if (isset($pdo) && $pdo !== null) {
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-[10px] font-bold uppercase text-gray-400">Phone Number</label>
                             <input type="text" id="cust_phone" placeholder="+94 7X XXX XXXX" class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold">
@@ -367,6 +373,10 @@ if (isset($pdo) && $pdo !== null) {
                         <div>
                             <label class="block text-[10px] font-bold uppercase text-gray-400">Email Address</label>
                             <input type="email" id="cust_email" placeholder="customer@email.com" class="w-full px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold uppercase text-gray-400">Customer Order Number</label>
+                            <input type="text" id="cust_order_number" name="customer_order_number" placeholder="e.g. PO-7890 / ORD-123" class="w-full px-3 py-1.5 bg-white border border-brand/40 rounded-lg text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand">
                         </div>
                     </div>
 
@@ -564,6 +574,7 @@ if (isset($pdo) && $pdo !== null) {
                     <p id="view_cust_address" class="text-xs text-gray-600 mt-1">Billing Address</p>
                 </div>
                 <div class="text-right text-xs text-gray-600 space-y-0.5">
+                    <p>Customer Order No: <span id="view_cust_order_no" class="font-bold text-gray-900 font-mono">-</span></p>
                     <p>Phone: <span id="view_cust_phone" class="font-semibold text-gray-800">-</span></p>
                     <p>Email: <span id="view_cust_email" class="font-semibold text-gray-800">-</span></p>
                     <p>BR No: <span id="view_cust_br" class="font-semibold text-gray-800">-</span></p>
@@ -936,6 +947,7 @@ function handleSaveInvoice(e) {
         customer_name: document.getElementById('cust_name').value,
         customer_phone: document.getElementById('cust_phone').value,
         customer_email: document.getElementById('cust_email').value,
+        customer_order_number: document.getElementById('cust_order_number').value.trim(),
         customer_address: document.getElementById('cust_address').value,
         br_number: document.getElementById('cust_br').value,
         invoice_number: document.getElementById('inv_number').value,
@@ -998,6 +1010,7 @@ function viewInvoice(id) {
                 document.getElementById('view_cust_business').textContent = inv.business_name || inv.customer_name;
                 document.getElementById('view_cust_contact').textContent = 'Attn: ' + (inv.customer_name || 'N/A');
                 document.getElementById('view_cust_address').textContent = inv.customer_address || 'Address Not Specified';
+                document.getElementById('view_cust_order_no').textContent = inv.customer_order_number || '-';
                 document.getElementById('view_cust_phone').textContent = inv.customer_phone || '-';
                 document.getElementById('view_cust_email').textContent = inv.customer_email || '-';
                 document.getElementById('view_cust_br').textContent = inv.br_number || '-';

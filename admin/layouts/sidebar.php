@@ -151,6 +151,10 @@ if (isset($pdo)) {
                 <i class="ti ti-package text-xl"></i>
                 Inventory
             </a>
+            <a href="/admin-b-grade-stock" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'b_grade_stock' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <i class="ti ti-boxes text-xl"></i>
+                B-Grade Stock
+            </a>
             <a href="/admin-reports" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'reports' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                 <i class="ti ti-chart-bar text-xl"></i>
                 Reports
@@ -193,9 +197,9 @@ if (isset($pdo)) {
                     <i class="ti ti-alert-triangle text-lg"></i>
                     Damage Goods
                 </a>
-                <a href="/admin-goods-return" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo $current_page === 'goods_return' ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
+                <a href="/admin-goods-return" class="flex items-center gap-4 w-full px-5 py-3 rounded-xl text-sm font-bold transition-all <?php echo ($current_page === 'goods_return' || $current_page === 'sales_goods_return') ? 'bg-brand-light text-brand shadow-lg shadow-brand/10' : 'text-gray-400 hover:bg-white/5 hover:text-white'; ?>">
                     <i class="ti ti-arrow-back-up text-lg"></i>
-                    Goods Return
+                    Sales Goods Return
                 </a>
             </div>
         </div>
